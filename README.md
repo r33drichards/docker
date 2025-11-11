@@ -23,7 +23,8 @@ If port `6697` or `6667` are already in use another random port is used. Otherwi
 First, a simple run command:
 
 ```console
-$ docker run --name ircd -p 6667:6667 inspircd/inspircd-docker
+$ 
+docker run --name ircd -p 0.0.0.0:6667:6667 inspircd/inspircd-docker
 ```
 
 This will start an InspIRCd instance listening on the default IRC port 6667 on the container.
@@ -108,6 +109,15 @@ We provide two possibly ways to define a default oper for the server.
 If neither `INSP_OPER_PASSWORD_HASH`, nor `INSP_OPER_FINGERPRINT` is configured, no oper will be provided to keep your server secure.
 
 Further details see official [`opers.conf` docs](https://github.com/inspircd/inspircd/blob/insp4/docs/conf/opers.example.conf).
+
+### Bot Oper Configuration
+
+For IRC bots that need to bypass flood protection, we provide a pre-configured bot oper setup:
+- Configuration file: `conf/bot-oper.conf`
+- Documentation: `conf/BOT-OPER-README.md`
+- Test script: `tests/test_bot_flood.py`
+
+This configuration grants flood bypass privileges (`users/flood/no-throttle`, `users/flood/no-fakelag`, `users/flood/increased-buffers`) to allow bots to send messages rapidly without being throttled. See the README for setup instructions and security considerations.
 
 ### Password authentication
 

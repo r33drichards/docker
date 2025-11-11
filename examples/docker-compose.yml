@@ -1,0 +1,84 @@
+version: '3.8'
+
+# Example docker-compose configuration for InspIRCd with Bot Oper support
+#
+# This example shows how to set up InspIRCd with the bot oper configuration
+# to allow IRC bots to bypass flood protection.
+#
+# Usage:
+#   1. Copy this file to your project directory
+#   2. Create a conf.d directory with bot-oper.conf
+#   3. Run: docker-compose -f docker-compose-bot.yml up -d
+#
+# To test:
+#   python3 ../tests/test_bot_flood.py
+
+services:
+  inspircd:
+    image: inspircd/inspircd-docker:latest
+    container_name: inspircd-bot-test
+
+    ports:
+      # IRC plaintext port
+      - "6667:6667"
+      # IRC SSL/TLS port
+      - "6697:6697"
+
+    # Mount custom configuration
+    volumes:
+      # Mount the conf.d directory containing bot-oper.conf
+      # The file will be automatically included by InspIRCd
+      - ./conf.d:/inspircd/conf.d:ro
+
+      # Optionally mount a custom main config
+      # - ./inspircd.conf:/inspircd/conf/inspircd.conf:ro
+
+    environment:
+      # Network configuration
+      INSP_NET_NAME: "BotTestNet"
+      INSP_SERVER_NAME: "irc.bottest.example.com"
+
+      # Admin info
+      INSP_ADMIN_NAME: "IRC Admin"
+      INSP_ADMIN_DESC: "Network Administrator"
+      INSP_ADMIN_EMAIL: "admin@example.com"
+
+      # Disable DNSBL for faster testing
+      INSP_ENABLE_DNSBL: "no"
+
+      # Optional: Set a connection password
+      # INSP_CONNECT_PASSWORD: "your_server_password"
+      # INSP_CONNECT_HASH: "bcrypt"
+
+      # Optional: Create a standard admin oper account
+      # INSP_OPER_NAME: "admin"
+      # INSP_OPER_PASSWORD_HASH: "your_hashed_password"
+      # INSP_OPER_HASH: "bcrypt"
+
+    restart: unless-stopped
+
+    # Resource limits (optional)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2'
+    #       memory: 512M
+
+# If you want to run the test automatically
+#  bot-test:
+#    image: python:3.11-slim
+#    container_name: bot-flood-test
+#    depends_on:
+#      - inspircd
+#    volumes:
+#      - ../tests:/tests:ro
+#    command: >
+#      sh -c "
+#        sleep 5 &&
+#        python3 /tests/test_bot_flood.py
+#          --host inspircd
+#          --port 6667
+#          --messages 100
+#          --delay 0.01
+#      "
+#    restart: "no"
