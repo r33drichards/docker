@@ -186,3 +186,37 @@ cat <<EOF
 EOF
 
 fi
+
+#-#-#-#-#-#-#-#-#-#-#-#-  BOT OPER (flood bypass)   -#-#-#-#-#-#-#-#-#-#
+#   Optional oper account for a trusted bot that needs to bypass
+#   flood protection (no throttle / no fakelag / larger buffers).
+#   Enabled when INSP_BOT_OPER_PASSWORD (plaintext) or
+#   INSP_BOT_OPER_PASSWORD_HASH (hashed) is set. Safe for a single-user server.
+if [ "${INSP_BOT_OPER_PASSWORD_HASH}" != "" ] || [ "${INSP_BOT_OPER_PASSWORD}" != "" ]; then
+if [ "${INSP_BOT_OPER_PASSWORD_HASH}" != "" ]; then
+    BOT_PW_ATTRS="hash=\"${INSP_BOT_OPER_HASH:-hmac-sha256}\" password=\"${INSP_BOT_OPER_PASSWORD_HASH}\""
+else
+    BOT_PW_ATTRS="password=\"${INSP_BOT_OPER_PASSWORD}\""
+fi
+cat <<EOF
+<class
+     name="BotUser"
+     commands="PRIVMSG NOTICE PART JOIN NICK USER QUIT MODE NAMES LIST TOPIC KICK WHO WHOIS AWAY PING PONG"
+     privs="users/flood/no-throttle users/flood/no-fakelag users/flood/increased-buffers"
+     usermodes=""
+     chanmodes=""
+     snomasks="">
+
+<type
+    name="BotType"
+    classes="BotUser"
+    maxchans="256">
+
+<oper
+      name="${INSP_BOT_OPER_NAME:-BotUser}"
+      ${BOT_PW_ATTRS}
+      host="${INSP_BOT_OPER_HOST:-*@*}"
+      sslonly="${INSP_BOT_OPER_SSLONLY:-no}"
+      type="BotType">
+EOF
+fi
