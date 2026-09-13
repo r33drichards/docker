@@ -257,6 +257,43 @@ Currently used secrets:
 * `inspircd.key`
 * `inspircd.crt`
 
+## Statistics over HTTP
+
+InspIRCd can serve server statistics as XML over HTTP through the `httpd` and
+`httpd_stats` modules. This is how an external collector turns the server into
+metrics; see
+[inspircd-otel-exporter](https://github.com/r33drichards/inspircd-otel-exporter)
+for one that forwards them to an OpenTelemetry endpoint.
+
+The listener is **disabled by default**, because `/stats` exposes sensitive
+information about connected users, including their hosts and IP addresses.
+Only enable it on a network you trust, and set `INSP_HTTPD_PASSWORD` so the
+`httpd_acl` module requires HTTP basic authentication.
+
+| Variable               | Default      | Description                                             |
+|------------------------|--------------|---------------------------------------------------------|
+|`INSP_HTTPD_ENABLE`     |`no`          |Set to `yes` to load the modules and open the listener   |
+|`INSP_HTTPD_PORT`       |`8067`        |Port the HTTP listener binds to                          |
+|`INSP_HTTPD_ADDRESS`    |all interfaces|Address to bind to. Leave empty for dual-stack IPv4+IPv6 |
+|`INSP_HTTPD_TIMEOUT`    |`20`          |Seconds before an idle HTTP connection is closed         |
+|`INSP_HTTPD_USERNAME`   |`stats`       |HTTP basic authentication username for `/stats`          |
+|`INSP_HTTPD_PASSWORD`   |no default    |HTTP basic authentication password. Unset means no ACL   |
+
+Leave `INSP_HTTPD_ADDRESS` empty unless you need a single address family.
+InspIRCd only enables dual-stack sockets for an empty address; an explicit
+`::` sets `IPV6_V6ONLY`, which stops IPv4 clients connecting.
+
+```console
+$ docker run --name inspircd -p 6667:6667 \
+    -e "INSP_HTTPD_ENABLE=yes" \
+    -e "INSP_HTTPD_PASSWORD=s3cret" \
+    inspircd/inspircd-docker
+$ curl -u stats:s3cret http://127.0.0.1:8067/stats/general
+```
+
+The paths are `/stats` (everything), `/stats/general` (counters only) and
+`/stats/users`.
+
 ## Generic configuration includes
 
 To extend the default configuration you can use `/inspircd/conf.d/`.
