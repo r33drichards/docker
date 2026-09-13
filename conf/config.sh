@@ -28,6 +28,7 @@ cat <<EOF
 
 # Connect block section
 <define name="usednsbl" value="${INSP_ENABLE_DNSBL:-yes}">
+<define name="maxchans" value="${INSP_MAXCHANS:-256}">
 <define name="connecthash" value="${INSP_CONNECT_HASH}">
 <define name="connectpassword" value="${INSP_CONNECT_PASSWORD}">
 EOF

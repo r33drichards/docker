@@ -66,6 +66,7 @@ Use the following environment variables to configure your container:
 |`INSP_ENABLE_DNSBL`      |`yes`                           |Set to `no` to disable DNSBLs                 |
 |`INSP_CONNECT_PASSWORD`  |no default                      |Password either as plaintext, or hash value   |
 |`INSP_CONNECT_HASH`      |no default                      |Hashing algorithm for `INSP_CONNECT_PASSWORD` |
+|`INSP_MAXCHANS`          |`256`                           |Maximum channels a user may join at once      |
 
 A quick example how to use the environment variables:
 
