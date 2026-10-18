@@ -4,13 +4,14 @@
  */
 
 #include "inspircd.h"
+#include "parsed_command.h"
 
 class ModulePreCommand final
 	: public Module
 {
 public:
 	ModulePreCommand()
-		: Module(VF_NONE, "Logs the shape of validated parsed commands with parameter values redacted.")
+		: Module(VF_NONE, "Logs an unredacted representation of validated parsed commands for debugging.")
 	{
 	}
 
@@ -21,18 +22,13 @@ public:
 		// text is not copied into the log.
 		if (validated)
 		{
-			std::string params;
-			for (size_t index = 0; index < parameters.size(); ++index)
-			{
-				if (index)
-					params += ',';
-				params += "\"<redacted>\"";
-			}
+			// Copy the full parsed values; never retain references to parser buffers.
+			// This snapshot exists only for this callback, with no queue or export.
+			const ParsedCommand parsed{command, parameters};
 
-			// Parameter values, tags, raw lines, and user identity are never logged.
-			ServerInstance->Logs.Normal(MODNAME,
-				"command={} params=[{}] parameter_count={} validated=true",
-				command, params, parameters.size());
+			// Debug output includes full values, including credentials and private
+			// messages. Repr escapes bytes to prevent log-line injection.
+			ServerInstance->Logs.Normal(MODNAME, "{} validated=true", parsed.Repr());
 		}
 		return MOD_RES_PASSTHRU;
 	}

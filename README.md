@@ -348,12 +348,19 @@ You can put the sources these modules in the modules directory of this repositor
 It also allows you to overwrite modules.
 
 
-### Included pre-command hook (InspIRCd 4)
+### Included pre-command debug hook (InspIRCd 4)
+
+**Warning: this opt-in debugging module logs unredacted command parameters.**
+Passwords, SASL payloads, operator credentials, channel keys, service
+authentication, private messages, and identifying parameters can enter server
+logs and any log collectors. Use only with synthetic data or where this capture
+is explicitly intended. Leave it unloaded on normal production servers. Escaping
+prevents log-line injection; it does **not** hide secrets.
 
 This repository includes `modules/m_precommand.cpp`. The Docker build compiles
 it into `m_precommand.so`, but it is **not loaded by default**. It observes
-InspIRCd's `OnPreCommand` hook and prints the parsed command's shape to the
-normal-level `m_precommand` server log. To load it and send that log to stdout:
+InspIRCd's `OnPreCommand` hook and logs at normal level under `m_precommand`.
+For an isolated debugging server, load it and route its output to stdout:
 
 ```sh
 docker build -t inspircd:precommand .
@@ -361,40 +368,44 @@ cat > precommand.conf <<'CONF'
 <module name="precommand">
 <log method="stdout" level="normal" type="m_precommand">
 CONF
-docker run --rm -p 6667:6667 \
+docker run --rm -p 127.0.0.1:6667:6667 \
   -v "$(pwd)/precommand.conf:/inspircd/conf.d/precommand.conf:ro" inspircd:precommand
 ```
 
-For example, a client sending `/quote PING :hello` produces this record (with
-the server's normal log prefix):
+For each validated callback, the module copies the full parsed values into an
+owned `ParsedCommand` struct (`modules/parsed_command.h`): `command` is a
+`std::string` and `parameters` is a `std::vector<std::string>`. Argument order,
+spaces, empty values, and arbitrary bytes are preserved without keeping
+references to parser buffers. The snapshot lives only within that callback;
+there is no queue or network exporter. Normal destruction is not a secure-memory
+erasure guarantee. Its printed representation is retained by configured logs.
+
+For example, `/quote PING :hello` produces this record after the server log prefix:
 
 ```text
-command=PING params=["<redacted>"] parameter_count=1 validated=true
+ParsedCommand{command="PING", parameters=["hello"]} validated=true
 ```
 
-The command name, parameter count, and parameter array shape are visible;
-**every parameter value is redacted**, including ordinary text. Tags, raw lines,
-and user identities are not printed. This avoids exposing passwords, SASL
-payloads, operator credentials, WEBIRC credentials, channel keys, service
-authentication, and sensitive text passed to custom commands. There is no
-option to print unredacted values. Other server logging modules/settings are
-independent and may have different privacy behavior.
+`Repr()` prints every value without redaction. Quotes and backslashes are escaped;
+control and non-ASCII bytes use fixed-width `\xHH` escapes. For example, a UTF-8
+`café` parameter is represented as `"caf\xc3\xa9"`. This is a byte-preserving
+C-style representation, not JSON; it is deterministic and always one ASCII line.
+The raw IRC line, message tags, and the separate user object are not collected,
+but identities and secrets occurring in command parameters are printed in full.
 
-The hook only prints the `validated=true` stage, avoiding the usual duplicate
-pre-/post-validation callbacks. Core-synthesized commands (such as LUSERS and
-MOTD during registration) and callbacks invoked by other modules can also appear.
-Commands rejected before validation (including
-unknown commands, missing parameters, and permission failures) are not printed.
-A record means core validation passed, not that the command handler succeeded.
-Parameters reflect the parser's command-specific joining and empty-argument
-handling at this stage. The hook always returns `MOD_RES_PASSTHRU`: it does not
-change commands, parameters, routing, or responses, and sends no user replies.
-This is a diagnostic module; leave it unloaded when continuous command metadata
-logging is unnecessary.
+Only the `validated=true` stage is printed, avoiding the normal duplicate
+pre-/post-validation callbacks. Unknown commands, missing-parameter commands,
+and permission failures rejected before this stage are excluded. Core-generated
+LUSERS/MOTD and callbacks invoked by other modules can also appear. A record
+means core validation passed, not that the command handler succeeded. Parameters
+reflect command-specific joining and empty-argument handling at this stage.
+The hook always returns `MOD_RES_PASSTHRU`: it does not mutate or block commands,
+change routing, or send user replies.
 
 `./run_tests.sh` discovers `tests/precommand.sh`, which uses Python 3 on the host
-to check opt-in loading, parsed shapes, redaction, and unchanged client behavior
-against the `inspircd:testing` image.
+and synthetic data to check opt-in logging, exact captured values, escaping, and
+unchanged client behavior against `inspircd:testing`. `tests/precommand_struct.sh`
+uses a host C++ compiler (`CXX`, or `c++`) to test ownership and the representation.
 
 Make sure you install all needed dependencies using `ADDPACKAGES`.
 

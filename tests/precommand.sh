@@ -1,5 +1,5 @@
 #!/bin/sh
-# Check default and opt-in hook behavior, including output privacy.
+# Check default and opt-in hook behavior, using synthetic data only.
 set -eu
 
 TESTDIR=$(mktemp -d)
@@ -20,7 +20,7 @@ trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 
 # cap, account, and gateway are already loaded by the image's default config.
-# Register AUTHENTICATE too, to exercise redaction even when its handler fails.
+# Register AUTHENTICATE too, to check full values even when its handler fails.
 printf '<module name="sasl">\n<sasl target="services.test">\n' > "$TESTDIR/precommand.conf"
 for mode in unloaded loaded; do
     if [ "$mode" = loaded ]; then

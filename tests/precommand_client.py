@@ -76,7 +76,7 @@ def main():
         lines = observer.until(lambda line: " PRIVMSG hookobserver :" in line)
         assert any(line.endswith(":private-message-secret two  spaces café") for line in lines), lines
 
-        # Failed handlers still pass core validation. Every argument is redacted.
+        # Failed handlers still pass core validation. All values here are synthetic.
         caller.send("OPER operator-name-secret operator-password-secret")
         caller.send("PASS connection-password-secret")
         caller.send("AUTHENTICATE sasl-payload-secret")
