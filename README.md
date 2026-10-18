@@ -485,3 +485,7 @@ You can also reach many of the project maintainers via the `#inspircd` IRC chann
 ## Contributing
 
 You are invited to contribute new features, fixes, or updates, large or small; we are always thrilled to receive pull requests and do our best to process them as fast as we can.
+
+## Optional JavaScript and WebAssembly hooks
+
+See [JAVASCRIPT.md](JAVASCRIPT.md) for the opt-in V8 image, pre/post command callbacks, configurable script files/directories, local Wasm assets, and explicit user/admin mutation authority. The original image remains unchanged.

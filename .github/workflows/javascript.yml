@@ -1,0 +1,25 @@
+name: Optional JavaScript module
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  javascript:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        inspircd: [v4.8.0, v4.12.1]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build optional V8 image and test runtime
+        run: |
+          docker build -f Dockerfile.javascript --target builder --build-arg VERSION=${{ matrix.inspircd }} -t javascript-builder .
+          docker run --rm --entrypoint sh -v "$PWD:/repo:ro" javascript-builder -c 'cd /repo && sh tests/js_runtime.sh && sh tests/js_script_loader.sh'
+          docker build -f Dockerfile.javascript --build-arg VERSION=${{ matrix.inspircd }} -t javascript-testing .
+      - name: Test native command bridge inside Alpine
+        run: |
+          docker run --rm --user root --entrypoint sh -v "$PWD:/repo:ro" javascript-testing -c 'apk add --no-cache python3 && su inspircd -s /bin/sh -c "INSPIRCD_NATIVE=/inspircd python3 /repo/tests/javascript_native.py"'
+      - name: Verify generated binding inventory
+        run: sh tests/js_bindings.sh
