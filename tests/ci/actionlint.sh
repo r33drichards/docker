@@ -14,4 +14,4 @@ printf '%s  %s\n' "$SHA256" "$DIR/actionlint.tar.gz" | sha256sum -c -
 tar -xzf "$DIR/actionlint.tar.gz" -C "$DIR" actionlint
 cd "$ROOT"
 "$DIR/actionlint" -version
-"$DIR/actionlint" -color
+"$DIR/actionlint" -color .github/workflows/*.yml

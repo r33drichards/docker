@@ -15,6 +15,8 @@ defaults:
     shell: bash
 jobs:
   quality:
+    env:
+      PIP_CACHE_DIR: /tmp/quality-pip-cache
     runs-on: ubuntu-22.04
     container: debian:trixie
     timeout-minutes: 10
@@ -28,7 +30,7 @@ jobs:
           apt-get install -y --no-install-recommends ca-certificates curl git python3 python3-venv clang-format-19 shellcheck cppcheck
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: ~/.cache/pip
+          path: /tmp/quality-pip-cache
           key: ruff-trixie-0.16.9
       - name: Formatting, lint, generated files, and workflow lint
         run: |
