@@ -60,7 +60,8 @@ check_python()
 
 check_python \
     tools/generate_js_bindings.py tests/test_generate_js_bindings.py tests/test_authorize_heavy.py \
-    tests/javascript_native.py tests/precommand_client.py tests/precommand_log.py \
+    tests/javascript_native.py tests/precommand_client.py tests/test_precommand_client.py \
+    tests/precommand_log.py \
     tests/ci/*.py tests/fuzz/*.py
 
 "$SHELLCHECK" --severity=style \
@@ -72,4 +73,5 @@ check_python \
 "$PYTHON" tools/generate_js_bindings.py --check
 "$PYTHON" tests/test_generate_js_bindings.py
 "$PYTHON" tests/test_authorize_heavy.py
+"$PYTHON" tests/test_precommand_client.py
 printf '%s\n' 'PASS: C++/Python formatting, static analysis, shell lint, generator drift, and CI selector tests'

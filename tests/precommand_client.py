@@ -4,24 +4,43 @@
 import argparse
 import socket
 import time
+from contextlib import suppress
 
 
 class Client:
     def __init__(self, host, port, nick):
+        self.nick = nick
+        self.sock = None
         deadline = time.monotonic() + 90
+
+        def remaining():
+            seconds = deadline - time.monotonic()
+            if seconds <= 0:
+                raise TimeoutError("Initial IRC registration did not complete within 90 seconds")
+            return seconds
+
+        # Docker's proxy can accept TCP while the entrypoint is still preparing
+        # the daemon. Readiness requires successful registration, not just TCP.
         while True:
+            registered = False
             try:
-                self.sock = socket.create_connection((host, port), timeout=1)
-                break
+                self.sock = socket.create_connection((host, port), timeout=min(1, remaining()))
+                self.buffer = b""
+                for line in (f"NICK {nick}", f"USER {nick} 0 * :Hook test"):
+                    self.sock.settimeout(min(1, remaining()))
+                    self.send(line)
+                self.until(lambda line: f" 001 {nick} " in line, timeout=min(15, remaining()))
+                registered = True
+                return
             except OSError:
                 if time.monotonic() >= deadline:
                     raise
-                time.sleep(0.2)
-        self.nick = nick
-        self.buffer = b""
-        self.send(f"NICK {nick}")
-        self.send(f"USER {nick} 0 * :Hook test")
-        self.until(lambda line: f" 001 {nick} " in line)
+            finally:
+                if not registered and self.sock is not None:
+                    with suppress(OSError):
+                        self.sock.close()
+                    self.sock = None
+            time.sleep(min(0.2, max(0, deadline - time.monotonic())))
 
     def send(self, line):
         self.sock.sendall((line + "\r\n").encode("utf-8"))
