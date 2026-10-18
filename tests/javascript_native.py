@@ -161,7 +161,22 @@ def main():
                 reload("ircd.on('postCommand', e => { throw Error('post failed'); });")
                 caller.barrier('post-error-cannot-undo')
                 caller.barrier('post-only-does-not-lock-pre')
-                print('PASS: native rewrite, Wasm, deny/effect discard, user/admin mutation, atomic reload, timeout, post failure')
+                script.write_text(GOOD)
+                config.write_text(base.replace('<module name="javascript">', '') + f'<javascript file="{script}">\n')
+                offset = (path / 'server.log').stat().st_size
+                server.send_signal(signal.SIGHUP)
+                deadline = time.monotonic() + 15
+                while 'The m_javascript.so module was unloaded' not in (path / 'server.log').read_text()[offset:]:
+                    assert time.monotonic() < deadline, 'Module unload did not complete'
+                    assert server.poll() is None
+                    time.sleep(.1)
+                caller.send('XWASM')
+                lines = caller.barrier('after-module-unload')
+                assert any(' XWASM :Unknown command' in line for line in lines), lines
+                reload(GOOD)
+                caller.send('XWASM')
+                caller.until(lambda line: ' PONG ' in line and line.endswith('42'))
+                print('PASS: native rewrite, Wasm, authority, failclosed/reload, and actual module unload/reload')
             except Exception:
                 print((path / 'server.log').read_text())
                 raise
