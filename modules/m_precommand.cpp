@@ -1,5 +1,5 @@
 /*
- * An observational pre-command hook for InspIRCd 4.
+ * Observational pre- and post-command hooks for InspIRCd 4.
  * SPDX-License-Identifier: MIT
  */
 
@@ -11,7 +11,7 @@ class ModulePreCommand final
 {
 public:
 	ModulePreCommand()
-		: Module(VF_NONE, "Logs an unredacted representation of validated parsed commands for debugging.")
+		: Module(VF_NONE, "Logs unredacted pre- and post-command snapshots for debugging.")
 	{
 	}
 
@@ -28,10 +28,23 @@ public:
 
 			// Debug output includes full values, including credentials and private
 			// messages. Repr escapes bytes to prevent log-line injection.
-			ServerInstance->Logs.Normal(MODNAME, "{} validated=true", parsed.Repr());
+			ServerInstance->Logs.Normal(MODNAME, "stage=OnPreCommand {} validated=true", parsed.Repr());
 		}
 		return MOD_RES_PASSTHRU;
 	}
+
+	void OnPostCommand(Command* command, const CommandBase::Params& parameters, LocalUser* user, CmdResult result, bool loop) override
+	{
+		const ParsedCommand parsed{command->name, parameters};
+		const char* resultname = "INVALID";
+		if (result == CmdResult::SUCCESS)
+			resultname = "SUCCESS";
+		else if (result == CmdResult::FAILURE)
+			resultname = "FAILURE";
+		ServerInstance->Logs.Normal(MODNAME, "stage=OnPostCommand {} result={} loop={}",
+			parsed.Repr(), resultname, loop ? "true" : "false");
+	}
+
 };
 
 MODULE_INIT(ModulePreCommand)
