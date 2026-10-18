@@ -3,7 +3,8 @@
 Every pull-request update runs the quick suite: formatting and static checks,
 generator/label-selector unit tests, ASan/UBSan ownership and V8 tests, native
 Valgrind ownership tests, three 10-second libFuzzer targets, and actual module
-compilation against pinned InspIRCd 4.8.0 and 4.12.1 commits.
+compilation against the pinned InspIRCd 4.12.1 commit. Both Dockerfiles default
+to v4.12.1, and default-image CI builds and tests that same release.
 
 ## Request heavy checks
 
@@ -11,7 +12,7 @@ A repository writer, maintainer, or administrator can apply the **ci:heavy**
 label to a pull request. This additionally runs:
 - 120 seconds per fuzz target;
 - Valgrind V8 lifecycle checks across repeated module reloads;
-- Alpine runtime and real-daemon integration tests on both supported versions;
+- Alpine runtime and real-daemon integration tests on InspIRCd 4.12.1;
 - the repository's existing default-image build/test workflow.
 
 The label remains effective on subsequent commits. Remove it to cancel the

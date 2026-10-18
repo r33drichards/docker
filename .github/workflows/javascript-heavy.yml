@@ -74,7 +74,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        inspircd: [v4.8.0, v4.12.1]
+        inspircd: [v4.12.1]
     env:
       DOCKER_BUILD_RECORD_UPLOAD: 'false'
     steps:

@@ -20,7 +20,7 @@ jobs:
       DOCKER_REPO: inspircd/inspircd-docker
       GITHUB_BRANCH: master
       GITHUB_REPO: inspircd/docker
-      INSP_VERSION: v4.8.0
+      INSP_VERSION: v4.12.1
     steps:
       -
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5

@@ -2,7 +2,7 @@ FROM alpine:3.22 AS builder
 
 LABEL maintainer="InspIRCd Team <noreply@inspircd.org>"
 
-ARG VERSION=insp4
+ARG VERSION=v4.12.1
 ARG CONFIGUREARGS=
 ARG EXTRASMODULES=
 ARG BUILD_DEPENDENCIES=

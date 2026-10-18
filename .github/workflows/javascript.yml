@@ -104,8 +104,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - version: v4.8.0
-            sha: 704b642bc1d464d3fe3162d2e33bcda020a1aaf5
           - version: v4.12.1
             sha: 4785cd00553ac81cfbef7f0278803ebec42225f3
     steps:

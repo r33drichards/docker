@@ -329,7 +329,7 @@ Available build arguments:
 
 |Argument            |Description                                                              |
 |--------------------|-------------------------------------------------------------------------|
-|`VERSION`           |Version of InspIRCd. Uses `-b`-parameter from `git clone`                |
+|`VERSION`           |Version of InspIRCd (default: `v4.12.1`). Uses `-b`-parameter from `git clone`                |
 |`CONFIGUREARGS`     |Additional parameters. Used to enable core extras like `geo_maxmind`   |
 |`EXTRASMODULES`     |Additional modules from [inspircd-contrib](https://github.com/inspircd/inspircd-contrib) repository like `geocmd`|
 |`BUILD_DEPENDENCIES`|Additional packages which are only needed during compilation             |
