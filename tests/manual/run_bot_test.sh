@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Quick test script for bot flood configuration
+# Interactive manual test for bot flood configuration (not an unattended CI test)
 #
 # This script helps you quickly test the bot oper flood bypass
 # against a running InspIRCd instance (local or remote).
@@ -94,7 +94,7 @@ echo "======================================================================"
 echo ""
 
 # Run the Python test script
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 python3 test_bot_flood.py \
     --host "$HOST" \
     --port "$PORT" \

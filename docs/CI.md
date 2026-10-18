@@ -6,6 +6,11 @@ Valgrind ownership tests, three 10-second libFuzzer targets, and actual module
 compilation against the pinned InspIRCd 4.12.1 commit. Both Dockerfiles default
 to v4.12.1, and default-image CI builds and tests that same release.
 
+The default-image runner discovers only top-level `tests/*.sh` unattended tests.
+Interactive helpers live in `tests/manual/`; run the bot helper with
+`bash tests/manual/run_bot_test.sh` against a separately configured test server.
+It prompts for confirmation and is not part of automated CI discovery.
+
 ## Request heavy checks
 
 A repository writer, maintainer, or administrator can apply the **ci:heavy**

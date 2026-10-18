@@ -24,7 +24,7 @@ The `conf.d/bot-oper.conf` file will be automatically loaded by InspIRCd.
 ```bash
 # Run the test script
 cd ../tests
-./run_bot_test.sh
+bash manual/run_bot_test.sh
 
 # Or directly with Python:
 python3 test_bot_flood.py
@@ -56,7 +56,7 @@ docker run -d \
 
 ```bash
 cd tests
-./run_bot_test.sh
+bash manual/run_bot_test.sh
 ```
 
 ## Using in Your Bot
