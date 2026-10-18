@@ -1,13 +1,20 @@
 name: Build container
 on:
   pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
   push:
-  schedule:
-    - cron: '0 0 * * 1'
+    branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+concurrency:
+  group: container-${{ ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'ci:heavy') && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
+    if: github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ci:heavy') && ((github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'ci:heavy'))
+    timeout-minutes: 45
     runs-on: ubuntu-22.04
     env:
       DOCKER_REPO: inspircd/inspircd-docker
@@ -16,7 +23,9 @@ jobs:
       INSP_VERSION: v4.8.0
     steps:
       -
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
       -
         name: Pipeline variables
         id: pipeline_vars
@@ -30,12 +39,12 @@ jobs:
           if [ "$EXPECTED" == "$ACTUAL" ]
           then
             echo "On $GITHUB_REPO repo, $GITHUB_BRANCH branch - building all architectures and pushing to Docker Hub"
-            echo "push=true" >> $GITHUB_OUTPUT
-            echo "platforms=linux/amd64,linux/arm64" >> $GITHUB_OUTPUT
+            echo "push=true" >> "$GITHUB_OUTPUT"
+            echo "platforms=linux/amd64,linux/arm64" >> "$GITHUB_OUTPUT"
           else
             echo "Not on $GITHUB_REPO repo and $GITHUB_BRANCH branch - only building amd64 architecture and not pushing to Docker Hub"
-            echo "push=false" >> $GITHUB_OUTPUT
-            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+            echo "push=false" >> "$GITHUB_OUTPUT"
+            echo "platforms=linux/amd64" >> "$GITHUB_OUTPUT"
           fi
       -
         name: Build and test amd64 image
@@ -46,7 +55,7 @@ jobs:
             | head -n1)
 
           echo "docker swarm init on $IP"
-          docker swarm init --advertise-addr $IP
+          docker swarm init --advertise-addr "$IP"
           docker build --build-arg VERSION="${INSP_VERSION}" -t inspircd:testing .
 
           echo "* * * Image built, running tests... * * *"
@@ -55,7 +64,7 @@ jobs:
       -
         name: Docker meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.DOCKER_REPO }}
           tags: |
@@ -64,20 +73,20 @@ jobs:
             type=semver,pattern={{major}},value=${{ env.INSP_VERSION }}
       -
         name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       -
         name: Log in to Docker Hub
         if: github.repository == env.GITHUB_REPO && github.ref_name == env.GITHUB_BRANCH
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       -
         name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           build-args: VERSION=${{ env.INSP_VERSION }}
@@ -87,7 +96,7 @@ jobs:
       -
         name: Update description on Docker Hub
         if: github.repository == env.GITHUB_REPO && github.ref_name == env.GITHUB_BRANCH
-        uses: peter-evans/dockerhub-description@v5
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}

@@ -1,25 +1,128 @@
-name: Optional JavaScript module
+name: JavaScript quick checks
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
   push:
+    branches: [master]
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: javascript-quick-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+defaults:
+  run:
+    shell: bash
 jobs:
-  javascript:
+  quality:
     runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        inspircd: [v4.8.0, v4.12.1]
+    container: debian:trixie
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - name: Build optional V8 image and test runtime
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Install versioned toolchain
         run: |
-          docker build -f Dockerfile.javascript --target builder --build-arg VERSION=${{ matrix.inspircd }} -t javascript-builder .
-          docker run --rm --entrypoint sh -v "$PWD:/repo:ro" javascript-builder -c 'cd /repo && sh tests/js_runtime.sh && sh tests/js_script_loader.sh'
-          docker build -f Dockerfile.javascript --build-arg VERSION=${{ matrix.inspircd }} -t javascript-testing .
-      - name: Test native command bridge inside Alpine
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git python3 python3-venv clang-format-19 shellcheck cppcheck
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/pip
+          key: ruff-trixie-0.16.9
+      - name: Formatting, lint, generated files, and workflow lint
         run: |
-          docker run --rm --user root --entrypoint sh -v "$PWD:/repo:ro" javascript-testing -c 'apk add --no-cache python3 && su inspircd -s /bin/sh -c "INSPIRCD_NATIVE=/inspircd python3 /repo/tests/javascript_native.py"'
-      - name: Verify generated binding inventory
-        run: sh tests/js_bindings.sh
+          python3 -m venv /tmp/quality-venv
+          /tmp/quality-venv/bin/pip install --disable-pip-version-check ruff==0.16.9
+          export PATH="/tmp/quality-venv/bin:$PATH"
+          sh tests/ci/quality.sh
+          sh tests/ci/actionlint.sh
+  native:
+    runs-on: ubuntu-22.04
+    container: debian:trixie
+    timeout-minutes: 15
+    env:
+      CXX: g++-14
+      CI_NATIVE_LOG_DIR: artifacts/native
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Install distro-matched V8 and native tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends g++-14 libc6-dbg libnode-dev valgrind pkg-config python3
+          mkdir -p artifacts/native
+          dpkg-query -W > artifacts/native/packages.txt
+          useradd --create-home --uid 1000 ci
+          chown -R ci:ci "$GITHUB_WORKSPACE"
+      - name: Required ASan, UBSan, leak and ownership checks
+        run: |
+          runuser -u ci -- bash tests/ci/native.sh sanitizers
+          runuser -u ci -- bash tests/ci/native.sh valgrind
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: native-${{ github.sha }}
+          path: artifacts/native
+          if-no-files-found: error
+          retention-days: 14
+  fuzz-smoke:
+    runs-on: ubuntu-22.04
+    container: debian:trixie
+    timeout-minutes: 10
+    env:
+      CXX: clang++-19
+      FUZZ_OUT: artifacts/fuzz
+      FUZZ_SECONDS: '10'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Install fuzzer toolchain
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends clang-19 libclang-rt-19-dev g++-14 python3
+          useradd --create-home --uid 1000 ci
+          chown -R ci:ci "$GITHUB_WORKSPACE"
+      - name: Execute seeded boundary fuzzing
+        run: runuser -u ci -- sh tests/fuzz/run.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: fuzz-smoke-${{ github.sha }}
+          path: artifacts/fuzz
+          if-no-files-found: error
+          retention-days: 14
+  module-compile:
+    runs-on: ubuntu-22.04
+    container: debian:trixie
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: v4.8.0
+            sha: 704b642bc1d464d3fe3162d2e33bcda020a1aaf5
+          - version: v4.12.1
+            sha: 4785cd00553ac81cfbef7f0278803ebec42225f3
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Install compile dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git g++-14 make perl pkg-config libnode-dev binutils
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: inspircd/inspircd
+          ref: ${{ matrix.sha }}
+          path: upstream
+          persist-credentials: false
+      - name: Compile actual module with matching V8
+        env:
+          CXX: g++-14
+          INSPIRCD_SOURCE: ${{ github.workspace }}/upstream
+          INSPIRCD_SHA: ${{ matrix.sha }}
+        run: sh tests/ci/compile_module.sh

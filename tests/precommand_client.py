@@ -74,13 +74,17 @@ def main():
 
         caller.send("PRIVMSG hookobserver :private-message-secret two  spaces café")
         lines = observer.until(lambda line: " PRIVMSG hookobserver :" in line)
-        assert any(line.endswith(":private-message-secret two  spaces café") for line in lines), lines
+        assert any(line.endswith(":private-message-secret two  spaces café") for line in lines), (
+            lines
+        )
 
         # Failed handlers still pass core validation. All values here are synthetic.
         caller.send("OPER operator-name-secret operator-password-secret")
         caller.send("PASS connection-password-secret")
         caller.send("AUTHENTICATE sasl-payload-secret")
-        caller.send("WEBIRC gateway-password-secret gateway-user-secret gateway-host-secret 192.0.2.1")
+        caller.send(
+            "WEBIRC gateway-password-secret gateway-user-secret gateway-host-secret 192.0.2.1"
+        )
         caller.send("PRIVMSG NickServ :IDENTIFY service-password-secret")
         caller.send("VERSION")
         caller.send("DIE :admin-password-secret")  # Operator-only; rejected before validation.
@@ -92,7 +96,9 @@ def main():
         assert any(" 421 hookcaller UNKNOWNSECRET " in line for line in lines), lines
         assert any(" 481 hookcaller " in line for line in lines), lines
         assert any(" 351 hookcaller " in line for line in lines), lines
-        assert any(" PONG " in line and line.endswith("hook-finish-secret") for line in lines), lines
+        assert any(" PONG " in line and line.endswith("hook-finish-secret") for line in lines), (
+            lines
+        )
         assert not any(" NOTICE " in line for line in lines), lines
         print("PASS: registration, PING, JOIN, MODE, PRIVMSG, and error behavior unchanged")
     finally:

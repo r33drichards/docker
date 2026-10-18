@@ -4,7 +4,7 @@
 #          V8_LDFLAGS='-L/path/lib -Wl,-rpath,/path/lib -lnode' ./tests/js_runtime.sh
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 TESTDIR=$(mktemp -d)
 trap 'rm -rf "$TESTDIR"' EXIT
 trap 'exit 1' HUP INT TERM

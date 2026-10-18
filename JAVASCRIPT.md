@@ -190,3 +190,7 @@ headers/libraries or explicit `V8_CXXFLAGS`/`V8_LDFLAGS`; it reports SKIP if abs
 Native daemon integration: `INSPIRCD_NATIVE=/path/to/run sh tests/javascript.sh`
 after building/installing `m_javascript.so`. All traffic/data is synthetic and
 loopback-only. The native suite does not modify an existing server configuration.
+
+## Continuous integration
+
+See [CI coverage and label-triggered heavy runs](docs/CI.md).

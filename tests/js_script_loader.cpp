@@ -7,8 +7,8 @@
 #include <type_traits>
 
 namespace fs = std::filesystem;
-using js_scripts::Limits;
 using js_scripts::Authority;
+using js_scripts::Limits;
 using js_scripts::LoadError;
 using js_scripts::LoadSources;
 using js_scripts::LoadWasmAssets;
@@ -16,10 +16,8 @@ using js_scripts::Source;
 using js_scripts::SourceSpec;
 using Kind = SourceSpec::Kind;
 
-static_assert(std::is_same<decltype(Source::content), std::string>::value,
-	"Source bytes must be owned");
-static_assert(std::is_same<decltype(Source::canonical_path), fs::path>::value,
-	"Source paths must be owned");
+static_assert(std::is_same<decltype(Source::content), std::string>::value, "Source bytes must be owned");
+static_assert(std::is_same<decltype(Source::canonical_path), fs::path>::value, "Source paths must be owned");
 
 static void Check(bool condition, const std::string& message)
 {
@@ -35,8 +33,7 @@ static void Write(const fs::path& path, const std::string& bytes)
 	Check(!file.fail(), "could not write fixture " + path.string());
 }
 
-template <typename Action>
-static void ExpectError(const std::string& fragment, Action action)
+template <typename Action> static void ExpectError(const std::string& fragment, Action action)
 {
 	try
 	{
@@ -73,19 +70,18 @@ int main(int argc, char** argv)
 		fs::create_symlink(root / "after.js", directory / "ignored-link.js");
 		fs::create_symlink(root / "missing.js", directory / "broken-link.js");
 		fs::create_directory_symlink(directory / "nested", directory / "linked-directory.js");
-		Check(::mkfifo((directory / "ignored-fifo.js").c_str(), 0600) == 0,
-			"could not create FIFO fixture");
+		Check(::mkfifo((directory / "ignored-fifo.js").c_str(), 0600) == 0, "could not create FIFO fixture");
 
-		const auto ordered = LoadSources({{Kind::File, "before.js"},
-			{Kind::Directory, "plugins"}, {Kind::File, root / "after.js"}}, root);
+		const auto ordered = LoadSources(
+			{{Kind::File, "before.js"}, {Kind::Directory, "plugins"}, {Kind::File, root / "after.js"}}, root);
 		const std::vector<std::string> expected{"before", "A", "a", "z", "low byte", "high byte", "after"};
 		Check(ordered.size() == expected.size(), "discovery included an ignored entry or lost a source");
 		for (std::size_t i = 0; i < ordered.size(); ++i)
 		{
 			Check(ordered[i].content == expected[i], "configured/bytewise ordering failed");
 			Check(ordered[i].canonical_path.is_absolute(), "output path is not absolute");
-			Check(ordered[i].canonical_path == fs::canonical(ordered[i].canonical_path),
-				"output path is not canonical");
+			Check(
+				ordered[i].canonical_path == fs::canonical(ordered[i].canonical_path), "output path is not canonical");
 		}
 		Check(ordered.front().canonical_path == fs::canonical(root / "before.js"),
 			"relative source did not use config root");
@@ -95,28 +91,27 @@ int main(int argc, char** argv)
 			Check(source.authority == Authority::User, "omitted authority must default to User");
 		Check(Source{root / "before.js", "stub"}.authority == Authority::User,
 			"two-field Source initialization must retain the User default");
-		const auto authorities = LoadSources({{Kind::File, "before.js"},
-			{Kind::Directory, "plugins", Authority::Admin},
-			{Kind::File, "after.js", Authority::Admin}}, root);
+		const auto authorities = LoadSources({{Kind::File, "before.js"}, {Kind::Directory, "plugins", Authority::Admin},
+												 {Kind::File, "after.js", Authority::Admin}},
+			root);
 		Check(authorities.front().authority == Authority::User, "explicit User source gained authority");
 		for (std::size_t i = 1; i < authorities.size(); ++i)
 			Check(authorities[i].authority == Authority::Admin, "directory/file authority was not inherited");
-		ExpectError("duplicate canonical path", [&]
-		{
-			LoadSources({{Kind::File, "before.js", Authority::User},
-				{Kind::File, "before.js", Authority::Admin}}, root);
-		});
-		ExpectError("unknown script authority", [&]
-		{
-			LoadSources({{Kind::File, "before.js", static_cast<Authority>(999)}}, root);
-		});
+		ExpectError("duplicate canonical path",
+			[&]
+			{
+				LoadSources(
+					{{Kind::File, "before.js", Authority::User}, {Kind::File, "before.js", Authority::Admin}}, root);
+			});
+		ExpectError("unknown script authority",
+			[&] { LoadSources({{Kind::File, "before.js", static_cast<Authority>(999)}}, root); });
 		std::cout << "PASS: User default, explicit/inherited Admin authority and cross-authority duplicates\n";
 
 		fs::create_symlink(root / "before.js", root / "alias.js");
 		fs::create_directory_symlink(directory, root / "plugins-link");
 		const auto explicit_link = LoadSources({{Kind::File, "alias.js"}}, root);
 		Check(explicit_link[0].content == "before" &&
-			explicit_link[0].canonical_path == fs::canonical(root / "before.js"),
+				explicit_link[0].canonical_path == fs::canonical(root / "before.js"),
 			"explicit file symlink did not resolve canonically");
 		const auto directory_link = LoadSources({{Kind::Directory, "plugins-link"}}, root);
 		Check(directory_link.size() == 5 && directory_link[0].canonical_path == directory / "A.js",
@@ -126,22 +121,14 @@ int main(int argc, char** argv)
 		ExpectError("cannot resolve", [&] { LoadSources({{Kind::File, "plugins/broken-link.js"}}, root); });
 		std::cout << "PASS: explicit symlinks resolve; directory-entry symlinks are ignored\n";
 
-		ExpectError("duplicate canonical path", [&]
-		{
-			LoadSources({{Kind::File, "before.js"}, {Kind::File, root / "./before.js"}}, root);
-		});
-		ExpectError("duplicate canonical path", [&]
-		{
-			LoadSources({{Kind::File, "before.js"}, {Kind::File, "alias.js"}}, root);
-		});
-		ExpectError("duplicate canonical path", [&]
-		{
-			LoadSources({{Kind::Directory, "plugins"}, {Kind::File, "plugins/a.js"}}, root);
-		});
-		ExpectError("duplicate canonical path", [&]
-		{
-			LoadSources({{Kind::Directory, "plugins"}, {Kind::Directory, "plugins-link"}}, root);
-		});
+		ExpectError("duplicate canonical path",
+			[&] { LoadSources({{Kind::File, "before.js"}, {Kind::File, root / "./before.js"}}, root); });
+		ExpectError("duplicate canonical path",
+			[&] { LoadSources({{Kind::File, "before.js"}, {Kind::File, "alias.js"}}, root); });
+		ExpectError("duplicate canonical path",
+			[&] { LoadSources({{Kind::Directory, "plugins"}, {Kind::File, "plugins/a.js"}}, root); });
+		ExpectError("duplicate canonical path",
+			[&] { LoadSources({{Kind::Directory, "plugins"}, {Kind::Directory, "plugins-link"}}, root); });
 		std::cout << "PASS: duplicate files, aliases, overlapping directories and explicit paths fail\n";
 
 		ExpectError("cannot resolve", [&] { LoadSources({{Kind::File, "missing.js"}}, root); });
@@ -168,15 +155,12 @@ int main(int argc, char** argv)
 		Check(LoadSources({{Kind::File, "four.js"}, {Kind::File, "three.js"}}, root, Limits{4, 7, 2}).size() == 2,
 			"exact byte/count limits should pass");
 		ExpectError("per-file byte limit", [&] { LoadSources({{Kind::File, "four.js"}}, root, Limits{3, 99, 9}); });
-		ExpectError("total byte limit", [&]
-		{
-			LoadSources({{Kind::File, "four.js"}, {Kind::File, "three.js"}}, root, Limits{4, 6, 2});
-		});
-		ExpectError("source count limit", [&]
-		{
-			LoadSources({{Kind::File, "four.js"}, {Kind::File, "three.js"}}, root, Limits{4, 7, 1});
-		});
-		ExpectError("source count limit", [&] { LoadSources({{Kind::Directory, "plugins"}}, root, Limits{99, 99, 4}); });
+		ExpectError("total byte limit",
+			[&] { LoadSources({{Kind::File, "four.js"}, {Kind::File, "three.js"}}, root, Limits{4, 6, 2}); });
+		ExpectError("source count limit",
+			[&] { LoadSources({{Kind::File, "four.js"}, {Kind::File, "three.js"}}, root, Limits{4, 7, 1}); });
+		ExpectError(
+			"source count limit", [&] { LoadSources({{Kind::Directory, "plugins"}}, root, Limits{99, 99, 4}); });
 		ExpectError("all limits must be positive", [&] { LoadSources({}, root, Limits{0, 1, 1}); });
 		ExpectError("all limits must be positive", [&] { LoadSources({}, root, Limits{1, 0, 1}); });
 		ExpectError("all limits must be positive", [&] { LoadSources({}, root, Limits{1, 1, 0}); });
@@ -194,21 +178,17 @@ int main(int argc, char** argv)
 		std::cout << "PASS: binary bytes, NUL, CRLF, multibuffer reads and retained ownership\n";
 
 		auto active = LoadSources({{Kind::File, "before.js"}}, root);
-		ExpectError("cannot resolve", [&]
-		{
-			active = LoadSources({{Kind::File, "after.js"}, {Kind::File, "missing.js"}}, root);
-		});
+		ExpectError("cannot resolve",
+			[&] { active = LoadSources({{Kind::File, "after.js"}, {Kind::File, "missing.js"}}, root); });
 		Check(active.size() == 1 && active[0].content == "before" &&
-			active[0].canonical_path == fs::canonical(root / "before.js"),
+				active[0].canonical_path == fs::canonical(root / "before.js"),
 			"a failed candidate load changed active state");
 		std::cout << "PASS: later-source failure leaves the caller's active set unchanged\n";
 
 		ExpectError("paths must be nonempty", [&] { LoadSources({{Kind::File, ""}}, root); });
 		ExpectError("paths must be nonempty", [&] { LoadSources({}, ""); });
-		ExpectError("no NUL bytes", [&]
-		{
-			LoadSources({{Kind::File, fs::path(std::string("before.js\0hidden.js", 19))}}, root);
-		});
+		ExpectError("no NUL bytes",
+			[&] { LoadSources({{Kind::File, fs::path(std::string("before.js\0hidden.js", 19))}}, root); });
 		ExpectError("config root", [&] { LoadSources({}, root / "before.js"); });
 		ExpectError("unknown source kind", [&] { LoadSources({{static_cast<Kind>(999), "before.js"}}, root); });
 		std::cout << "PASS: malformed paths, config roots and source kinds fail clearly\n";
@@ -219,12 +199,13 @@ int main(int argc, char** argv)
 			wasm_bytes += static_cast<char>(byte);
 		Write(root / "core.wasm", wasm_header);
 		Write(root / "bytes.wasm", wasm_bytes);
-		const auto assets = LoadWasmAssets({{"core_v1-1", "core.wasm"}, {"Bytes", root / "bytes.wasm"}}, root,
-			Limits{256, 264, 2});
+		const auto assets =
+			LoadWasmAssets({{"core_v1-1", "core.wasm"}, {"Bytes", root / "bytes.wasm"}}, root, Limits{256, 264, 2});
 		Check(assets.size() == 2 && assets[0].name == "core_v1-1" && assets[1].name == "Bytes",
 			"Wasm asset order or names changed");
 		Check(assets[0].canonical_path == fs::canonical(root / "core.wasm") &&
-			assets[1].canonical_path == fs::canonical(root / "bytes.wasm"), "Wasm paths are not canonical");
+				assets[1].canonical_path == fs::canonical(root / "bytes.wasm"),
+			"Wasm paths are not canonical");
 		Check(assets[0].content == wasm_header && assets[1].content == wasm_bytes,
 			"Wasm binary bytes were not preserved");
 		Write(root / "bytes.wasm", "changed");
@@ -238,23 +219,17 @@ int main(int argc, char** argv)
 		std::cout << "PASS: owned binary Wasm assets, canonical paths, names, order and exact limits\n";
 
 		for (const auto& invalid : std::vector<std::string>{"", "has.dot", "has/slash", "has space", "line\nbreak",
-			std::string(1, '\0'), std::string(1, '\x80'), std::string(65, 'x')})
+				 std::string(1, '\0'), std::string(1, '\x80'), std::string(65, 'x')})
 			ExpectError("Wasm name must be", [&] { LoadWasmAssets({{invalid, "core.wasm"}}, root); });
-		ExpectError("duplicate Wasm name", [&]
-		{
-			LoadWasmAssets({{"core", "core.wasm"}, {"core", "bytes.wasm"}}, root);
-		});
-		ExpectError("duplicate canonical path", [&]
-		{
-			LoadWasmAssets({{"core", "core.wasm"}, {"other", root / "./core.wasm"}}, root);
-		});
+		ExpectError(
+			"duplicate Wasm name", [&] { LoadWasmAssets({{"core", "core.wasm"}, {"core", "bytes.wasm"}}, root); });
+		ExpectError("duplicate canonical path",
+			[&] { LoadWasmAssets({{"core", "core.wasm"}, {"other", root / "./core.wasm"}}, root); });
 		fs::create_symlink(root / "core.wasm", root / "alias.wasm");
 		Check(LoadWasmAssets({{"alias", "alias.wasm"}}, root)[0].canonical_path == fs::canonical(root / "core.wasm"),
 			"explicit Wasm symlink should resolve canonically");
-		ExpectError("duplicate canonical path", [&]
-		{
-			LoadWasmAssets({{"core", "core.wasm"}, {"alias", "alias.wasm"}}, root);
-		});
+		ExpectError("duplicate canonical path",
+			[&] { LoadWasmAssets({{"core", "core.wasm"}, {"alias", "alias.wasm"}}, root); });
 		ExpectError("cannot resolve", [&] { LoadWasmAssets({{"missing", "missing.wasm"}}, root); });
 		ExpectError(".wasm extension", [&] { LoadWasmAssets({{"wrong", "before.js"}}, root); });
 		ExpectError(".wasm extension", [&] { LoadWasmAssets({{"wrong", "core.WASM"}}, root); });
@@ -262,21 +237,16 @@ int main(int argc, char** argv)
 		fs::create_directory(root / "directory.wasm");
 		ExpectError("not a regular file", [&] { LoadWasmAssets({{"directory", "directory.wasm"}}, root); });
 		ExpectError("per-file byte limit", [&] { LoadWasmAssets({{"core", "core.wasm"}}, root, Limits{7, 99, 2}); });
-		ExpectError("total byte limit", [&]
-		{
-			LoadWasmAssets({{"core", "core.wasm"}, {"bytes", "bytes.wasm"}}, root, Limits{256, 263, 2});
-		});
-		ExpectError("source count limit", [&]
-		{
-			LoadWasmAssets({{"core", "core.wasm"}, {"bytes", "bytes.wasm"}}, root, Limits{256, 264, 1});
-		});
+		ExpectError("total byte limit",
+			[&] { LoadWasmAssets({{"core", "core.wasm"}, {"bytes", "bytes.wasm"}}, root, Limits{256, 263, 2}); });
+		ExpectError("source count limit",
+			[&] { LoadWasmAssets({{"core", "core.wasm"}, {"bytes", "bytes.wasm"}}, root, Limits{256, 264, 1}); });
 		auto active_assets = assets;
-		ExpectError("cannot resolve", [&]
-		{
-			active_assets = LoadWasmAssets({{"core", "core.wasm"}, {"missing", "missing.wasm"}}, root);
-		});
-		Check(active_assets.size() == 2 && active_assets[0].name == "core_v1-1" &&
-			active_assets[1].content == wasm_bytes, "failed Wasm candidate changed active assets");
+		ExpectError("cannot resolve",
+			[&] { active_assets = LoadWasmAssets({{"core", "core.wasm"}, {"missing", "missing.wasm"}}, root); });
+		Check(
+			active_assets.size() == 2 && active_assets[0].name == "core_v1-1" && active_assets[1].content == wasm_bytes,
+			"failed Wasm candidate changed active assets");
 		std::cout << "PASS: Wasm invalid names, duplicate names/paths, path errors, bounds and failure isolation\n";
 
 		if (::geteuid() != 0)

@@ -39,7 +39,15 @@ else:
         (b"OPER", [b"operator-name-secret", b"operator-password-secret"]),
         (b"PASS", [b"connection-password-secret"]),
         (b"AUTHENTICATE", [b"sasl-payload-secret"]),
-        (b"WEBIRC", [b"gateway-password-secret", b"gateway-user-secret", b"gateway-host-secret", b"192.0.2.1"]),
+        (
+            b"WEBIRC",
+            [
+                b"gateway-password-secret",
+                b"gateway-user-secret",
+                b"gateway-host-secret",
+                b"192.0.2.1",
+            ],
+        ),
         (b"PRIVMSG", [b"NickServ", b"IDENTIFY service-password-secret"]),
         (b"VERSION", []),
         (b"PING", [b"tag-ping-secret"]),
@@ -49,12 +57,14 @@ else:
     assert b"UNKNOWNSECRET" not in counts and b"DIE" not in counts, counts
     hook_lines = [line for line in text.splitlines() if "stage=OnPreCommand" in line]
     assert len(hook_lines) == len(records), hook_lines
-    assert all(all(0x20 <= ord(char) < 0x7f for char in line) for line in hook_lines), hook_lines
+    assert all(all(0x20 <= ord(char) < 0x7F for char in line) for line in hook_lines), hook_lines
     assert "message-tag-secret" not in "\n".join(hook_lines), hook_lines
     assert "<redacted>" not in "\n".join(hook_lines), hook_lines
     all_hook_lines = [line for line in text.splitlines() if "ParsedCommand{" in line]
     assert not any("stage=OnUser" in line for line in text.splitlines()), text
-    assert all(all(0x20 <= ord(char) < 0x7f for char in line) for line in all_hook_lines), all_hook_lines
+    assert all(all(0x20 <= ord(char) < 0x7F for char in line) for line in all_hook_lines), (
+        all_hook_lines
+    )
 
     # Successful handlers emit a pre snapshot followed by a post snapshot.
     for fragment in [
@@ -65,12 +75,18 @@ else:
         matches = [line for line in all_hook_lines if fragment in line]
         assert len(matches) == 2, matches
         assert "stage=OnPreCommand" in matches[0], matches
-        assert "stage=OnPostCommand" in matches[1] and "result=SUCCESS loop=false" in matches[1], matches
+        assert "stage=OnPostCommand" in matches[1] and "result=SUCCESS loop=false" in matches[1], (
+            matches
+        )
 
     # Validation can pass even when the handler then fails.
     for fragment in ["operator-password-secret", "IDENTIFY service-password-secret"]:
         matches = [line for line in all_hook_lines if fragment in line]
         assert len(matches) == 2 and "stage=OnPreCommand" in matches[0], matches
-        assert "stage=OnPostCommand" in matches[1] and "result=FAILURE loop=false" in matches[1], matches
-    assert not any("UNKNOWNSECRET" in line or 'command="DIE"' in line for line in all_hook_lines), all_hook_lines
+        assert "stage=OnPostCommand" in matches[1] and "result=FAILURE loop=false" in matches[1], (
+            matches
+        )
+    assert not any("UNKNOWNSECRET" in line or 'command="DIE"' in line for line in all_hook_lines), (
+        all_hook_lines
+    )
     print("PASS: full snapshots, pre/post command order, and success/failure results")

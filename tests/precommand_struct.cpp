@@ -13,15 +13,14 @@ static_assert(std::is_same<decltype(ParsedCommand::parameters), std::vector<std:
 int main()
 {
 	const std::vector<std::string> expected{
-		"target", "two  spaces :and a colon", "Unicode café ☕", "", "password-secret"
-	};
+		"target", "two  spaces :and a colon", "Unicode café ☕", "", "password-secret"};
 	std::string command = "PRIVMSG";
 	std::vector<std::string> parameters = expected;
 	const ParsedCommand parsed{command, parameters};
 	assert(parsed.command == "PRIVMSG");
 	assert(parsed.parameters == expected);
-	assert(parsed.Repr() == R"(ParsedCommand{command="PRIVMSG", parameters=["target", "two  spaces :and a colon", "Unicode caf\xc3\xa9 \xe2\x98\x95", "", "password-secret"]})");
-
+	assert(parsed.Repr() ==
+		R"(ParsedCommand{command="PRIVMSG", parameters=["target", "two  spaces :and a colon", "Unicode caf\xc3\xa9 \xe2\x98\x95", "", "password-secret"]})");
 
 	// Mutating and freeing the original buffers must not alter the snapshot.
 	command.assign("CHANGED");
@@ -32,7 +31,8 @@ int main()
 	assert(parsed.parameters == expected);
 
 	// The snapshot must also outlive inputs created in a nested scope.
-	const auto retained = [] {
+	const auto retained = []
+	{
 		std::string local_command = "OPER";
 		std::vector<std::string> local_parameters{"operator", "full-password-secret"};
 		return ParsedCommand{local_command, local_parameters};
@@ -70,5 +70,4 @@ int main()
 		decoded += byte;
 	}
 	assert(decoded == bytes);
-
 }

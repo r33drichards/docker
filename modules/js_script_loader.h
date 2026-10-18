@@ -21,11 +21,19 @@
 
 namespace js_scripts
 {
-enum class Authority { User, Admin };
+enum class Authority
+{
+	User,
+	Admin
+};
 
 struct SourceSpec
 {
-	enum class Kind { File, Directory };
+	enum class Kind
+	{
+		File,
+		Directory
+	};
 	Kind kind;
 	std::filesystem::path path;
 	Authority authority = Authority::User;
@@ -62,7 +70,9 @@ class LoadError : public std::runtime_error
 {
 public:
 	explicit LoadError(const std::string& message)
-		: std::runtime_error("Script asset loader: " + message) {}
+		: std::runtime_error("Script asset loader: " + message)
+	{
+	}
 };
 
 namespace detail
@@ -181,11 +191,9 @@ inline std::string Read(const fs::path& path, const Limits& limits, std::size_t 
 	}
 
 	const auto after = Stat(fd.Get(), path);
-	if (before.st_size != after.st_size || before.st_mtim.tv_sec != after.st_mtim.tv_sec
-		|| before.st_mtim.tv_nsec != after.st_mtim.tv_nsec
-		|| before.st_ctim.tv_sec != after.st_ctim.tv_sec
-		|| before.st_ctim.tv_nsec != after.st_ctim.tv_nsec
-		|| static_cast<std::uintmax_t>(after.st_size) != content.size())
+	if (before.st_size != after.st_size || before.st_mtim.tv_sec != after.st_mtim.tv_sec ||
+		before.st_mtim.tv_nsec != after.st_mtim.tv_nsec || before.st_ctim.tv_sec != after.st_ctim.tv_sec ||
+		before.st_ctim.tv_nsec != after.st_ctim.tv_nsec || static_cast<std::uintmax_t>(after.st_size) != content.size())
 		throw LoadError("file changed while reading: " + Label(path));
 	return content;
 }
@@ -209,8 +217,8 @@ inline std::string Read(const fs::path& path, const Limits& limits, std::size_t 
 // at most one extra byte to detect overflow. Metadata checks catch ordinary
 // concurrent edits, but this is not a filesystem-wide
 // atomic snapshot or protection against adversarial directory replacement.
-inline std::vector<Source> LoadSources(const std::vector<SourceSpec>& specs,
-	const std::filesystem::path& config_root, const Limits& limits = {})
+inline std::vector<Source> LoadSources(
+	const std::vector<SourceSpec>& specs, const std::filesystem::path& config_root, const Limits& limits = {})
 {
 	namespace fs = std::filesystem;
 	const auto root = detail::ConfigRoot(config_root, limits);
@@ -252,7 +260,7 @@ inline std::vector<Source> LoadSources(const std::vector<SourceSpec>& specs,
 		fs::directory_iterator iterator(directory, error);
 		if (error)
 			throw LoadError("cannot enumerate " + detail::Label(directory) + ": " + error.message());
-		for (const fs::directory_iterator end; iterator != end; )
+		for (const fs::directory_iterator end; iterator != end;)
 		{
 			const auto entry = iterator->path();
 			if (entry.extension() == ".js")
@@ -273,13 +281,14 @@ inline std::vector<Source> LoadSources(const std::vector<SourceSpec>& specs,
 		}
 		if (entries.empty())
 			throw LoadError("directory contains no regular .js files: " + detail::Label(directory));
-		std::sort(entries.begin(), entries.end(), [](const fs::path& left, const fs::path& right)
-		{
-			const auto a = left.filename().native();
-			const auto b = right.filename().native();
-			return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end(),
-				[](unsigned char x, unsigned char y) { return x < y; });
-		});
+		std::sort(entries.begin(), entries.end(),
+			[](const fs::path& left, const fs::path& right)
+			{
+				const auto a = left.filename().native();
+				const auto b = right.filename().native();
+				return std::lexicographical_compare(
+					a.begin(), a.end(), b.begin(), b.end(), [](unsigned char x, unsigned char y) { return x < y; });
+			});
 		for (const auto& entry : entries)
 			append(entry, spec.authority); // Canonical parent + filename; never resolve entry links.
 	}
@@ -296,8 +305,8 @@ inline std::vector<Source> LoadSources(const std::vector<SourceSpec>& specs,
 // This API only reads owned binary bytes. It validates neither Wasm magic nor
 // module contents, executes nothing, and grants no runtime filesystem or WASI
 // access. Engine compilation/validation and atomic publication belong to callers.
-inline std::vector<WasmAsset> LoadWasmAssets(const std::vector<WasmSpec>& specs,
-	const std::filesystem::path& config_root, const Limits& limits = {})
+inline std::vector<WasmAsset> LoadWasmAssets(
+	const std::vector<WasmSpec>& specs, const std::filesystem::path& config_root, const Limits& limits = {})
 {
 	const auto root = detail::ConfigRoot(config_root, limits);
 	std::vector<WasmAsset> candidate;
@@ -307,11 +316,12 @@ inline std::vector<WasmAsset> LoadWasmAssets(const std::vector<WasmSpec>& specs,
 	for (const auto& spec : specs)
 	{
 		const bool valid_name = !spec.name.empty() && spec.name.size() <= 64 &&
-			std::all_of(spec.name.begin(), spec.name.end(), [](unsigned char byte)
-			{
-				return (byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z')
-					|| (byte >= '0' && byte <= '9') || byte == '_' || byte == '-';
-			});
+			std::all_of(spec.name.begin(), spec.name.end(),
+				[](unsigned char byte)
+				{
+					return (byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z') ||
+						(byte >= '0' && byte <= '9') || byte == '_' || byte == '-';
+				});
 		if (!valid_name)
 			throw LoadError("Wasm name must be 1-64 ASCII letters, digits, underscores or hyphens");
 		if (!names.insert(spec.name).second)

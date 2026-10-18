@@ -11,14 +11,15 @@ also requires extending CANONICAL_BINDINGS after reviewing its native contract.
 Inventory-only entries can never generate a registration row or a TS method.
 This tool uses only the Python standard library and does not require V8.
 """
+
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,43 +33,83 @@ CANONICAL_SYMBOL = re.compile(r"[A-Za-z][A-Za-z0-9_]*(?:::[A-Za-z][A-Za-z0-9_]*)
 HEADER = re.compile(r"include/[a-z][a-z0-9_]*\.h\Z")
 RESERVED_JS_NAMES = frozenset({"__proto__", "prototype", "constructor"})
 SUPPORTED_TYPES = frozenset({"string", "boolean", "number"})
-INVENTORY_SIDE_EFFECTS = frozenset({
-    "pure", "read_server_state", "randomness", "mutates_argument", "process_control",
-    "network_configuration", "authentication", "borrowed_mutable_state",
-    "mutates_server", "module_control", "sensitive_state",
-})
+INVENTORY_SIDE_EFFECTS = frozenset(
+    {
+        "pure",
+        "read_server_state",
+        "randomness",
+        "mutates_argument",
+        "process_control",
+        "network_configuration",
+        "authentication",
+        "borrowed_mutable_state",
+        "mutates_server",
+        "module_control",
+        "sensitive_state",
+    }
+)
 # Each record specifies the exact overload or callable hook. This is a reviewed
 # contract catalogue, intentionally separate from the editable manifest.
 CANONICAL_BINDINGS = {
     "match": (
-        "JsIrcdMatch", "InspIRCd::Match", "include/inspircd.h",
+        "JsIrcdMatch",
+        "InspIRCd::Match",
+        "include/inspircd.h",
         "static bool Match(const std::string& str, const std::string& pattern, const unsigned char* map = nullptr);",
-        "InspIRCd::Match(str, pattern)", ("str", "pattern"), "boolean", "read_server_state",
+        "InspIRCd::Match(str, pattern)",
+        ("str", "pattern"),
+        "boolean",
+        "read_server_state",
     ),
     "matchCIDR": (
-        "JsIrcdMatchCIDR", "InspIRCd::MatchCIDR", "include/inspircd.h",
+        "JsIrcdMatchCIDR",
+        "InspIRCd::MatchCIDR",
+        "include/inspircd.h",
         "static bool MatchCIDR(const std::string& str, const std::string& pattern, const unsigned char* map = nullptr);",
-        "InspIRCd::MatchCIDR(str, pattern)", ("str", "pattern"), "boolean", "read_server_state",
+        "InspIRCd::MatchCIDR(str, pattern)",
+        ("str", "pattern"),
+        "boolean",
+        "read_server_state",
     ),
     "isNick": (
-        "JsIrcdIsNick", "InspIRCd::IsNick", "include/inspircd.h",
+        "JsIrcdIsNick",
+        "InspIRCd::IsNick",
+        "include/inspircd.h",
         "std::function<bool(const std::string_view&)> IsNick = &DefaultIsNick;",
-        "ServerInstance->IsNick(value)", ("value",), "boolean", "read_server_state",
+        "ServerInstance->IsNick(value)",
+        ("value",),
+        "boolean",
+        "read_server_state",
     ),
     "isChannel": (
-        "JsIrcdIsChannel", "ChannelManager::IsChannel", "include/channelmanager.h",
+        "JsIrcdIsChannel",
+        "ChannelManager::IsChannel",
+        "include/channelmanager.h",
         "std::function<bool(const std::string_view&)> IsChannel = DefaultIsChannel;",
-        "ServerInstance->Channels.IsChannel(value)", ("value",), "boolean", "read_server_state",
+        "ServerInstance->Channels.IsChannel(value)",
+        ("value",),
+        "boolean",
+        "read_server_state",
     ),
     "stripColor": (
-        "JsIrcdStripColor", "InspIRCd::StripColor", "include/inspircd.h",
-        "static void StripColor(std::string& str);", "InspIRCd::StripColor(value_copy)",
-        ("value",), "string", "copy_only",
+        "JsIrcdStripColor",
+        "InspIRCd::StripColor",
+        "include/inspircd.h",
+        "static void StripColor(std::string& str);",
+        "InspIRCd::StripColor(value_copy)",
+        ("value",),
+        "string",
+        "copy_only",
     ),
     "time": (
-        "JsIrcdTime", "InspIRCd::Time", "include/inspircd.h",
-        "inline auto Time() const { return ts.tv_sec; }", "ServerInstance->Time()",
-        (), "number", "read_server_state",
+        "JsIrcdTime",
+        "InspIRCd::Time",
+        "include/inspircd.h",
+        "inline auto Time() const { return ts.tv_sec; }",
+        "ServerInstance->Time()",
+        (),
+        "number",
+        "read_server_state",
     ),
 }
 
@@ -81,8 +122,9 @@ def fail(path: str, message: str) -> None:
     raise ManifestError(f"{path}: {message}")
 
 
-def object_keys(value: Any, required: set[str], path: str,
-                optional: frozenset[str] = frozenset()) -> None:
+def object_keys(
+    value: Any, required: set[str], path: str, optional: frozenset[str] = frozenset()
+) -> None:
     if not isinstance(value, dict):
         fail(path, "expected an object")
     missing = required - value.keys()
@@ -140,14 +182,19 @@ def primitive_type(value: Any, path: str) -> None:
 
 
 def validate_manifest(data: Any) -> dict[str, Any]:
-    object_keys(data, {"schema_version", "api_namespace", "upstream", "policies", "bindings", "inventory"}, "manifest")
+    object_keys(
+        data,
+        {"schema_version", "api_namespace", "upstream", "policies", "bindings", "inventory"},
+        "manifest",
+    )
     if type(data["schema_version"]) is not int or data["schema_version"] != 1:
         fail("schema_version", "only integer schema version 1 is supported")
     if data["api_namespace"] != "ircd":
         fail("api_namespace", "only the ircd namespace is supported")
     object_keys(data["upstream"], {"project", "version", "source"}, "upstream")
     expected_upstream = {
-        "project": "InspIRCd", "version": "4.12.1",
+        "project": "InspIRCd",
+        "version": "4.12.1",
         "source": "https://github.com/inspircd/inspircd/tree/v4.12.1/include",
     }
     if data["upstream"] != expected_upstream:
@@ -162,7 +209,22 @@ def validate_manifest(data: Any) -> dict[str, Any]:
     adapters: set[str] = set()
     for index, binding in enumerate(data["bindings"]):
         path = f"bindings[{index}]"
-        object_keys(binding, {"js_name", "adapter", "native", "arguments", "returns", "description", "side_effects", "authorization", "lifetime", "errors"}, path)
+        object_keys(
+            binding,
+            {
+                "js_name",
+                "adapter",
+                "native",
+                "arguments",
+                "returns",
+                "description",
+                "side_effects",
+                "authorization",
+                "lifetime",
+                "errors",
+            },
+            path,
+        )
         for key in ("js_name", "adapter"):
             identifier(binding[key], f"{path}.{key}")
         unique(binding["js_name"], names, f"{path}.js_name")
@@ -193,10 +255,14 @@ def validate_manifest(data: Any) -> dict[str, Any]:
             fail(f"{path}.js_name", "native mapping has not been audited in CANONICAL_BINDINGS")
         adapter, symbol, header, declaration, call, args, result, effects = expected
         actual = (
-            binding["adapter"], binding["native"]["symbol"], binding["native"]["header"],
-            binding["native"]["declaration"], binding["native"]["call"],
+            binding["adapter"],
+            binding["native"]["symbol"],
+            binding["native"]["header"],
+            binding["native"]["declaration"],
+            binding["native"]["call"],
             tuple(argument["name"] for argument in binding["arguments"]),
-            binding["returns"]["type"], binding["side_effects"],
+            binding["returns"]["type"],
+            binding["side_effects"],
         )
         if actual != (adapter, symbol, header, declaration, call, args, result, effects):
             fail(path, "mapping differs from the reviewed canonical native contract")
@@ -205,7 +271,21 @@ def validate_manifest(data: Any) -> dict[str, Any]:
     ids: set[str] = set()
     for index, entry in enumerate(data["inventory"]):
         path = f"inventory[{index}]"
-        object_keys(entry, {"id", "native", "classification", "reason", "conversion", "side_effects", "authorization", "lifetime"}, path, frozenset({"proposed_js_name"}))
+        object_keys(
+            entry,
+            {
+                "id",
+                "native",
+                "classification",
+                "reason",
+                "conversion",
+                "side_effects",
+                "authorization",
+                "lifetime",
+            },
+            path,
+            frozenset({"proposed_js_name"}),
+        )
         identifier(entry["id"], f"{path}.id")
         unique(entry["id"], ids, f"{path}.id")
         native_record(entry["native"], f"{path}.native", False)
@@ -217,7 +297,10 @@ def validate_manifest(data: Any) -> dict[str, Any]:
         if classification not in ("excluded", "requires_manual_wrapper", "planned_mutation"):
             fail(f"{path}.classification", "unsupported inventory classification")
         if classification == "planned_mutation":
-            if entry["authorization"] != "pending_authority_decision" or entry["side_effects"] != "mutates_server":
+            if (
+                entry["authorization"] != "pending_authority_decision"
+                or entry["side_effects"] != "mutates_server"
+            ):
                 fail(path, "planned mutations must remain pending and identify server mutation")
             if "proposed_js_name" not in entry:
                 fail(path, "planned mutations require a proposed_js_name")
@@ -247,7 +330,9 @@ def render_outputs(data: dict[str, Any]) -> dict[str, str]:
     bindings = sorted(data["bindings"], key=lambda row: row["js_name"])
     inventory = sorted(data["inventory"], key=lambda row: row["id"])
     normalized = dict(data, bindings=bindings, inventory=inventory)
-    canonical_json = json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    canonical_json = json.dumps(
+        normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    )
     digest = hashlib.sha256(canonical_json.encode("ascii")).hexdigest()
     banner = [
         "// Generated by tools/generate_js_bindings.py; do not edit.",
@@ -262,7 +347,9 @@ def render_outputs(data: dict[str, Any]) -> dict[str, str]:
         "#endif",
     ]
     for binding in bindings:
-        registration.append(f'IRC_JS_BINDING("{binding["js_name"]}", {binding["adapter"]}, {len(binding["arguments"])})')
+        registration.append(
+            f'IRC_JS_BINDING("{binding["js_name"]}", {binding["adapter"]}, {len(binding["arguments"])})'
+        )
     declarations = banner + [
         "/** Audited utility surface. Inventory-only and pending mutation APIs are absent.",
         " * All methods enforce exact arity and strict primitive argument types.",
@@ -271,17 +358,19 @@ def render_outputs(data: dict[str, Any]) -> dict[str, str]:
         "interface IrcdApi {",
     ]
     for binding in bindings:
-        declarations.extend([
-            "  /**",
-            f'   * {binding["description"]}',
-            f'   * Native: {binding["native"]["symbol"]}',
-            f'   * Return conversion: {binding["returns"]["conversion"]}',
-        ])
+        declarations.extend(
+            [
+                "  /**",
+                f"   * {binding['description']}",
+                f"   * Native: {binding['native']['symbol']}",
+                f"   * Return conversion: {binding['returns']['conversion']}",
+            ]
+        )
         for argument in binding["arguments"]:
-            declarations.append(f'   * @param {argument["name"]} {argument["conversion"]}')
+            declarations.append(f"   * @param {argument['name']} {argument['conversion']}")
         declarations.append("   */")
-        args = ", ".join(f'{a["name"]}: {a["type"]}' for a in binding["arguments"])
-        declarations.append(f'  {binding["js_name"]}({args}): {binding["returns"]["type"]};')
+        args = ", ".join(f"{a['name']}: {a['type']}" for a in binding["arguments"])
+        declarations.append(f"  {binding['js_name']}({args}): {binding['returns']['type']};")
     declarations.extend(["}", "", "declare const ircd: Readonly<IrcdApi>;"])
     expanded = dict(
         generated_by="tools/generate_js_bindings.py",
@@ -292,8 +381,10 @@ def render_outputs(data: dict[str, Any]) -> dict[str, str]:
         policies=data["policies"],
         counts={
             "exposed": len(bindings),
-            **{kind: sum(entry["classification"] == kind for entry in inventory)
-               for kind in ("excluded", "requires_manual_wrapper", "planned_mutation")},
+            **{
+                kind: sum(entry["classification"] == kind for entry in inventory)
+                for kind in ("excluded", "requires_manual_wrapper", "planned_mutation")
+            },
         },
         bindings=[dict(binding, exposed=True) for binding in bindings],
         inventory=[dict(entry, exposed=False) for entry in inventory],
@@ -306,10 +397,14 @@ def render_outputs(data: dict[str, Any]) -> dict[str, str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--manifest", type=Path, default=ROOT / "bindings/inspircd.json")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "modules/js_generated")
-    parser.add_argument("--check", action="store_true", help="report missing/stale files without writing")
+    parser.add_argument(
+        "--check", action="store_true", help="report missing/stale files without writing"
+    )
     args = parser.parse_args(argv)
     try:
         outputs = render_outputs(load_manifest(args.manifest))
@@ -320,7 +415,9 @@ def main(argv: list[str] | None = None) -> int:
                 if not path.exists() or path.read_bytes() != expected.encode("utf-8"):
                     stale.append(str(path))
             if stale:
-                print("Generated bindings are missing or stale:\n" + "\n".join(stale), file=sys.stderr)
+                print(
+                    "Generated bindings are missing or stale:\n" + "\n".join(stale), file=sys.stderr
+                )
                 return 1
             print(f"PASS: {len(outputs)} generated binding files are current")
             return 0

@@ -17,36 +17,39 @@ void Check(bool condition, const std::string& message)
 		throw std::runtime_error(message);
 }
 
-bool Evaluate(v8::Isolate* isolate, v8::Local<v8::Context> context,
-	const std::string& source, v8::Local<v8::Value>& result)
+bool Evaluate(
+	v8::Isolate* isolate, v8::Local<v8::Context> context, const std::string& source, v8::Local<v8::Value>& result)
 {
 	v8::Local<v8::String> text;
 	v8::Local<v8::Script> script;
-	return v8::String::NewFromUtf8(isolate, source.data(), v8::NewStringType::kNormal,
-		static_cast<int>(source.size())).ToLocal(&text)
-		&& v8::Script::Compile(context, text).ToLocal(&script)
-		&& script->Run(context).ToLocal(&result);
+	return v8::String::NewFromUtf8(isolate, source.data(), v8::NewStringType::kNormal, static_cast<int>(source.size()))
+			   .ToLocal(&text) &&
+		v8::Script::Compile(context, text).ToLocal(&script) && script->Run(context).ToLocal(&result);
 }
 
 bool Invoke(js_runtime::Runtime& runtime, const std::string& expression, std::string& error)
 {
-	return runtime.WithContext([&](v8::Isolate* isolate, v8::Local<v8::Context> context)
-	{
-		v8::Local<v8::Value> value;
-		return Evaluate(isolate, context, expression, value)
-			&& js_runtime::Runtime::RequireSynchronous(isolate, value);
-	}, error);
+	return runtime.WithContext(
+		[&](v8::Isolate* isolate, v8::Local<v8::Context> context)
+		{
+			v8::Local<v8::Value> value;
+			return Evaluate(isolate, context, expression, value) &&
+				js_runtime::Runtime::RequireSynchronous(isolate, value);
+		},
+		error);
 }
 
 void AssertExpression(js_runtime::Runtime& runtime, const std::string& expression)
 {
 	std::string error;
-	Check(runtime.WithContext([&](v8::Isolate* isolate, v8::Local<v8::Context> context)
-	{
-		v8::Local<v8::Value> value;
-		return Evaluate(isolate, context, expression, value)
-			&& value->IsTrue();
-	}, error), "expression failed: " + expression + "; " + error);
+	Check(runtime.WithContext(
+			  [&](v8::Isolate* isolate, v8::Local<v8::Context> context)
+			  {
+				  v8::Local<v8::Value> value;
+				  return Evaluate(isolate, context, expression, value) && value->IsTrue();
+			  },
+			  error),
+		"expression failed: " + expression + "; " + error);
 }
 
 void CheckDisabled(js_runtime::Runtime& runtime)
@@ -54,11 +57,14 @@ void CheckDisabled(js_runtime::Runtime& runtime)
 	Check(!runtime.IsHealthy(), "failed runtime remained healthy");
 	bool ran = false;
 	std::string error;
-	Check(!runtime.WithContext([&](v8::Isolate*, v8::Local<v8::Context>)
-	{
-		ran = true;
-		return true;
-	}, error), "poisoned runtime was reused");
+	Check(!runtime.WithContext(
+			  [&](v8::Isolate*, v8::Local<v8::Context>)
+			  {
+				  ran = true;
+				  return true;
+			  },
+			  error),
+		"poisoned runtime was reused");
 	Check(!ran && error.find("disabled until reload") != std::string::npos,
 		"disabled runtime ran work or did not explain recovery");
 }
@@ -68,33 +74,35 @@ void TestInitializationAndIsolation()
 	std::string error;
 	js_runtime::Runtime first(1000);
 	int calls = 0;
-	Check(first.Initialize("globalThis.answer = nativeAdd(20, 22); void 0;", "first.js",
-		[&](v8::Isolate* isolate, v8::Local<v8::Context> context)
-		{
-			auto callback = [](const v8::FunctionCallbackInfo<v8::Value>& args)
-			{
-				auto* count = static_cast<int*>(args.Data().As<v8::External>()->Value());
-				++*count;
-				args.GetReturnValue().Set(args[0].As<v8::Int32>()->Value()
-					+ args[1].As<v8::Int32>()->Value());
-			};
-			v8::Local<v8::Function> function;
-			return v8::Function::New(context, callback,
-				v8::External::New(isolate, &calls)).ToLocal(&function)
-				&& context->Global()->Set(context,
-					v8::String::NewFromUtf8Literal(isolate, "nativeAdd"), function).FromMaybe(false);
-		}, error), "host setup/evaluation failed: " + error);
+	Check(first.Initialize(
+			  "globalThis.answer = nativeAdd(20, 22); void 0;", "first.js",
+			  [&](v8::Isolate* isolate, v8::Local<v8::Context> context)
+			  {
+				  auto callback = [](const v8::FunctionCallbackInfo<v8::Value>& args)
+				  {
+					  auto* count = static_cast<int*>(args.Data().As<v8::External>()->Value());
+					  ++*count;
+					  args.GetReturnValue().Set(args[0].As<v8::Int32>()->Value() + args[1].As<v8::Int32>()->Value());
+				  };
+				  v8::Local<v8::Function> function;
+				  return v8::Function::New(context, callback, v8::External::New(isolate, &calls)).ToLocal(&function) &&
+					  context->Global()
+						  ->Set(context, v8::String::NewFromUtf8Literal(isolate, "nativeAdd"), function)
+						  .FromMaybe(false);
+			  },
+			  error),
+		"host setup/evaluation failed: " + error);
 	Check(calls == 1, "registered host callback was not called exactly once");
 	AssertExpression(first, "answer === 42");
-	AssertExpression(first, "typeof process === 'undefined' && typeof require === 'undefined'"
+	AssertExpression(first,
+		"typeof process === 'undefined' && typeof require === 'undefined'"
 		" && typeof Buffer === 'undefined' && typeof setTimeout === 'undefined'"
 		" && typeof queueMicrotask === 'undefined'");
 	js_runtime::Runtime second(1000);
 	Check(second.Initialize("void 0;", "second.js", {}, error), error);
 	AssertExpression(second, "typeof answer === 'undefined' && typeof nativeAdd === 'undefined'");
 	Check(first.GetIsolate() != second.GetIsolate(), "scripts shared an isolate");
-	Check(first.GetIsolate()->GetMicrotasksPolicy() == v8::MicrotasksPolicy::kExplicit,
-		"microtasks are not explicit");
+	Check(first.GetIsolate()->GetMicrotasksPolicy() == v8::MicrotasksPolicy::kExplicit, "microtasks are not explicit");
 }
 
 void TestErrorHandling()
@@ -121,11 +129,10 @@ void TestErrorHandling()
 	}
 	{
 		js_runtime::Runtime runtime(1000);
-		Check(!runtime.Initialize("void 0;", "host-failure.js",
-			[](v8::Isolate*, v8::Local<v8::Context>) -> bool
-			{
-				throw std::runtime_error("PRIVATE_NATIVE_DETAIL");
-			}, error), "C++ setup exception escaped or was accepted");
+		Check(!runtime.Initialize(
+				  "void 0;", "host-failure.js", [](v8::Isolate*, v8::Local<v8::Context>) -> bool
+				  { throw std::runtime_error("PRIVATE_NATIVE_DETAIL"); }, error),
+			"C++ setup exception escaped or was accepted");
 		Check(error.find("PRIVATE_NATIVE_DETAIL") == std::string::npos, "native exception content leaked");
 		CheckDisabled(runtime);
 	}
@@ -150,7 +157,8 @@ void TestSynchronousOnly()
 	{
 		js_runtime::Runtime runtime(1000);
 		Check(runtime.Initialize("globalThis.observed = 0; Promise.resolve().then(() => { observed = 1; }); void 0;",
-			"microtasks.js", {}, error), error);
+				  "microtasks.js", {}, error),
+			error);
 		AssertExpression(runtime, "observed === 0");
 		AssertExpression(runtime, "observed === 0");
 	}
@@ -169,7 +177,8 @@ void TestSynchronousOnly()
 	{
 		js_runtime::Runtime runtime(1000);
 		Check(runtime.Initialize("void 0;", "atomics.js", {}, error), error);
-		AssertExpression(runtime, "(() => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);"
+		AssertExpression(runtime,
+			"(() => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);"
 			" return false; } catch (error) { return error instanceof TypeError; } })()");
 	}
 }
@@ -182,8 +191,8 @@ void TestWebAssemblyErrors()
 		// Truncated wasm header: synchronous Module construction must fail
 		// during initialization rather than publish a usable script runtime.
 		Check(!runtime.Initialize(
-			"new WebAssembly.Module(new Uint8Array([0,97,115,109,1]));",
-			"malformed-wasm.js", {}, error), "malformed wasm module was accepted");
+				  "new WebAssembly.Module(new Uint8Array([0,97,115,109,1]));", "malformed-wasm.js", {}, error),
+			"malformed wasm module was accepted");
 		Check(error.find("JavaScript exception") != std::string::npos,
 			"malformed wasm did not report a script exception: " + error);
 		CheckDisabled(runtime);
@@ -192,11 +201,12 @@ void TestWebAssemblyErrors()
 		js_runtime::Runtime runtime(1000);
 		// (module (func (export "trap") unreachable)): valid bytes compile
 		// and instantiate; only calling the exported function should trap.
-		const bool initialized = runtime.Initialize(
-			"const bytes = new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,"
-			"7,8,1,4,116,114,97,112,0,0,10,5,1,3,0,0,11]);"
-			"const wasm = new WebAssembly.Instance(new WebAssembly.Module(bytes));"
-			"function callback() { wasm.exports.trap(); }", "trapping-wasm.js", {}, error);
+		const bool initialized =
+			runtime.Initialize("const bytes = new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,"
+							   "7,8,1,4,116,114,97,112,0,0,10,5,1,3,0,0,11]);"
+							   "const wasm = new WebAssembly.Instance(new WebAssembly.Module(bytes));"
+							   "function callback() { wasm.exports.trap(); }",
+				"trapping-wasm.js", {}, error);
 		Check(initialized, "valid trapping wasm could not initialize: " + error);
 		AssertExpression(runtime, "typeof wasm.exports.trap === 'function'");
 		Check(!Invoke(runtime, "callback()", error), "wasm unreachable trap was accepted");
@@ -220,18 +230,20 @@ void TestTermination()
 	{
 		js_runtime::Runtime runtime(30);
 		Check(runtime.Initialize("function callback() { try { while (true) {} } catch (error) { return true; } }",
-			"infinite-callback.js", {}, error), error);
+				  "infinite-callback.js", {}, error),
+			error);
 		Check(!Invoke(runtime, "callback()", error), "infinite callback caught termination");
 		Check(error.find("timed out") != std::string::npos, "callback did not time out: " + error);
 		CheckDisabled(runtime);
 	}
 	{
 		js_runtime::Runtime runtime(30);
-		Check(runtime.Initialize(
-			"const bytes = new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,"
-			"7,8,1,4,115,112,105,110,0,0,10,9,1,7,0,3,64,12,0,11,11]);"
-			"const wasm = new WebAssembly.Instance(new WebAssembly.Module(bytes));"
-			"function callback() { wasm.exports.spin(); }", "infinite-wasm.js", {}, error), error);
+		Check(runtime.Initialize("const bytes = new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,"
+								 "7,8,1,4,115,112,105,110,0,0,10,9,1,7,0,3,64,12,0,11,11]);"
+								 "const wasm = new WebAssembly.Instance(new WebAssembly.Module(bytes));"
+								 "function callback() { wasm.exports.spin(); }",
+				  "infinite-wasm.js", {}, error),
+			error);
 		const auto start = std::chrono::steady_clock::now();
 		Check(!Invoke(runtime, "callback()", error), "infinite wasm callback survived");
 		Check(error.find("timed out") != std::string::npos, "wasm did not time out: " + error);
@@ -250,12 +262,15 @@ void TestTermination()
 	}
 	{
 		js_runtime::Runtime runtime(10);
-		Check(!runtime.Initialize("void 0;", "slow-setup.js",
-			[](v8::Isolate*, v8::Local<v8::Context>)
-			{
-				std::this_thread::sleep_for(std::chrono::milliseconds(25));
-				return true;
-			}, error), "host setup escaped the operation budget");
+		Check(!runtime.Initialize(
+				  "void 0;", "slow-setup.js",
+				  [](v8::Isolate*, v8::Local<v8::Context>)
+				  {
+					  std::this_thread::sleep_for(std::chrono::milliseconds(25));
+					  return true;
+				  },
+				  error),
+			"host setup escaped the operation budget");
 		Check(error.find("timed out") != std::string::npos, "setup did not time out: " + error);
 	}
 }
@@ -274,25 +289,27 @@ void TestLifetimeAndReentrancy()
 		js_runtime::Runtime runtime(1000);
 		Check(runtime.Initialize("void 0;", "owner-thread.js", {}, error), error);
 		bool success = true;
-		std::thread other([&]
-		{
-			success = runtime.WithContext([](v8::Isolate*, v8::Local<v8::Context>) { return true; }, error);
-		});
+		std::thread other(
+			[&] { success = runtime.WithContext([](v8::Isolate*, v8::Local<v8::Context>) { return true; }, error); });
 		other.join();
-		Check(!success && error.find("non-owning thread") != std::string::npos,
-			"cross-thread isolate use was accepted");
+		Check(
+			!success && error.find("non-owning thread") != std::string::npos, "cross-thread isolate use was accepted");
 		AssertExpression(runtime, "true");
 	}
 	{
 		js_runtime::Runtime runtime(1000);
 		Check(runtime.Initialize("void 0;", "reentrant.js", {}, error), error);
-		Check(!runtime.WithContext([&](v8::Isolate*, v8::Local<v8::Context>)
-		{
-			std::string inner_error;
-			Check(!runtime.WithContext([](v8::Isolate*, v8::Local<v8::Context>) { return true; }, inner_error),
-				"reentrant isolate use was accepted");
-			return true;
-		}, error), "outer operation ignored reentrant failure");
+		Check(!runtime.WithContext(
+				  [&](v8::Isolate*, v8::Local<v8::Context>)
+				  {
+					  std::string inner_error;
+					  Check(
+						  !runtime.WithContext([](v8::Isolate*, v8::Local<v8::Context>) { return true; }, inner_error),
+						  "reentrant isolate use was accepted");
+					  return true;
+				  },
+				  error),
+			"outer operation ignored reentrant failure");
 		CheckDisabled(runtime);
 	}
 	// Destroy timed-out isolates immediately, then run fresh generations. Any
@@ -322,7 +339,8 @@ int main()
 		TestTermination();
 		TestLifetimeAndReentrancy();
 		std::cout << "PASS: V8 " << v8::V8::GetVersion()
-			<< " runtime, isolation, failclosed errors, synchronous hooks, wasm validation/traps, compilation/JS/wasm deadlines, reload lifetime\n";
+				  << " runtime, isolation, failclosed errors, synchronous hooks, wasm validation/traps, "
+					 "compilation/JS/wasm deadlines, reload lifetime\n";
 		return EXIT_SUCCESS;
 	}
 	catch (const std::exception& error)

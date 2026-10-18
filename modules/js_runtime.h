@@ -23,8 +23,7 @@ namespace detail
 {
 // Newer V8 releases dropped ScriptOrigin's isolate argument. Prefer the newer
 // constructor when available without requiring a brittle version-number gate.
-template <typename Origin = v8::ScriptOrigin>
-Origin MakeScriptOrigin(v8::Isolate* isolate, v8::Local<v8::Value> name)
+template <typename Origin = v8::ScriptOrigin> Origin MakeScriptOrigin(v8::Isolate* isolate, v8::Local<v8::Value> name)
 {
 	if constexpr (std::is_constructible<Origin, v8::Local<v8::Value>>::value)
 		return Origin(name);
@@ -36,7 +35,7 @@ Origin MakeScriptOrigin(v8::Isolate* isolate, v8::Local<v8::Value> name)
 // platform and never call V8::Dispose/DisposePlatform. The containing shared
 // object MUST be linked NODELETE so its code and this singleton survive unload.
 // This embedder assumes it is the sole owner of V8 process initialization.
-inline void EnsurePlatform()
+inline v8::Platform* EnsurePlatform()
 {
 	struct State
 	{
@@ -57,6 +56,7 @@ inline void EnsurePlatform()
 	static const State* const state = new State;
 	if (!state->ready)
 		throw std::runtime_error("V8 process initialization failed");
+	return state->platform;
 }
 
 // There is exactly one watchdog per active operation. Finish and termination
@@ -79,15 +79,16 @@ public:
 	Deadline(v8::Isolate* target, std::chrono::milliseconds budget)
 		: isolate(target)
 		, deadline(Clock::now() + budget)
-		, worker([this]
-		{
-			std::unique_lock<std::mutex> lock(mutex);
-			if (!wake.wait_until(lock, deadline, [this] { return finished; }))
-			{
-				expired = true;
-				isolate->TerminateExecution();
-			}
-		})
+		, worker(
+			  [this]
+			  {
+				  std::unique_lock<std::mutex> lock(mutex);
+				  if (!wake.wait_until(lock, deadline, [this] { return finished; }))
+				  {
+					  expired = true;
+					  isolate->TerminateExecution();
+				  }
+			  })
 	{
 	}
 
@@ -135,6 +136,7 @@ private:
 	const std::chrono::milliseconds timeout;
 	const std::thread::id owner = std::this_thread::get_id();
 	std::unique_ptr<v8::ArrayBuffer::Allocator> allocator;
+	v8::Platform* platform = nullptr;
 	v8::Isolate* isolate = nullptr;
 	v8::Global<v8::Context> context;
 	std::string source_name;
@@ -158,7 +160,7 @@ public:
 			throw std::invalid_argument("JavaScript timeout must be positive");
 		if (heap_limit_mb == 0 || heap_limit_mb > std::numeric_limits<std::size_t>::max() / mib)
 			throw std::invalid_argument("JavaScript heap threshold is invalid");
-		detail::EnsurePlatform();
+		platform = detail::EnsurePlatform();
 		allocator.reset(v8::ArrayBuffer::Allocator::NewDefaultAllocator());
 		if (!allocator)
 			throw std::runtime_error("V8 ArrayBuffer allocator initialization failed");
@@ -181,6 +183,8 @@ public:
 		// Destruction is only valid on the owning thread after the current
 		// operation returned and after caller-owned persistent handles reset.
 		context.Reset();
+		// The platform outlives this isolate; release its foreground task runner.
+		v8::platform::NotifyIsolateShutdown(platform, isolate);
 		isolate->Dispose();
 	}
 
@@ -200,13 +204,12 @@ public:
 			return false;
 		if (!value->IsPromise())
 			return true;
-		target->ThrowException(v8::Exception::TypeError(v8::String::NewFromUtf8Literal(
-			target, "Asynchronous JavaScript callbacks are not supported")));
+		target->ThrowException(v8::Exception::TypeError(
+			v8::String::NewFromUtf8Literal(target, "Asynchronous JavaScript callbacks are not supported")));
 		return false;
 	}
 
-	bool Initialize(const std::string& source, const std::string& filename,
-		const Action& setup, std::string& error)
+	bool Initialize(const std::string& source, const std::string& filename, const Action& setup, std::string& error)
 	{
 		if (std::this_thread::get_id() != owner)
 		{
@@ -221,27 +224,30 @@ public:
 		}
 		initialized = true;
 		source_name = filename;
-		return WithContext([&](v8::Isolate* target, v8::Local<v8::Context> local_context)
-		{
-			if (setup && !setup(target, local_context))
-				return false;
-			if (source.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())
-				|| filename.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
-				return false;
-			v8::Local<v8::String> code;
-			v8::Local<v8::String> name;
-			if (!v8::String::NewFromUtf8(target, source.data(), v8::NewStringType::kNormal,
-				static_cast<int>(source.size())).ToLocal(&code)
-				|| !v8::String::NewFromUtf8(target, filename.data(), v8::NewStringType::kNormal,
-					static_cast<int>(filename.size())).ToLocal(&name))
-				return false;
-			auto origin = detail::MakeScriptOrigin(target, name);
-			v8::Local<v8::Script> script;
-			v8::Local<v8::Value> result;
-			return v8::Script::Compile(local_context, code, &origin).ToLocal(&script)
-				&& script->Run(local_context).ToLocal(&result)
-				&& RequireSynchronous(target, result);
-		}, error);
+		return WithContext(
+			[&](v8::Isolate* target, v8::Local<v8::Context> local_context)
+			{
+				if (setup && !setup(target, local_context))
+					return false;
+				if (source.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
+					filename.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+					return false;
+				v8::Local<v8::String> code;
+				v8::Local<v8::String> name;
+				if (!v8::String::NewFromUtf8(
+						target, source.data(), v8::NewStringType::kNormal, static_cast<int>(source.size()))
+						.ToLocal(&code) ||
+					!v8::String::NewFromUtf8(
+						target, filename.data(), v8::NewStringType::kNormal, static_cast<int>(filename.size()))
+						.ToLocal(&name))
+					return false;
+				auto origin = detail::MakeScriptOrigin(target, name);
+				v8::Local<v8::Script> script;
+				v8::Local<v8::Value> result;
+				return v8::Script::Compile(local_context, code, &origin).ToLocal(&script) &&
+					script->Run(local_context).ToLocal(&result) && RequireSynchronous(target, result);
+			},
+			error);
 	}
 
 	bool WithContext(const Action& action, std::string& error)
