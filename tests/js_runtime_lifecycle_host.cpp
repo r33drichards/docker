@@ -3,6 +3,8 @@
 #include <dlfcn.h>
 #include <valgrind/memcheck.h>
 
+#include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -17,11 +19,22 @@ void Check(bool condition, const std::string& message)
 		throw std::runtime_error(message);
 }
 
+void Progress(unsigned int generation, const char* phase)
+{
+	using Clock = std::chrono::steady_clock;
+	static const auto started = Clock::now();
+	const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - started).count();
+	std::fprintf(stderr, "HOST +%lldms generation=%u %s\n", static_cast<long long>(elapsed), generation, phase);
+	std::fflush(stderr);
+}
+
 void Reload(const char* path, unsigned int expected_generation)
 {
+	Progress(expected_generation, "dlopen: start");
 	void* library = dlopen(path, RTLD_NOW | RTLD_LOCAL);
 	if (!library)
 		throw std::runtime_error(dlerror());
+	Progress(expected_generation, "dlopen: complete; resolving entry point");
 	dlerror();
 	void* symbol = dlsym(library, "lifecycle_generation");
 	const char* error = dlerror();
@@ -31,11 +44,14 @@ void Reload(const char* path, unsigned int expected_generation)
 	static_assert(sizeof(Run) == sizeof(symbol), "POSIX dlsym pointer size mismatch");
 	Run run;
 	std::memcpy(&run, &symbol, sizeof(run));
+	Progress(expected_generation, "calling generation");
 	Check(run() == expected_generation, "runtime failed or NODELETE state reset across dlclose");
+	Progress(expected_generation, "generation complete; dlclose: start");
 	Check(dlclose(library) == 0, "dlclose failed");
 	void* retained = dlopen(path, RTLD_NOW | RTLD_NOLOAD | RTLD_LOCAL);
 	Check(retained != nullptr, "NODELETE library was unmapped after dlclose");
 	Check(dlclose(retained) == 0, "retained dlclose failed");
+	Progress(expected_generation, "dlclose: complete; NODELETE verified");
 }
 
 struct Heap
@@ -48,9 +64,11 @@ struct Heap
 
 Heap Snapshot()
 {
+	Progress(0, "heap snapshot: start");
 	VALGRIND_DO_QUICK_LEAK_CHECK;
 	Heap heap;
 	VALGRIND_COUNT_LEAKS(heap.lost, heap.possible, heap.reachable, heap.suppressed);
+	Progress(0, "heap snapshot: complete");
 	return heap;
 }
 } // namespace
@@ -59,6 +77,8 @@ int main(int argc, char** argv)
 {
 	try
 	{
+		std::setvbuf(stderr, nullptr, _IONBF, 0);
+		Progress(0, "host main entered");
 		Check(argc == 2, "usage: js_runtime_lifecycle_host SHARED_LIBRARY");
 		Check(RUNNING_ON_VALGRIND != 0, "this test requires Valgrind Memcheck");
 		// Warm both successful and terminated isolate paths and libc's thread cache.

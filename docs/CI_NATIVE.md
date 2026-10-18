@@ -74,6 +74,24 @@ broad V8 suppression is installed. The explicit
 `--smc-check=all-non-file` setting follows Valgrind's
 [self-modifying-code guidance](https://valgrind.org/docs/manual/manual-core.html#manual-core.adv).
 
+The Memcheck command requires `--fair-sched=yes`. Valgrind's default pipe-based
+scheduler can let a busy interpreter repeatedly reacquire its execution lock,
+starving the watchdog that must interrupt the infinite-script test. This was
+reproduced on an unpinned multicore run: the default scheduler stalled during a
+warmup timeout, while the same binary with fair scheduling completed all 28
+generations in about 13 seconds. The [official threading guidance](https://valgrind.org/docs/manual/manual-core.html#manual-core.pthreads)
+explains this fairness difference. Fair scheduling changes the test tool's
+scheduling, not the runtime's deadlines or thread count; it is required rather
+than allowed to fall back silently. The 180-second outer cap and every memory
+and lifecycle assertion remain unchanged.
+
+The host and module emit flushed, monotonic-timestamped phase diagnostics before
+and after loading, construction, script execution, destruction, and heap scans.
+Application output streams live to the CI console and is retained in the stdout
+log. Valgrind also writes ten-second CPU/thread progress reports and timestamped
+errors to its own log, so a timeout identifies the last running phase rather
+than producing only an empty warmup log.
+
 The platform is deliberately process-lived and the DSO deliberately NODELETE.
 Consequently, a live worker thread's TLS and reachable platform allocations
 remain at process exit. The V8 lane does **not** claim zero exit allocations.

@@ -74,4 +74,4 @@ check_python \
 "$PYTHON" tests/test_generate_js_bindings.py
 "$PYTHON" tests/test_authorize_heavy.py
 "$PYTHON" tests/test_precommand_client.py
-printf '%s\n' 'PASS: C++/Python formatting, static analysis, shell lint, generator drift, and CI selector tests'
+printf '%s\n' 'PASS: C++/Python formatting, static analysis, shell lint, generator drift, CI selector, and registration tests'

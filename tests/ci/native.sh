@@ -129,15 +129,19 @@ memcheck() {
     local leak_kinds=$2
     shift 2
     local log="$LOG_DIR/$test.memcheck.log"
+    local started=$SECONDS
+    printf 'RUN: %s (Memcheck; fair scheduler; timeout %ss)\n' "$test" "$TEST_TIMEOUT"
     if timeout --kill-after=10 "$TEST_TIMEOUT" "$VALGRIND" "${VG_EXTRA[@]}" \
-        --tool=memcheck --default-suppressions=no --error-exitcode=99 --leak-check=full \
+        --tool=memcheck --fair-sched=yes --progress-interval=10 --time-stamp=yes \
+        --default-suppressions=no --error-exitcode=99 --leak-check=full \
         --show-leak-kinds=definite,indirect,possible --errors-for-leak-kinds="$leak_kinds" \
         --track-origins=yes --smc-check=all-non-file --log-file="$log" "$@" \
-        > "$LOG_DIR/$test.stdout.log" 2>&1; then
-        cat "$LOG_DIR/$test.stdout.log" "$log"
+        2>&1 | tee "$LOG_DIR/$test.stdout.log"; then
+        cat "$log"
+        printf 'PASS: %s completed in %ss\n' "$test" "$((SECONDS - started))"
     else
         local status=$?
-        cat "$LOG_DIR/$test.stdout.log" "$log" >&2
+        cat "$log" >&2
         echo "FAIL: $test exited $status (logs: $LOG_DIR)" >&2
         exit "$status"
     fi

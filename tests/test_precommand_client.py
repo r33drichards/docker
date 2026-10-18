@@ -38,7 +38,7 @@ class RegistrationTests(unittest.TestCase):
         return sock
 
     def test_registration_reset_retries_and_discards_partial_buffer(self):
-        failed = self.connected_socket(b":old partial", ConnectionResetError("not ready"))
+        failed = self.connected_socket(b"\xffpartial", ConnectionResetError("not ready"))
         ready = self.connected_socket(b":server 001 nick :Welcome\r\n")
         with mock.patch.object(
             precommand_client.socket, "create_connection", side_effect=[failed, ready]
