@@ -347,6 +347,39 @@ You can put the sources these modules in the modules directory of this repositor
 
 It also allows you to overwrite modules.
 
+
+### Included ECHO module (InspIRCd 4)
+
+This repository includes `modules/m_echo.cpp`. The Docker build compiles it
+into `m_echo.so`, but it is **not loaded by default**. To enable it, add
+`<module name="echo">` to your server configuration, or mount a small config file:
+
+```sh
+docker build -t inspircd:echo .
+printf '<module name="echo">\n' > echo.conf
+docker run --rm -p 6667:6667 \
+  -v "$(pwd)/echo.conf:/inspircd/conf.d/echo.conf:ro" inspircd:echo
+```
+
+From a connected IRC client, send the raw command (many clients have their own
+local `/echo` command):
+
+```text
+/quote ECHO :Hello from IRC
+```
+
+The server returns `NOTICE <your-nick> :Hello from IRC` only to the issuing
+client. No operator privileges are required. Multiple arguments are joined
+with single spaces; a trailing `:<text>` argument preserves spaces within
+that text. Missing or empty text receives numeric `461` (not enough parameters).
+Replies obey the server's IRC line-length limit; oversized text may be truncated.
+The command echoes text only: it does not execute commands, broadcast to other
+clients, or add logging. It is separate from the IRCv3 `echo-message` capability.
+
+The existing `./run_tests.sh` suite runs `tests/echo.sh` against the
+`inspircd:testing` image. That test requires Python 3 on the host and covers
+opt-in loading, argument handling, literal text, and caller-only output.
+
 Make sure you install all needed dependencies using `ADDPACKAGES`.
 
 
