@@ -47,7 +47,8 @@ check_cpp()
 check_cpp \
     modules/m_precommand.cpp modules/parsed_command.h \
     modules/extra/m_javascript.cpp modules/js_native_utilities.h \
-    modules/js_runtime.h modules/js_script_loader.h modules/js_wire_validation.h \
+    modules/js_runtime.h modules/js_script_loader.h modules/js_wire_validation.h modules/js_hook_snapshot.h \
+    tests/fixtures/m_js_hook_probe.cpp \
     tests/precommand_struct.cpp tests/js_runtime.cpp tests/js_script_loader.cpp \
     tests/js_runtime_lifecycle.cpp tests/js_runtime_lifecycle_host.cpp \
     tests/fuzz/*.cpp tests/fuzz/*.h
@@ -59,7 +60,8 @@ check_python()
 }
 
 check_python \
-    tools/generate_js_bindings.py tests/test_generate_js_bindings.py tests/test_authorize_heavy.py \
+    tools/generate_js_bindings.py tools/generate_module_hooks.py \
+    tests/test_generate_module_hooks.py tests/test_generate_js_bindings.py tests/test_authorize_heavy.py \
     tests/javascript_native.py tests/precommand_client.py tests/test_precommand_client.py \
     tests/precommand_log.py \
     tests/ci/*.py tests/fuzz/*.py
@@ -72,6 +74,8 @@ check_python \
 # Generated files have one canonical formatter: the generator itself.
 "$PYTHON" tools/generate_js_bindings.py --check
 "$PYTHON" tests/test_generate_js_bindings.py
+"$PYTHON" tools/generate_module_hooks.py --check
+"$PYTHON" tests/test_generate_module_hooks.py
 "$PYTHON" tests/test_authorize_heavy.py
 "$PYTHON" tests/test_precommand_client.py
 printf '%s\n' 'PASS: C++/Python formatting, static analysis, shell lint, generator drift, CI selector, and registration tests'

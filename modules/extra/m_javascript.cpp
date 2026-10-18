@@ -8,6 +8,11 @@
 #include "js_script_loader.h"
 #include "js_native_utilities.h"
 #include <cstring>
+#include <type_traits>
+#include "message.h"
+#include "numeric.h"
+#include "xline.h"
+#include "js_generated/hook_specs.h"
 
 namespace
 {
@@ -22,6 +27,7 @@ struct DispatchState
 {
 	bool alive = true;
 	bool internal = false;
+	bool running = false;
 };
 struct FlagGuard
 {
@@ -144,11 +150,22 @@ v8::Local<v8::Value> Display(v8::Isolate* isolate, const std::string& text)
 	return value;
 }
 
+#include "js_hook_snapshot.h"
+
+const HookSpec* FindHook(const std::string& stage)
+{
+	for (const auto& hook : HookSpecs)
+		if (stage == hook.name)
+			return &hook;
+	return nullptr;
+}
+
 class Script
 {
 public:
 	js_runtime::Runtime runtime;
-	std::vector<v8::Global<v8::Function>> pre, post;
+	std::map<std::string, std::vector<v8::Global<v8::Function>>> callbacks;
+	bool dispatching = false;
 	std::vector<Effect> effects;
 	Authority authority;
 	std::string actor;
@@ -190,13 +207,18 @@ public:
 		}
 		if (!Text(args.GetIsolate(), args[0], stage))
 			return;
-		auto* callbacks = stage == "preCommand" ? &self->pre : stage == "postCommand" ? &self->post : nullptr;
-		if (!callbacks || callbacks->size() >= 16)
+		if (!FindHook(stage))
+		{
+			Error(args.GetIsolate(), "Unknown stage");
+			return;
+		}
+		auto& callbacks = self->callbacks[stage];
+		if (callbacks.size() >= 16)
 		{
 			Error(args.GetIsolate(), "Unknown stage or too many callbacks");
 			return;
 		}
-		callbacks->emplace_back(args.GetIsolate(), args[1].As<v8::Function>());
+		callbacks.emplace_back(args.GetIsolate(), args[1].As<v8::Function>());
 	}
 	static void Wasm(const v8::FunctionCallbackInfo<v8::Value>& args)
 	{
@@ -220,9 +242,9 @@ public:
 	{
 		auto* self = Self(args);
 		std::string target, text;
-		if (self->loading || self->actor.empty())
+		if (self->loading || !self->dispatching || (self->authority == Authority::User && self->actor.empty()))
 		{
-			Error(args.GetIsolate(), "State changes require an active command callback");
+			Error(args.GetIsolate(), "State changes require an active callback and a local actor for user authority");
 			return;
 		}
 		if (args.Length() != 2)
@@ -324,9 +346,8 @@ public:
 			return;
 		auto* actor = ServerInstance->Users.FindUUID<LocalUser>(effect.actor);
 		auto* target = ServerInstance->Users.FindUUID<LocalUser>(effect.target);
-		if (!actor || actor->quitting || !target || target->quitting)
-			return;
-		if (effect.authority == Authority::User && target != actor)
+		if (!target || target->quitting ||
+			(effect.authority == Authority::User && (!actor || actor->quitting || target != actor)))
 			return;
 		FlagGuard guard(owner->internal);
 		if (!effect.rename)
@@ -472,11 +493,14 @@ class ModuleJavaScript final : public Module
 	{
 		if (!active)
 			return true;
+		FlagGuard running(state->running);
 		for (auto& script : active->scripts)
 		{
-			auto& callbacks = pre ? script->pre : script->post;
-			if (callbacks.empty())
+			auto found = script->callbacks.find(pre ? "preCommand" : "postCommand");
+			if (found == script->callbacks.end())
 				continue;
+			auto& callbacks = found->second;
+			FlagGuard callbackflag(script->dispatching);
 			script->actor = actor;
 			script->effects.clear();
 			std::string error;
@@ -522,12 +546,122 @@ class ModuleJavaScript final : public Module
 			ServerInstance->AtomicActions.AddAction(new DeferredEffect(state, std::move(effect)));
 	}
 
+	static std::string Actor(User* user) { return user && IS_LOCAL(user) ? user->uuid : std::string(); }
+	static bool HookDecision(v8::Local<v8::Context> context, v8::Local<v8::Value> returned, const HookSpec& hook,
+		Authority authority, ModResult& result)
+	{
+		auto* isolate = context->GetIsolate();
+		if (returned->IsUndefined())
+			return true;
+		if (!returned->IsObject() || returned->IsArray())
+		{
+			Error(isolate, "Expected undefined or a hook decision");
+			return false;
+		}
+		auto object = returned.As<v8::Object>();
+		v8::Local<v8::Array> keys;
+		if (!object->GetOwnPropertyNames(context).ToLocal(&keys) || keys->Length() != 1)
+		{
+			Error(isolate, "Hook decisions contain only action; snapshots are read-only");
+			return false;
+		}
+		v8::Local<v8::Value> key, action;
+		std::string keyname, name;
+		if (!keys->Get(context, 0).ToLocal(&key) || !Text(isolate, key, keyname) || keyname != "action" ||
+			!object->Get(context, Key(isolate, "action")).ToLocal(&action) || !Text(isolate, action, name))
+		{
+			Error(isolate, "Expected action");
+			return false;
+		}
+		if (name == "pass")
+			return true;
+		if (name == "deny")
+		{
+			result = MOD_RES_DENY;
+			return true;
+		}
+		if (name == "allow" && hook.allow && authority == Authority::Admin)
+		{
+			result = MOD_RES_ALLOW;
+			return true;
+		}
+		Error(isolate, "allow requires admin authority and a hook that does not transfer socket ownership");
+		return false;
+	}
+	using SnapshotBuilder = std::function<bool(HookSnapshot&, v8::Local<v8::Object>)>;
+	ModResult DispatchHook(const char* stage, const std::string& actor, const SnapshotBuilder& build)
+	{
+		if (!active || state->internal || state->running)
+			return MOD_RES_PASSTHRU;
+		const auto& hook = *FindHook(stage);
+		FlagGuard running(state->running);
+		std::vector<Effect> effects;
+		ModResult result = MOD_RES_PASSTHRU;
+		for (auto& script : active->scripts)
+		{
+			auto found = script->callbacks.find(stage);
+			if (found == script->callbacks.end())
+				continue;
+			FlagGuard callbackflag(script->dispatching);
+			script->actor = actor;
+			script->effects.clear();
+			std::string error;
+			const bool washealthy = script->runtime.IsHealthy();
+			const bool success = script->runtime.WithContext(
+				[&](v8::Isolate* isolate, v8::Local<v8::Context> context)
+				{
+					for (auto& callback : found->second)
+					{
+						HookSnapshot snapshot(context);
+						auto event = v8::Object::New(isolate);
+						if (!Put(context, event, "stage", Key(isolate, stage)) ||
+							!Put(context, event, "userId",
+								actor.empty() ? v8::Local<v8::Value>(v8::Null(isolate)) : Display(isolate, actor)) ||
+							!build(snapshot, event))
+							return false;
+						v8::Local<v8::Value> arg = event, returned;
+						if (!callback.Get(isolate)->Call(context, v8::Undefined(isolate), 1, &arg).ToLocal(&returned) ||
+							!js_runtime::Runtime::RequireSynchronous(isolate, returned))
+							return false;
+						if (hook.decision && !HookDecision(context, returned, hook, script->authority, result))
+							return false;
+						if (result != MOD_RES_PASSTHRU)
+							break;
+					}
+					return true;
+				},
+				error);
+			script->actor.clear();
+			if (!success || result == MOD_RES_DENY)
+			{
+				script->effects.clear();
+				if (!success && washealthy)
+					ServerInstance->Logs.Normal(
+						MODNAME, "JavaScript hook failed; script disabled until successful rehash");
+				return success ? result : hook.decision && hook.failclosed ? MOD_RES_DENY : MOD_RES_PASSTHRU;
+			}
+			effects.insert(effects.end(), script->effects.begin(), script->effects.end());
+			script->effects.clear();
+			if (result != MOD_RES_PASSTHRU)
+				break;
+		}
+		Schedule(effects);
+		return result;
+	}
+
 public:
 	ModuleJavaScript()
-		: Module(VF_NONE, "Runs trusted local JavaScript and Wasm command hooks with explicit authority.")
+		: Module(VF_NONE, "Runs trusted local JavaScript and Wasm Module hooks with explicit authority.")
 	{
 	}
 	~ModuleJavaScript() override { state->alive = false; }
+	void Prioritize() override
+	{
+		// Inspect/refuse accepted sockets before core_clients takes ownership.
+		ServerInstance->Modules.SetPriority(this, I_OnAcceptConnection, PRIORITY_FIRST);
+	}
+
+#include "js_generated/hook_adapters.inc"
 	void ReadConfig(ConfigStatus&) override
 	{
 		try
@@ -570,7 +704,7 @@ public:
 	ModResult OnPreCommand(
 		std::string& command, CommandBase::Params& parameters, LocalUser* user, bool validated) override
 	{
-		if (validated || state->internal)
+		if (validated || state->internal || state->running)
 			return MOD_RES_PASSTHRU;
 		if (dispatchdepth >= 8)
 			return MOD_RES_DENY;
@@ -619,7 +753,7 @@ public:
 	void OnPostCommand(
 		Command* handler, const CommandBase::Params& parameters, LocalUser* user, CmdResult result, bool loop) override
 	{
-		if (state->internal)
+		if (state->internal || state->running)
 			return;
 		std::string command = handler->name;
 		std::vector<std::string> params = parameters;

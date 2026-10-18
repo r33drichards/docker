@@ -5,6 +5,7 @@ The installation must already contain m_javascript.so. No existing config is rea
 """
 
 import grp
+import json
 import os
 import pathlib
 import pwd
@@ -58,6 +59,121 @@ ircd.on('postCommand', e => {
 """
 
 
+HOOKS = json.loads((ROOT / "bindings/module_hooks.json").read_text())["hooks"]
+FULL_HOOKS = (
+    "const hookNames = "
+    + json.dumps([h["js"] for h in HOOKS])
+    + r""";
+let selected = '*', action = 'pass', remaining = 0;
+const seen = new Set(), snapshots = new Map();
+for (const stage of hookNames) ircd.on(stage, e => {
+  if (e.stage !== stage) throw Error('wrong stage');
+  const control = stage === 'preCommand' && e.command === 'JSHOOKPROBE';
+  if (control && e.params[0] !== 'result') {
+    selected = e.params[0] || '*'; action = e.params[1] || 'pass'; remaining = 1;
+    seen.clear(); snapshots.clear();
+  }
+  seen.add(stage); snapshots.set(stage, e);
+  if (stage === 'postCommand' && e.command === 'JSHOOKPROBE' && e.params[0] === '*') {
+    if (hookNames.some(name => !seen.has(name))) throw Error('missing hook');
+    const preJoin = snapshots.get('userPreJoin');
+    if (preJoin.chan !== null || preJoin.user.id !== e.userId || !preJoin.user.local) throw Error('join snapshot');
+    if (snapshots.get('preRehash').user !== null || snapshots.get('preRehash').userId !== null) throw Error('server actor');
+    if (snapshots.get('userPreMessage').target.name.text !== '#jsprobe') throw Error('message target');
+    if (snapshots.get('userPreMessage').details.text.text !== 'probe') throw Error('message text');
+    if (snapshots.get('mode').changelist.items[0].mode.text !== 'i') throw Error('mode snapshot');
+    if (snapshots.get('buildNeighborList').exceptions.items[0].user.id !== e.userId) throw Error('neighbors');
+    if (snapshots.get('acceptConnection').fd !== -1 || !snapshots.get('acceptConnection').sock) throw Error('listener');
+    if (snapshots.get('preChangeConnectClass').errnum.code !== 999) throw Error('numeric');
+    if (snapshots.get('serviceAdd').service.name.text !== 'JSHOOKPROBE') throw Error('service');
+    if (snapshots.get('cleanup').item.value.id !== e.userId) throw Error('cleanup');
+    // These C++ stack values have already been destroyed: all nested copies must survive.
+    const line = snapshots.get('addLine').line;
+    if (line.type.text !== 'K' || line.reason.text !== 'probe' || line.reason.truncated) throw Error('owned line');
+    line.reason.bytes[0] = 0;
+    if (snapshots.get('delLine').line.reason.bytes[0] !== 112) throw Error('independent bytes');
+    ircd.notice(e.userId, 'full-hook-inventory:75');
+  }
+  if (!control && selected === stage && remaining > 0) {
+    --remaining;
+    if (action === 'error') throw Error('synthetic hook error');
+    if (action === 'timeout') while (true) {}
+    if (action === 'promise') return Promise.resolve({action: 'pass'});
+    if (action === 'malformed') return {action: 'pass', typo: true};
+    return {action};
+  }
+});
+"""
+)
+
+
+def exercise_module_hooks(caller, reload):
+    caller.send("JOIN #jsprobe")
+    caller.barrier("probe-channel")
+    reload(FULL_HOOKS)
+    caller.send("JSHOOKPROBE * pass")
+    caller.until(lambda line: line.endswith(":full-hook-inventory:75"))
+    decisions = [h for h in HOOKS if h["result"] == "ModResult"]
+    for authority, action in (("user", "pass"), ("user", "deny"), ("admin", "allow")):
+        for hook in decisions:
+            if action == "allow" and not hook["allow"]:
+                continue
+            reload(FULL_HOOKS, authority)
+            caller.send(f"JSHOOKPROBE {hook['js']} {action}")
+            caller.send("JSHOOKPROBE result")
+            caller.until(
+                lambda line, fragment=f"probe-result:{hook['js']}:{action} ": fragment in line
+            )
+    # Invalid decisions, asynchronous returns, exceptions and timeouts poison the
+    # isolate. Read native results only after a successful reload, not through a
+    # potentially fail-closed userWrite callback.
+    failure_cases = [
+        ("userPreNick", "error", "user", "deny"),
+        ("userPreMessage", "timeout", "user", "deny"),
+        ("checkPassword", "promise", "user", "deny"),
+        ("preMode", "malformed", "user", "deny"),
+        ("acceptConnection", "allow", "admin", "deny"),
+        ("userPreJoin", "allow", "user", "deny"),
+        ("userPreQuit", "error", "user", "pass"),
+        ("channelPreDelete", "error", "user", "pass"),
+        ("kill", "error", "user", "pass"),
+    ]
+    for stage, action, authority, expected in failure_cases:
+        reload(FULL_HOOKS, authority)
+        caller.send(f"JSHOOKPROBE {stage} {action}")
+        time.sleep(0.4)  # callback must have finished before rehash
+        reload("")
+        caller.send("JSHOOKPROBE result")
+        caller.until(lambda line, fragment=f"probe-result:{stage}:{expected} ": fragment in line)
+    # Real traffic, not only direct driver calls: snapshot changes cannot rewrite
+    # native state, and a denied lifecycle action must leave that state intact.
+    reload(r"""
+ircd.on('userPreMessage', e => { if (e.details.text.text === 'hook-block') return {action:'deny'}; });
+ircd.on('userPreNick', e => { if (e.newnick.text === 'hookblocked') return {action:'deny'}; e.newnick.text='not-a-native-rewrite'; });
+ircd.on('userJoin', e => { if (e.memb.channel.name.text === '#jslive') ircd.notice(e.userId,'real-join'); });
+ircd.on('userPart', e => { if (e.memb.channel.name.text === '#jslive') ircd.notice(e.userId,'real-part'); });
+""")
+    caller.send("JOIN #jslive")
+    caller.until(lambda line: line.endswith(":real-join"))
+    caller.send("NICK hookblocked")
+    caller.barrier("nick-denied")
+    assert irc_nick(caller, caller.nick)
+    caller.send("NICK hooksafe")
+    caller.until(lambda line: " NICK " in line and line.endswith(":hooksafe"))
+    caller.nick = "hooksafe"
+    caller.send("PRIVMSG hooksafe :hook-block")
+    lines = caller.barrier("message-denied")
+    assert not any(" PRIVMSG " in line and line.endswith(":hook-block") for line in lines), lines
+    caller.send("PRIVMSG hooksafe :hook-pass")
+    caller.until(lambda line: " PRIVMSG " in line and line.endswith(":hook-pass"))
+    caller.send("PART #jslive :probe")
+    caller.until(lambda line: line.endswith(":real-part"))
+    reload(GOOD)
+    print(
+        "PASS: all 75 native Module adapters, every ModResult pass/deny/admin-allow, hook failures, and real lifecycle policy"
+    )
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="irc-javascript-") as directory:
         path = pathlib.Path(directory)
@@ -77,6 +193,7 @@ def main():
 <alias text="INFO" replace="PING :deny">
 <alias text="TIME" replace="XLOOP">
 <module name="javascript">
+<module name="js_hook_probe">
 <log method="stdout" type="m_javascript MODULE CONFIG" level="normal">
 <javascriptsettings timeoutms="200">
 <javascriptwasm name="answer" file="{ROOT / "examples/javascript/answer.wasm"}">
@@ -154,6 +271,8 @@ def main():
                         time.sleep(0.1)
                     else:
                         raise AssertionError("Rehash did not complete")
+
+                exercise_module_hooks(caller, reload)
 
                 reload('throw Error("candidate fails");')
                 caller.send("XWASM")  # Last-good context survived failed reload.

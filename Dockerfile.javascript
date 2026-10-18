@@ -11,6 +11,8 @@ ARG VERSION=v4.12.1
 ARG CONFIGUREARGS=
 ARG EXTRASMODULES=
 ARG BUILD_DEPENDENCIES=
+# CI-only synthetic hook driver. Never shipped by a normal build.
+ARG TEST_HOOK_PROBE=0
 
 RUN apk add --no-cache gcc g++ make git pkgconfig perl binutils \
        perl-net-ssleay perl-crypt-ssleay perl-lwp-protocol-https \
@@ -24,6 +26,8 @@ RUN git clone --depth 1 --branch "$VERSION" \
        https://github.com/inspircd/inspircd.git /inspircd-src
 
 COPY modules/ /inspircd-src/src/modules/
+COPY tests/fixtures/ /tmp/js-hook-fixtures/
+RUN if [ "$TEST_HOOK_PROBE" = 1 ]; then cp /tmp/js-hook-fixtures/* /inspircd-src/src/modules/; fi
 WORKDIR /inspircd-src
 
 RUN echo $EXTRASMODULES | xargs --no-run-if-empty ./modulemanager install

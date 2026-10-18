@@ -88,7 +88,9 @@ jobs:
           context: .
           file: Dockerfile.javascript
           target: builder
-          build-args: VERSION=${{ matrix.inspircd }}
+          build-args: |
+            VERSION=${{ matrix.inspircd }}
+            TEST_HOOK_PROBE=1
           tags: javascript-builder
           load: true
           provenance: false
@@ -103,7 +105,9 @@ jobs:
         with:
           context: .
           file: Dockerfile.javascript
-          build-args: VERSION=${{ matrix.inspircd }}
+          build-args: |
+            VERSION=${{ matrix.inspircd }}
+            TEST_HOOK_PROBE=1
           tags: javascript-testing
           load: true
           provenance: false

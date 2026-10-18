@@ -194,3 +194,56 @@ loopback-only. The native suite does not modify an existing server configuration
 ## Continuous integration
 
 See [CI coverage and label-triggered heavy runs](docs/CI.md).
+
+## All core Module event hooks (InspIRCd 4.12.1)
+
+`ircd.on(stage, callback)` supports all 75 `Module::On*` callbacks: the 74
+Implementation-table events plus direct `OnCleanup`. See
+[the per-hook inventory](bindings/module_hooks_coverage.md) and
+`modules/js_generated/module_hooks.d.ts` for exact names, arguments, native
+return semantics, and failure policy. Optional modules’ separate EventProvider
+APIs and native lifecycle methods (Init, ReadConfig, Prioritize, destruction)
+are not additional script events. Wasm can participate through these JS callbacks;
+there is no separate Wasm hook ABI.
+
+```js
+ircd.on("userPreMessage", event => {
+  if (event.details.text.text === "blocked") return {action: "deny"};
+});
+```
+
+Except for the existing specialized pre/post-command shape, arguments are owned,
+bounded snapshots. Strings carry `{text, bytes, byteLength, truncated}`; invalid
+UTF-8 has null text and intact bytes. Lists carry `{items, length, truncated}`.
+Snapshots expose no native handles and changing them never changes native state.
+Text is capped at 64 KiB per value and 256 KiB per event; lists at 256 entries.
+Each event has `stage` and nullable `userId`; server events may have no actor.
+User-authority effects require a local actor; explicit admin authority permits
+local-target effects without an actor. The same queued-effect/reentrancy rules
+apply to all events.
+
+Void hooks observe only; return values are ignored except unsupported Promises.
+ModResult hooks accept undefined or `{action: "pass"}`, `{action: "deny"}`,
+and (only with admin authority and where inventoried) `{action: "allow"}`.
+Allow has the *native hook-specific meaning*, not a generic permit: consult the
+inventory/upstream documentation. acceptConnection never accepts allow because
+it would claim native socket ownership. Hooks run in native module order and
+an earlier decision can prevent later modules/callbacks from observing an event.
+Exceptions/timeouts/invalid decisions disable the script until successful rehash.
+Decision hooks fail closed, except kill, channelPreDelete and userPreQuit pass
+on failure so cleanup cannot be blocked by a disabled script. Observational
+failures do not undo native actions. No native mutation support is implied for
+mutable-reference arguments outside the existing command rewrite API.
+
+Inventory/ABI checks:
+
+```sh
+python3 tools/generate_module_hooks.py --check --upstream /path/to/inspircd/include/modules.h
+python3 tests/test_generate_module_hooks.py
+```
+
+The synthetic native suite additionally requires the test-only `m_js_hook_probe`
+module (optional image build arg `TEST_HOOK_PROBE=1`). It invokes all adapters,
+checks snapshots after native stack destruction, exercises every ModResult
+pass/deny/admin-allow decision, and sends real lifecycle/message traffic.
+The normal optional image excludes this probe and remains unloaded by default.
