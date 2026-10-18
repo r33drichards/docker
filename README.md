@@ -348,37 +348,53 @@ You can put the sources these modules in the modules directory of this repositor
 It also allows you to overwrite modules.
 
 
-### Included ECHO module (InspIRCd 4)
+### Included pre-command hook (InspIRCd 4)
 
-This repository includes `modules/m_echo.cpp`. The Docker build compiles it
-into `m_echo.so`, but it is **not loaded by default**. To enable it, add
-`<module name="echo">` to your server configuration, or mount a small config file:
+This repository includes `modules/m_precommand.cpp`. The Docker build compiles
+it into `m_precommand.so`, but it is **not loaded by default**. It observes
+InspIRCd's `OnPreCommand` hook and prints the parsed command's shape to the
+normal-level `m_precommand` server log. To load it and send that log to stdout:
 
 ```sh
-docker build -t inspircd:echo .
-printf '<module name="echo">\n' > echo.conf
+docker build -t inspircd:precommand .
+cat > precommand.conf <<'CONF'
+<module name="precommand">
+<log method="stdout" level="normal" type="m_precommand">
+CONF
 docker run --rm -p 6667:6667 \
-  -v "$(pwd)/echo.conf:/inspircd/conf.d/echo.conf:ro" inspircd:echo
+  -v "$(pwd)/precommand.conf:/inspircd/conf.d/precommand.conf:ro" inspircd:precommand
 ```
 
-From a connected IRC client, send the raw command (many clients have their own
-local `/echo` command):
+For example, a client sending `/quote PING :hello` produces this record (with
+the server's normal log prefix):
 
 ```text
-/quote ECHO :Hello from IRC
+command=PING params=["<redacted>"] parameter_count=1 validated=true
 ```
 
-The server returns `NOTICE <your-nick> :Hello from IRC` only to the issuing
-client. No operator privileges are required. Multiple arguments are joined
-with single spaces; a trailing `:<text>` argument preserves spaces within
-that text. Missing or empty text receives numeric `461` (not enough parameters).
-Replies obey the server's IRC line-length limit; oversized text may be truncated.
-The command echoes text only: it does not execute commands, broadcast to other
-clients, or add logging. It is separate from the IRCv3 `echo-message` capability.
+The command name, parameter count, and parameter array shape are visible;
+**every parameter value is redacted**, including ordinary text. Tags, raw lines,
+and user identities are not printed. This avoids exposing passwords, SASL
+payloads, operator credentials, WEBIRC credentials, channel keys, service
+authentication, and sensitive text passed to custom commands. There is no
+option to print unredacted values. Other server logging modules/settings are
+independent and may have different privacy behavior.
 
-The existing `./run_tests.sh` suite runs `tests/echo.sh` against the
-`inspircd:testing` image. That test requires Python 3 on the host and covers
-opt-in loading, argument handling, literal text, and caller-only output.
+The hook only prints the `validated=true` stage, avoiding the usual duplicate
+pre-/post-validation callbacks. Core-synthesized commands (such as LUSERS and
+MOTD during registration) and callbacks invoked by other modules can also appear.
+Commands rejected before validation (including
+unknown commands, missing parameters, and permission failures) are not printed.
+A record means core validation passed, not that the command handler succeeded.
+Parameters reflect the parser's command-specific joining and empty-argument
+handling at this stage. The hook always returns `MOD_RES_PASSTHRU`: it does not
+change commands, parameters, routing, or responses, and sends no user replies.
+This is a diagnostic module; leave it unloaded when continuous command metadata
+logging is unnecessary.
+
+`./run_tests.sh` discovers `tests/precommand.sh`, which uses Python 3 on the host
+to check opt-in loading, parsed shapes, redaction, and unchanged client behavior
+against the `inspircd:testing` image.
 
 Make sure you install all needed dependencies using `ADDPACKAGES`.
 
