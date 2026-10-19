@@ -1,0 +1,862 @@
+{
+  "schema_version": 1,
+  "api_namespace": "ircd",
+  "upstream": {
+    "project": "InspIRCd",
+    "version": "4.12.1",
+    "source": "https://github.com/inspircd/inspircd/tree/v4.12.1/include"
+  },
+  "policies": {
+    "arguments": "Exact arity and primitive types only; never perform JavaScript string or numeric coercion. Reject unpaired UTF-16 surrogates, preserve embedded NUL bytes in UTF-8 conversion, and use length-aware native strings.",
+    "errors": "Throw TypeError for wrong arity or type and malformed UTF-16; throw RangeError for results outside the documented numeric or string bounds. Native exceptions must become JavaScript Error without crossing the V8 callback boundary. No pending exception may be ignored.",
+    "lifetime": "All arguments are owned native copies for the duration of the synchronous adapter call. Return JavaScript-owned primitive values only. Do not retain native pointers, references, string_views, V8 locals, or user/channel objects across calls.",
+    "authorization": "These six utility bindings are read-only with respect to IRC state. The manifest does not grant mutation authority. Reentrancy, hook context, and module unload remain responsibilities of the embedding runtime.",
+    "registration": "Only entries in bindings are emitted as registration rows. Inventory entries, including proposed mutation names, never produce callbacks or TypeScript methods. Handwritten native adapters must implement the declared conversion and policy contracts.",
+    "scope": "Inventory covers public functions and callable hooks declared on InspIRCd in v4.12.1 inspircd.h, plus selected manager/pointer/container APIs and candidate UUID-resolved mutations. It is not an exhaustive binding of every API transitively included by inspircd.h."
+  },
+  "bindings": [
+    {
+      "js_name": "match",
+      "adapter": "JsIrcdMatch",
+      "native": {
+        "symbol": "InspIRCd::Match",
+        "declaration": "static bool Match(const std::string& str, const std::string& pattern, const unsigned char* map = nullptr);",
+        "header": "include/inspircd.h",
+        "call": "InspIRCd::Match(str, pattern)"
+      },
+      "arguments": [
+        {
+          "name": "str",
+          "type": "string",
+          "conversion": "Require a primitive JS string; reject unpaired UTF-16 surrogates and embedded NUL with TypeError; copy UTF-8 bytes into std::string. Native matching uses NUL-terminated internals even for its std::string overload."
+        },
+        {
+          "name": "pattern",
+          "type": "string",
+          "conversion": "Require a primitive JS string; reject unpaired UTF-16 surrogates and embedded NUL with TypeError; copy UTF-8 bytes into std::string. Native matching uses NUL-terminated internals even for its std::string overload."
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "conversion": "Copy the native bool into a primitive JS boolean."
+      },
+      "description": "Match a string using the server case map; the native map parameter is fixed to nullptr and is never exposed.",
+      "side_effects": "read_server_state",
+      "authorization": "read_only",
+      "lifetime": "owned_values_call_only",
+      "errors": "strict_arguments_native_exception_translation"
+    },
+    {
+      "js_name": "matchCIDR",
+      "adapter": "JsIrcdMatchCIDR",
+      "native": {
+        "symbol": "InspIRCd::MatchCIDR",
+        "declaration": "static bool MatchCIDR(const std::string& str, const std::string& pattern, const unsigned char* map = nullptr);",
+        "header": "include/inspircd.h",
+        "call": "InspIRCd::MatchCIDR(str, pattern)"
+      },
+      "arguments": [
+        {
+          "name": "str",
+          "type": "string",
+          "conversion": "Require a primitive JS string; reject unpaired UTF-16 surrogates and embedded NUL with TypeError; copy UTF-8 bytes into std::string. Native matching uses NUL-terminated internals even for its std::string overload."
+        },
+        {
+          "name": "pattern",
+          "type": "string",
+          "conversion": "Require a primitive JS string; reject unpaired UTF-16 surrogates and embedded NUL with TypeError; copy UTF-8 bytes into std::string. Native matching uses NUL-terminated internals even for its std::string overload."
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "conversion": "Copy the native bool into a primitive JS boolean."
+      },
+      "description": "Match a string using glob/CIDR matching and the server case map; the native map parameter is fixed to nullptr.",
+      "side_effects": "read_server_state",
+      "authorization": "read_only",
+      "lifetime": "owned_values_call_only",
+      "errors": "strict_arguments_native_exception_translation"
+    },
+    {
+      "js_name": "isNick",
+      "adapter": "JsIrcdIsNick",
+      "native": {
+        "symbol": "InspIRCd::IsNick",
+        "declaration": "std::function<bool(const std::string_view&)> IsNick = &DefaultIsNick;",
+        "header": "include/inspircd.h",
+        "call": "ServerInstance->IsNick(value)"
+      },
+      "arguments": [
+        {
+          "name": "value",
+          "type": "string",
+          "conversion": "Require a primitive JS string; reject unpaired UTF-16 surrogates; copy UTF-8 bytes including embedded NUL using explicit lengths into std::string."
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "conversion": "Copy the native bool into a primitive JS boolean."
+      },
+      "description": "Call the current configurable nickname validator; do not bypass it by calling DefaultIsNick.",
+      "side_effects": "read_server_state",
+      "authorization": "read_only",
+      "lifetime": "owned_values_call_only",
+      "errors": "strict_arguments_native_exception_translation"
+    },
+    {
+      "js_name": "isChannel",
+      "adapter": "JsIrcdIsChannel",
+      "native": {
+        "symbol": "ChannelManager::IsChannel",
+        "declaration": "std::function<bool(const std::string_view&)> IsChannel = DefaultIsChannel;",
+        "header": "include/channelmanager.h",
+        "call": "ServerInstance->Channels.IsChannel(value)"
+      },
+      "arguments": [
+        {
+          "name": "value",
+          "type": "string",
+          "conversion": "Require a primitive JS string; reject unpaired UTF-16 surrogates; copy UTF-8 bytes including embedded NUL using explicit lengths into std::string."
+        }
+      ],
+      "returns": {
+        "type": "boolean",
+        "conversion": "Copy the native bool into a primitive JS boolean."
+      },
+      "description": "Call the current configurable channel validator; any string_view remains valid only during the call.",
+      "side_effects": "read_server_state",
+      "authorization": "read_only",
+      "lifetime": "owned_values_call_only",
+      "errors": "strict_arguments_native_exception_translation"
+    },
+    {
+      "js_name": "stripColor",
+      "adapter": "JsIrcdStripColor",
+      "native": {
+        "symbol": "InspIRCd::StripColor",
+        "declaration": "static void StripColor(std::string& str);",
+        "header": "include/inspircd.h",
+        "call": "InspIRCd::StripColor(value_copy)"
+      },
+      "arguments": [
+        {
+          "name": "value",
+          "type": "string",
+          "conversion": "Require a primitive JS string; reject unpaired UTF-16 surrogates; copy UTF-8 bytes including embedded NUL using explicit lengths into std::string."
+        }
+      ],
+      "returns": {
+        "type": "string",
+        "conversion": "Copy the argument into value_copy, mutate only that copy, then create a JS-owned UTF-8 string with an explicit byte length; reject lengths unsupported by V8."
+      },
+      "description": "Return a color-stripped owned string without modifying the caller or any IRC state.",
+      "side_effects": "copy_only",
+      "authorization": "read_only",
+      "lifetime": "owned_values_call_only",
+      "errors": "strict_arguments_native_exception_translation"
+    },
+    {
+      "js_name": "time",
+      "adapter": "JsIrcdTime",
+      "native": {
+        "symbol": "InspIRCd::Time",
+        "declaration": "inline auto Time() const { return ts.tv_sec; }",
+        "header": "include/inspircd.h",
+        "call": "ServerInstance->Time()"
+      },
+      "arguments": [],
+      "returns": {
+        "type": "number",
+        "conversion": "Range-check the native integer against [-9007199254740991, 9007199254740991] before conversion to double; throw RangeError instead of rounding or truncating."
+      },
+      "description": "Return cached whole seconds since the UNIX epoch; this value updates once per server main-loop iteration.",
+      "side_effects": "read_server_state",
+      "authorization": "read_only",
+      "lifetime": "owned_values_call_only",
+      "errors": "strict_arguments_native_exception_translation"
+    }
+  ],
+  "inventory": [
+    {
+      "id": "is_user",
+      "native": {
+        "symbol": "InspIRCd::IsUser",
+        "declaration": "std::function<bool(const std::string_view&)> IsUser = &DefaultIsUser;",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Current hook needs a separate approved primitive adapter.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "read_server_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "random_int",
+      "native": {
+        "symbol": "InspIRCd::GenRandomInt",
+        "declaration": "unsigned long GenRandomInt(unsigned long max) const;",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Requires platform-width bounds, safe integer conversion, and explicit randomness policy.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "randomness",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "random_string",
+      "native": {
+        "symbol": "InspIRCd::GenRandomStr",
+        "declaration": "std::string GenRandomStr(size_t length) const;",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Requires allocation limits, length conversion, and randomness policy.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "randomness",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "default_is_nick",
+      "native": {
+        "symbol": "InspIRCd::DefaultIsNick",
+        "declaration": "static bool DefaultIsNick(const std::string_view& nick);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Bypasses the current IsNick hook; decide whether default-only validation is intended.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "read_server_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "default_is_user",
+      "native": {
+        "symbol": "InspIRCd::DefaultIsUser",
+        "declaration": "static bool DefaultIsUser(const std::string_view& user);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Bypasses the current IsUser hook; decide whether default-only validation is intended.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "read_server_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "is_fqdn",
+      "native": {
+        "symbol": "InspIRCd::IsFQDN",
+        "declaration": "inline static auto IsFQDN(const std::string_view& host) { return IsHost(host, false); }",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Needs a dedicated validated string adapter.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "pure",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "is_host",
+      "native": {
+        "symbol": "InspIRCd::IsHost",
+        "declaration": "static bool IsHost(const std::string_view& host, bool allowsimple);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Needs explicit boolean argument conversion and string ownership.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "pure",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "is_sid",
+      "native": {
+        "symbol": "InspIRCd::IsSID",
+        "declaration": "static bool IsSID(const std::string_view& sid);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Needs a dedicated validated string adapter.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "pure",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "is_valid_mask",
+      "native": {
+        "symbol": "InspIRCd::IsValidMask",
+        "declaration": "static bool IsValidMask(const std::string& mask);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Needs a dedicated validated string adapter.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "pure",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "match_mask",
+      "native": {
+        "symbol": "InspIRCd::MatchMask",
+        "declaration": "static bool MatchMask(const std::string& masks, const std::string& hostname, const std::string& address);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Needs a three-string adapter and bounded input policy.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "read_server_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "process_colors",
+      "native": {
+        "symbol": "InspIRCd::ProcessColors",
+        "declaration": "static void ProcessColors(std::string& str);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Must mutate only an owned copy and return an owned string.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "mutates_argument",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "time_ns",
+      "native": {
+        "symbol": "InspIRCd::Time_ns",
+        "declaration": "inline auto Time_ns() const { return ts.tv_nsec; }",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Returns the fractional nanosecond component, not an epoch timestamp; needs explicit naming and bounds.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "read_server_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "timing_safe_compare",
+      "native": {
+        "symbol": "InspIRCd::TimingSafeCompare",
+        "declaration": "static bool TimingSafeCompare(const std::string& str1, const std::string& str2);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Native unequal-length inputs leak length; do not imply constant-time JavaScript conversion or end-to-end comparison.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "pure",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "inspircd_constructor",
+      "native": {
+        "symbol": "InspIRCd::InspIRCd",
+        "declaration": "InspIRCd(int argc, char** argv);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Process ownership and raw argv are not script capabilities.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "process_control",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "bind_port",
+      "native": {
+        "symbol": "InspIRCd::BindPort",
+        "declaration": "bool BindPort(const std::shared_ptr<ConfigTag>& tag, const irc::sockets::sockaddrs& sa, std::vector<ListenSocket*>& oldports, sa_family_t protocol);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Socket creation, configuration pointers, and mutable listener containers need separate privileged design.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "network_configuration",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "bind_ports",
+      "native": {
+        "symbol": "InspIRCd::BindPorts",
+        "declaration": "size_t BindPorts(FailedPortList& failedports);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Network listener changes and mutable output containers are not exposed.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "network_configuration",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "check_password",
+      "native": {
+        "symbol": "InspIRCd::CheckPassword",
+        "declaration": "static bool CheckPassword(const std::string& password, const std::string& passwordhash, const std::string& value);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Password/hash material and authentication decisions are not generic script utilities.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "authentication",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "random_hook",
+      "native": {
+        "symbol": "InspIRCd::GenRandom",
+        "declaration": "std::function<void(char*, size_t)> GenRandom = &DefaultGenRandom;",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Writable raw buffers and hook replacement are excluded.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "mutates_argument",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "random_string_deprecated",
+      "native": {
+        "symbol": "InspIRCd::GenRandomStr",
+        "declaration": "std::string GenRandomStr(size_t length, bool printable) const;",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Deprecated overload; use an explicitly reviewed nondeprecated API.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "randomness",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "read_buffer",
+      "native": {
+        "symbol": "InspIRCd::GetReadBuffer",
+        "declaration": "inline auto* GetReadBuffer() { return readbuffer; }",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Returns shared mutable socket bytes with unsafe pointer lifetime.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "borrowed_mutable_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "rfc_events",
+      "native": {
+        "symbol": "InspIRCd::GetRFCEvents",
+        "declaration": "inline auto& GetRFCEvents() { return rfcevents; }",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Returns borrowed protocol event state; requires an owned wrapper and dispatch policy.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "borrowed_mutable_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "default_random",
+      "native": {
+        "symbol": "InspIRCd::DefaultGenRandom",
+        "declaration": "static void DefaultGenRandom(char* output, size_t max);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Raw writable buffers are excluded.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "mutates_argument",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "exit",
+      "native": {
+        "symbol": "InspIRCd::Exit",
+        "declaration": "void Exit(int status);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Server shutdown and process termination are excluded.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "process_control",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "rehash",
+      "native": {
+        "symbol": "InspIRCd::Rehash",
+        "declaration": "void Rehash(const std::string& uuid = \"\");",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Configuration reload is a privileged server mutation, not implied by a UUID string.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "mutates_server",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "run",
+      "native": {
+        "symbol": "InspIRCd::Run",
+        "declaration": "void Run();",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "The host owns the main loop; recursive process control is excluded.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "process_control",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "process_colors_vector",
+      "native": {
+        "symbol": "InspIRCd::ProcessColors",
+        "declaration": "static void ProcessColors(std::vector<std::string>& lines);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Deprecated mutable container overload; no borrowed container conversion.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "mutates_argument",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "signal",
+      "native": {
+        "symbol": "InspIRCd::SetSignal",
+        "declaration": "static void SetSignal(int signal);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Process signal control is excluded.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "process_control",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "update_time",
+      "native": {
+        "symbol": "InspIRCd::UpdateTime",
+        "declaration": "void UpdateTime();",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Changes the host clock cache; scripts only receive the read-only time snapshot.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "mutates_server",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "match_c_string",
+      "native": {
+        "symbol": "InspIRCd::Match",
+        "declaration": "static bool Match(const char* str, const char* pattern, const unsigned char* map = nullptr);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Raw C-string overload is excluded. The selected std::string overload also uses NUL-terminated native matching internally, so its handwritten adapter must reject embedded NUL instead of allowing suffix truncation.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "read_server_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "match_cidr_c_string",
+      "native": {
+        "symbol": "InspIRCd::MatchCIDR",
+        "declaration": "static bool MatchCIDR(const char* str, const char* pattern, const unsigned char* map = nullptr);",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Raw C-string overload is excluded. The selected std::string overload also uses NUL-terminated native matching internally, so its handwritten adapter must reject embedded NUL instead of allowing suffix truncation.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "read_server_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "find_uuid",
+      "native": {
+        "symbol": "UserManager::FindUUID",
+        "declaration": "User* FindUUID(const std::string& uuid, bool fullyconnected = false);",
+        "header": "include/usermanager.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "A future wrapper must resolve UUID on each invocation and return an owned snapshot, never User*.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "borrowed_mutable_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "channel_find",
+      "native": {
+        "symbol": "ChannelManager::Find",
+        "declaration": "Channel* Find(const std::string& channel) const;",
+        "header": "include/channelmanager.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "Resolve channel name on each invocation and copy any permitted result; never retain Channel*.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "borrowed_mutable_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "channel_map",
+      "native": {
+        "symbol": "ChannelManager::GetChans",
+        "declaration": "ChannelMap& GetChans() { return channels; }",
+        "header": "include/channelmanager.h"
+      },
+      "classification": "excluded",
+      "reason": "Borrowed mutable containers and their iterator/pointer lifetimes are not exposed.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "borrowed_mutable_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "channel_map_const",
+      "native": {
+        "symbol": "ChannelManager::GetChans",
+        "declaration": "const ChannelMap& GetChans() const { return channels; }",
+        "header": "include/channelmanager.h"
+      },
+      "classification": "excluded",
+      "reason": "Const containers still contain borrowed channel pointers; no automatic container conversion.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "borrowed_mutable_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "module_load",
+      "native": {
+        "symbol": "ModuleManager::Load",
+        "declaration": "bool Load(const std::string& filename, bool defer = false);",
+        "header": "include/modules.h"
+      },
+      "classification": "excluded",
+      "reason": "Module loading changes executable authority and unload/lifetime assumptions.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "module_control",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "module_unload",
+      "native": {
+        "symbol": "ModuleManager::Unload",
+        "declaration": "bool Unload(Module* module);",
+        "header": "include/modules.h"
+      },
+      "classification": "excluded",
+      "reason": "Module unloading is privileged and can invalidate the running JavaScript runtime.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "module_control",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "listeners",
+      "native": {
+        "symbol": "InspIRCd::ports",
+        "declaration": "std::vector<ListenSocket*> ports;",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Socket handles and mutable listener collections are not exposed.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "borrowed_mutable_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "configuration",
+      "native": {
+        "symbol": "InspIRCd::Config",
+        "declaration": "ServerConfig* Config = nullptr;",
+        "header": "include/inspircd.h"
+      },
+      "classification": "excluded",
+      "reason": "Configuration can contain secrets and pointers; generic object traversal is forbidden.",
+      "conversion": "No JavaScript conversion or registration is generated.",
+      "side_effects": "sensitive_state",
+      "authorization": "not_exposed",
+      "lifetime": "No native object is exposed to JavaScript."
+    },
+    {
+      "id": "change_nick",
+      "native": {
+        "symbol": "User::ChangeNick",
+        "declaration": "bool ChangeNick(const std::string& newnick, time_t newts = 0);",
+        "header": "include/users.h"
+      },
+      "classification": "requires_manual_wrapper",
+      "reason": "The raw method is not exposed by this generator. A separately handwritten ircd.rename UUID wrapper exists in m_javascript.cpp with queued execution and configured user/admin authority.",
+      "conversion": "ircd.rename copies UUID/nickname arguments, resolves local users again at execution, and validates nickname syntax. User authority routes self-renames through the core NICK parser; explicit admin authority invokes ChangeNick. No native pointer or success promise is returned.",
+      "side_effects": "mutates_server",
+      "authorization": "not_exposed",
+      "lifetime": "Never persist User*, LocalUser*, Channel*, or Membership*. Resolve again after calls that can invoke hooks, quit users, or destroy channels; reject missing/nonlocal targets as appropriate."
+    },
+    {
+      "id": "change_displayed_host",
+      "native": {
+        "symbol": "User::ChangeDisplayedHost",
+        "declaration": "void ChangeDisplayedHost(const std::string& newhost);",
+        "header": "include/users.h"
+      },
+      "classification": "planned_mutation",
+      "reason": "NOT automatically exposed: this API still needs a reviewed target scope, permission mapping, hook timing, validation, and error contract. Configurable user/admin authority alone does not define those per-API policies.",
+      "conversion": "Proposed wrapper accepts UUID strings, resolves live users at the instant of each call, validates channel and primitive arguments, and copies any result; no callback or final JS signature is generated.",
+      "side_effects": "mutates_server",
+      "authorization": "pending_authority_decision",
+      "lifetime": "Never persist User*, LocalUser*, Channel*, or Membership*. Resolve again after calls that can invoke hooks, quit users, or destroy channels; reject missing/nonlocal targets as appropriate.",
+      "proposed_js_name": "changeDisplayedHost"
+    },
+    {
+      "id": "change_real_host",
+      "native": {
+        "symbol": "User::ChangeRealHost",
+        "declaration": "void ChangeRealHost(const std::string& newhost, bool resetdisplay);",
+        "header": "include/users.h"
+      },
+      "classification": "planned_mutation",
+      "reason": "NOT automatically exposed: this API still needs a reviewed target scope, permission mapping, hook timing, validation, and error contract. Configurable user/admin authority alone does not define those per-API policies.",
+      "conversion": "Proposed wrapper accepts UUID strings, resolves live users at the instant of each call, validates channel and primitive arguments, and copies any result; no callback or final JS signature is generated.",
+      "side_effects": "mutates_server",
+      "authorization": "pending_authority_decision",
+      "lifetime": "Never persist User*, LocalUser*, Channel*, or Membership*. Resolve again after calls that can invoke hooks, quit users, or destroy channels; reject missing/nonlocal targets as appropriate.",
+      "proposed_js_name": "changeRealHost"
+    },
+    {
+      "id": "change_displayed_user",
+      "native": {
+        "symbol": "User::ChangeDisplayedUser",
+        "declaration": "void ChangeDisplayedUser(const std::string& newuser);",
+        "header": "include/users.h"
+      },
+      "classification": "planned_mutation",
+      "reason": "NOT automatically exposed: this API still needs a reviewed target scope, permission mapping, hook timing, validation, and error contract. Configurable user/admin authority alone does not define those per-API policies.",
+      "conversion": "Proposed wrapper accepts UUID strings, resolves live users at the instant of each call, validates channel and primitive arguments, and copies any result; no callback or final JS signature is generated.",
+      "side_effects": "mutates_server",
+      "authorization": "pending_authority_decision",
+      "lifetime": "Never persist User*, LocalUser*, Channel*, or Membership*. Resolve again after calls that can invoke hooks, quit users, or destroy channels; reject missing/nonlocal targets as appropriate.",
+      "proposed_js_name": "changeDisplayedUser"
+    },
+    {
+      "id": "change_real_user",
+      "native": {
+        "symbol": "User::ChangeRealUser",
+        "declaration": "void ChangeRealUser(const std::string& newuser, bool resetdisplay);",
+        "header": "include/users.h"
+      },
+      "classification": "planned_mutation",
+      "reason": "NOT automatically exposed: this API still needs a reviewed target scope, permission mapping, hook timing, validation, and error contract. Configurable user/admin authority alone does not define those per-API policies.",
+      "conversion": "Proposed wrapper accepts UUID strings, resolves live users at the instant of each call, validates channel and primitive arguments, and copies any result; no callback or final JS signature is generated.",
+      "side_effects": "mutates_server",
+      "authorization": "pending_authority_decision",
+      "lifetime": "Never persist User*, LocalUser*, Channel*, or Membership*. Resolve again after calls that can invoke hooks, quit users, or destroy channels; reject missing/nonlocal targets as appropriate.",
+      "proposed_js_name": "changeRealUser"
+    },
+    {
+      "id": "change_real_name",
+      "native": {
+        "symbol": "User::ChangeRealName",
+        "declaration": "void ChangeRealName(const std::string& newreal);",
+        "header": "include/users.h"
+      },
+      "classification": "planned_mutation",
+      "reason": "NOT automatically exposed: this API still needs a reviewed target scope, permission mapping, hook timing, validation, and error contract. Configurable user/admin authority alone does not define those per-API policies.",
+      "conversion": "Proposed wrapper accepts UUID strings, resolves live users at the instant of each call, validates channel and primitive arguments, and copies any result; no callback or final JS signature is generated.",
+      "side_effects": "mutates_server",
+      "authorization": "pending_authority_decision",
+      "lifetime": "Never persist User*, LocalUser*, Channel*, or Membership*. Resolve again after calls that can invoke hooks, quit users, or destroy channels; reject missing/nonlocal targets as appropriate.",
+      "proposed_js_name": "changeRealName"
+    },
+    {
+      "id": "quit_user",
+      "native": {
+        "symbol": "UserManager::QuitUser",
+        "declaration": "void QuitUser(User* user, const std::string& quitreason, const std::string* operreason = nullptr) ATTR_NOT_NULL(2);",
+        "header": "include/usermanager.h"
+      },
+      "classification": "planned_mutation",
+      "reason": "NOT automatically exposed: this API still needs a reviewed target scope, permission mapping, hook timing, validation, and error contract. Configurable user/admin authority alone does not define those per-API policies.",
+      "conversion": "Proposed wrapper accepts UUID strings, resolves live users at the instant of each call, validates channel and primitive arguments, and copies any result; no callback or final JS signature is generated.",
+      "side_effects": "mutates_server",
+      "authorization": "pending_authority_decision",
+      "lifetime": "Never persist User*, LocalUser*, Channel*, or Membership*. Resolve again after calls that can invoke hooks, quit users, or destroy channels; reject missing/nonlocal targets as appropriate.",
+      "proposed_js_name": "quitUser"
+    },
+    {
+      "id": "join_user",
+      "native": {
+        "symbol": "Channel::JoinUser",
+        "declaration": "static Membership* JoinUser(LocalUser* user, std::string channame, bool override = false, const std::string& key = \"\");",
+        "header": "include/channels.h"
+      },
+      "classification": "planned_mutation",
+      "reason": "NOT automatically exposed: this API still needs a reviewed target scope, permission mapping, hook timing, validation, and error contract. Configurable user/admin authority alone does not define those per-API policies.",
+      "conversion": "Proposed wrapper accepts UUID strings, resolves live users at the instant of each call, validates channel and primitive arguments, and copies any result; no callback or final JS signature is generated.",
+      "side_effects": "mutates_server",
+      "authorization": "pending_authority_decision",
+      "lifetime": "Never persist User*, LocalUser*, Channel*, or Membership*. Resolve again after calls that can invoke hooks, quit users, or destroy channels; reject missing/nonlocal targets as appropriate.",
+      "proposed_js_name": "joinUser"
+    },
+    {
+      "id": "part_user",
+      "native": {
+        "symbol": "Channel::PartUser",
+        "declaration": "inline bool PartUser(User* user, const std::string& reason)",
+        "header": "include/channels.h"
+      },
+      "classification": "planned_mutation",
+      "reason": "NOT automatically exposed: this API still needs a reviewed target scope, permission mapping, hook timing, validation, and error contract. Configurable user/admin authority alone does not define those per-API policies.",
+      "conversion": "Proposed wrapper accepts UUID strings, resolves live users at the instant of each call, validates channel and primitive arguments, and copies any result; no callback or final JS signature is generated.",
+      "side_effects": "mutates_server",
+      "authorization": "pending_authority_decision",
+      "lifetime": "Never persist User*, LocalUser*, Channel*, or Membership*. Resolve again after calls that can invoke hooks, quit users, or destroy channels; reject missing/nonlocal targets as appropriate.",
+      "proposed_js_name": "partUser"
+    },
+    {
+      "id": "kick_user",
+      "native": {
+        "symbol": "Channel::KickUser",
+        "declaration": "inline bool KickUser(User* source, User* victim, const std::string& reason)",
+        "header": "include/channels.h"
+      },
+      "classification": "planned_mutation",
+      "reason": "NOT automatically exposed: this API still needs a reviewed target scope, permission mapping, hook timing, validation, and error contract. Configurable user/admin authority alone does not define those per-API policies.",
+      "conversion": "Proposed wrapper accepts UUID strings, resolves live users at the instant of each call, validates channel and primitive arguments, and copies any result; no callback or final JS signature is generated.",
+      "side_effects": "mutates_server",
+      "authorization": "pending_authority_decision",
+      "lifetime": "Never persist User*, LocalUser*, Channel*, or Membership*. Resolve again after calls that can invoke hooks, quit users, or destroy channels; reject missing/nonlocal targets as appropriate.",
+      "proposed_js_name": "kickUser"
+    }
+  ]
+}
