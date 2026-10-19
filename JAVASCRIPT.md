@@ -1,5 +1,8 @@
 # Optional JavaScript and WebAssembly command hooks
 
+JavaScript module documentation: [Diátaxis documentation site](https://r33drichards.github.io/docker/) (MkDocs).
+Source and local build instructions: [site-docs](site-docs/index.md), [documentation guide](site-docs/how-to/documentation.md).
+
 `m_javascript` embeds V8 for **trusted administrator-authored scripts**. It is
 separate from the unredacted `m_precommand` debug logger. Neither module is loaded
 by default. JavaScript can reject/rewrite commands and request explicit native

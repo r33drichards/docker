@@ -1,0 +1,39 @@
+site_name: InspIRCd JavaScript module
+site_description: Trusted JavaScript and WebAssembly hooks for InspIRCd 4.12.1
+site_url: https://r33drichards.github.io/docker/
+repo_url: https://github.com/r33drichards/docker
+edit_uri: edit/feat/local-echo-command/site-docs/
+docs_dir: site-docs
+site_dir: site
+strict: true
+theme:
+  name: mkdocs
+  navigation_depth: 3
+nav:
+  - Home: index.md
+  - Tutorials:
+      - Your first command hook: tutorials/first-hook.md
+  - How-to guides:
+      - Build and configure: how-to/configure.md
+      - Reload and recover: how-to/reload.md
+      - Use WebAssembly: how-to/wasm.md
+      - Test changes: how-to/test.md
+      - Maintain and publish docs: how-to/documentation.md
+  - Reference:
+      - Configuration: reference/configuration.md
+      - Command hooks: reference/commands.md
+      - Core Module hooks: reference/hooks.md
+      - Native API and authority: reference/api.md
+      - Execution and failure limits: reference/limits.md
+  - Explanation:
+      - Trust and containment: explanation/trust.md
+      - Snapshots, ordering and effects: explanation/architecture.md
+markdown_extensions:
+  - admonition
+  - tables
+  - fenced_code
+validation:
+  links:
+    anchors: warn
+    not_found: warn
+    unrecognized_links: warn
