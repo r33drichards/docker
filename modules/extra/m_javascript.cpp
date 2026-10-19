@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: MIT */
-/// $CompilerFlags: -isystem /usr/include/node -pthread
-/// $LinkerFlags: -lnode -pthread -Wl,-z,nodelete
+/// $CompilerFlags: -isystem /usr/include/node -pthread find_compiler_flags("libcurl")
+/// $LinkerFlags: -lnode -pthread -Wl,-z,nodelete find_linker_flags("libcurl")
 
 #include "inspircd.h"
 #include "js_runtime.h"
+#include "js_webhooks.h"
 #include "js_wire_validation.h"
 #include "js_script_loader.h"
 #include "js_native_utilities.h"
@@ -22,6 +23,7 @@ struct Effect
 	std::string actor, target, text;
 	Authority authority;
 	bool rename;
+	std::shared_ptr<js_webhooks::Request> webhook = nullptr;
 };
 struct DispatchState
 {
@@ -170,11 +172,16 @@ public:
 	Authority authority;
 	std::string actor;
 	bool loading = true;
+	js_webhooks::Dispatcher& delivery;
+	std::shared_ptr<js_webhooks::Generation> generation;
 	const std::vector<js_scripts::WasmAsset>& wasm;
 
-	Script(unsigned int timeout, Authority auth, const std::vector<js_scripts::WasmAsset>& assets)
+	Script(unsigned int timeout, Authority auth, const std::vector<js_scripts::WasmAsset>& assets,
+		js_webhooks::Dispatcher& transport, std::shared_ptr<js_webhooks::Generation> owner)
 		: runtime(timeout)
 		, authority(auth)
+		, delivery(transport)
+		, generation(std::move(owner))
 		, wasm(assets)
 	{
 	}
@@ -237,6 +244,67 @@ public:
 				return;
 			}
 		Error(args.GetIsolate(), "Unknown configured Wasm asset");
+	}
+	static void PostWebhook(const v8::FunctionCallbackInfo<v8::Value>& args)
+	{
+		auto* self = Self(args);
+		if (self->loading || !self->dispatching || self->authority != Authority::Admin)
+		{
+			Error(args.GetIsolate(), "Webhook posting requires an active admin-authority callback");
+			return;
+		}
+		if (args.Length() != 2 || !args[0]->IsString() || !args[1]->IsString() ||
+			args[0].As<v8::String>()->Length() > 64 ||
+			static_cast<std::size_t>(args[1].As<v8::String>()->Length()) > js_webhooks::MaxBody)
+		{
+			Error(args.GetIsolate(), "Expected a bounded endpoint name and JSON object string");
+			return;
+		}
+		std::string name, body;
+		if (!Text(args.GetIsolate(), args[0], name) || !Text(args.GetIsolate(), args[1], body))
+			return;
+		if (!js_webhooks::ValidName(name) ||
+			self->generation->endpoints.find(name) == self->generation->endpoints.end() ||
+			body.size() > js_webhooks::MaxBody || self->effects.size() >= 16)
+		{
+			Error(args.GetIsolate(), "Unknown webhook destination or excessive webhook effect");
+			return;
+		}
+		v8::Local<v8::Value> parsed;
+		if (!v8::JSON::Parse(args.GetIsolate()->GetCurrentContext(), args[1].As<v8::String>()).ToLocal(&parsed))
+			return;
+		if (!parsed->IsObject() || parsed->IsArray())
+		{
+			Error(args.GetIsolate(), "Webhook JSON must contain an object");
+			return;
+		}
+		auto request = self->delivery.Stage(self->generation, name, body);
+		const bool accepted = !!request;
+		if (request)
+		{
+			Effect effect{self->actor, std::string(), std::string(), self->authority, false};
+			effect.webhook = std::move(request);
+			self->effects.push_back(std::move(effect));
+		}
+		args.GetReturnValue().Set(accepted);
+	}
+	static void WebhookStats(const v8::FunctionCallbackInfo<v8::Value>& args)
+	{
+		auto* self = Self(args);
+		if (args.Length() != 0 || self->authority != Authority::Admin)
+		{
+			Error(args.GetIsolate(), "Webhook statistics require admin authority and no arguments");
+			return;
+		}
+		const auto& stats = self->delivery.Stats();
+		auto context = args.GetIsolate()->GetCurrentContext();
+		auto value = v8::Object::New(args.GetIsolate());
+		if (!Put(context, value, "pending", v8::Number::New(args.GetIsolate(), stats.pending.load())) ||
+			!Put(context, value, "sent", v8::Number::New(args.GetIsolate(), stats.sent.load())) ||
+			!Put(context, value, "failed", v8::Number::New(args.GetIsolate(), stats.failed.load())) ||
+			!Put(context, value, "discarded", v8::Number::New(args.GetIsolate(), stats.discarded.load())))
+			return;
+		args.GetReturnValue().Set(value);
 	}
 	static void EffectCall(const v8::FunctionCallbackInfo<v8::Value>& args, bool rename)
 	{
@@ -307,6 +375,8 @@ public:
 				js_native::RegisterUtilities(isolate, api);
 				auto data = v8::External::New(isolate, this);
 				api->Set(Key(isolate, "on"), v8::FunctionTemplate::New(isolate, Safe<On>, data));
+				api->Set(Key(isolate, "postWebhook"), v8::FunctionTemplate::New(isolate, Safe<PostWebhook>, data));
+				api->Set(Key(isolate, "webhookStats"), v8::FunctionTemplate::New(isolate, Safe<WebhookStats>, data));
 				api->Set(Key(isolate, "wasm"), v8::FunctionTemplate::New(isolate, Safe<Wasm>, data));
 				api->Set(Key(isolate, "notice"), v8::FunctionTemplate::New(isolate, Safe<Notice>, data));
 				api->Set(Key(isolate, "rename"), v8::FunctionTemplate::New(isolate, Safe<Rename>, data));
@@ -323,6 +393,7 @@ public:
 
 struct ScriptSet
 {
+	std::shared_ptr<js_webhooks::Generation> generation;
 	std::vector<js_scripts::WasmAsset> wasm;
 	std::vector<std::unique_ptr<Script>> scripts;
 };
@@ -370,6 +441,7 @@ public:
 
 class ModuleJavaScript final : public Module
 {
+	js_webhooks::Dispatcher delivery;
 	std::unique_ptr<ScriptSet> active;
 	std::shared_ptr<DispatchState> state = std::make_shared<DispatchState>();
 	const CommandBase::Params* rewriteparams = nullptr;
@@ -543,7 +615,12 @@ class ModuleJavaScript final : public Module
 	void Schedule(std::vector<Effect>& effects)
 	{
 		for (auto& effect : effects)
-			ServerInstance->AtomicActions.AddAction(new DeferredEffect(state, std::move(effect)));
+		{
+			if (effect.webhook)
+				delivery.Commit(std::move(effect.webhook));
+			else
+				ServerInstance->AtomicActions.AddAction(new DeferredEffect(state, std::move(effect)));
+		}
 	}
 
 	static std::string Actor(User* user) { return user && IS_LOCAL(user) ? user->uuid : std::string(); }
@@ -654,7 +731,13 @@ public:
 		: Module(VF_NONE, "Runs trusted local JavaScript and Wasm Module hooks with explicit authority.")
 	{
 	}
-	~ModuleJavaScript() override { state->alive = false; }
+	~ModuleJavaScript() override
+	{
+		state->alive = false;
+		if (active)
+			active->generation->alive = false;
+		delivery.Stop();
+	}
 	void Prioritize() override
 	{
 		// Inspect/refuse accepted sockets before core_clients takes ownership.
@@ -683,16 +766,32 @@ public:
 				assets.push_back({tag->getString("name"), tag->getString("file")});
 			auto timeout =
 				ServerInstance->Config->ConfValue("javascriptsettings")->getNum<unsigned int>("timeoutms", 25, 1, 1000);
+			std::map<std::string, js_webhooks::Endpoint> endpoints;
+			for (const auto& [_, tag] : ServerInstance->Config->ConfTags("javascriptwebhook"))
+			{
+				const auto name = tag->getString("name");
+				if (!js_webhooks::ValidName(name) || endpoints.size() >= 16 || endpoints.count(name))
+					throw std::runtime_error("Invalid, duplicate or excessive webhook endpoint");
+				endpoints.emplace(
+					name, js_webhooks::ValidateEndpoint(tag->getString("url"), tag->getBool("loopbackhttp", false)));
+			}
 			auto candidate = std::make_unique<ScriptSet>();
+			candidate->generation = std::make_shared<js_webhooks::Generation>(std::move(endpoints));
 			candidate->wasm = js_scripts::LoadWasmAssets(assets, ServerInstance->Config->Paths.Config);
 			for (const auto& source : js_scripts::LoadSources(sources, ServerInstance->Config->Paths.Config))
 			{
-				auto script = std::make_unique<Script>(timeout, source.authority, candidate->wasm);
+				auto script = std::make_unique<Script>(
+					timeout, source.authority, candidate->wasm, delivery, candidate->generation);
 				std::string error;
 				if (!script->Load(source, error))
 					throw std::runtime_error("JavaScript initialization failed (active scripts retained)");
 				candidate->scripts.push_back(std::move(script));
 			}
+			if (!candidate->generation->endpoints.empty())
+				delivery.Start();
+			if (active)
+				active->generation->alive = false;
+			candidate->generation->alive = true;
 			active.swap(candidate);
 			ServerInstance->Logs.Normal(MODNAME, "JavaScript configuration loaded");
 		}

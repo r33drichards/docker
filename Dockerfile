@@ -17,7 +17,7 @@ ARG TEST_HOOK_PROBE=0
 COPY modules/ /src/modules/
 COPY tests/fixtures/ /tmp/js-hook-fixtures/
 
-RUN apk add --no-cache gcc g++ make git pkgconfig perl binutils \
+RUN apk add --no-cache gcc g++ make git pkgconfig perl binutils curl-dev \
        perl-net-ssleay perl-crypt-ssleay perl-lwp-protocol-https \
        perl-libwww wget gnutls-dev "nodejs-dev=${NODEJS_VERSION}" $BUILD_DEPENDENCIES
 
@@ -52,7 +52,7 @@ FROM alpine:3.22
 ARG NODEJS_VERSION
 ARG RUN_DEPENDENCIES=
 
-RUN apk add --no-cache libgcc libstdc++ gnutls gnutls-utils "nodejs-libs=${NODEJS_VERSION}" $RUN_DEPENDENCIES && \
+RUN apk add --no-cache libgcc libstdc++ gnutls gnutls-utils libcurl ca-certificates "nodejs-libs=${NODEJS_VERSION}" $RUN_DEPENDENCIES && \
     addgroup -g 10000 -S inspircd && \
     adduser -u 10000 -h /inspircd/ -D -S -G inspircd inspircd
 
