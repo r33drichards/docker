@@ -45,5 +45,6 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           export GIT_CONFIG_COUNT=1
           export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
-          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_VALUE_0
           .venv-docs/bin/mkdocs gh-deploy --strict --message 'Publish JavaScript documentation'
