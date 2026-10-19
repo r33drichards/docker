@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://r33drichards.github.io/docker/reference/hooks/">
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Core Module hooks - InspIRCd JavaScript module</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">InspIRCd JavaScript module</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Tutorials</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">How-to guides</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../how-to/configure/" class="dropdown-item">Build and configure</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/reload/" class="dropdown-item">Reload and recover</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/wasm/" class="dropdown-item">Use WebAssembly</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/documentation/" class="dropdown-item">Maintain and publish docs</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../configuration/" class="dropdown-item">Configuration</a>
+</li>
+                                    
+<li>
+    <a href="../commands/" class="dropdown-item">Command hooks</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Core Module hooks</a>
+</li>
+                                    
+<li>
+    <a href="../api/" class="dropdown-item">Native API and authority</a>
+</li>
+                                    
+<li>
+    <a href="../limits/" class="dropdown-item">Execution and failure limits</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../explanation/trust/" class="dropdown-item">Trust and containment</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../commands/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../api/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/r33drichards/docker/edit/feat/local-echo-command/site-docs/reference/hooks.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#core-module-hooks" class="nav-link">Core Module hooks</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#hook-inventory" class="nav-link">Hook inventory</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#complete-typescript-hook-declarations" class="nav-link">Complete TypeScript hook declarations</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<!-- Generated by tools/generate_docs_reference.py; edit JAVASCRIPT.md or the binding sources. -->
+<h1 id="core-module-hooks">Core Module hooks</h1>
+<p><code>ircd.on(stage, callback)</code> supports all 75 <code>Module::On*</code> callbacks: the 74
+Implementation-table events plus direct <code>OnCleanup</code>. See
+<a href="#hook-inventory">the per-hook inventory</a> and
+<code>modules/js_generated/module_hooks.d.ts</code> for exact names, arguments, native
+return semantics, and failure policy. Optional modules’ separate EventProvider
+APIs and native lifecycle methods (Init, ReadConfig, Prioritize, destruction)
+are not additional script events. Wasm can participate through these JS callbacks;
+there is no separate Wasm hook ABI.</p>
+<pre><code class="language-js">ircd.on(&quot;userPreMessage&quot;, event =&gt; {
+  if (event.details.text.text === &quot;blocked&quot;) return {action: &quot;deny&quot;};
+});
+</code></pre>
+<p>Except for the existing specialized pre/post-command shape, arguments are owned,
+bounded snapshots. Strings carry <code>{text, bytes, byteLength, truncated}</code>; invalid
+UTF-8 has null text and intact bytes. Lists carry <code>{items, length, truncated}</code>.
+Snapshots expose no native handles and changing them never changes native state.
+Text is capped at 64 KiB per value and 256 KiB per event; lists at 256 entries.
+Each event has <code>stage</code> and nullable <code>userId</code>; server events may have no actor.
+User-authority effects require a local actor; explicit admin authority permits
+local-target effects without an actor. The same queued-effect/reentrancy rules
+apply to all events.</p>
+<p>Void hooks observe only; return values are ignored except unsupported Promises.
+ModResult hooks accept undefined or <code>{action: "pass"}</code>, <code>{action: "deny"}</code>,
+and (only with admin authority and where inventoried) <code>{action: "allow"}</code>.
+Allow has the <em>native hook-specific meaning</em>, not a generic permit: consult the
+inventory/upstream documentation. acceptConnection never accepts allow because
+it would claim native socket ownership. Hooks run in native module order and
+an earlier decision can prevent later modules/callbacks from observing an event.
+Exceptions/timeouts/invalid decisions disable the script until successful rehash.
+Decision hooks fail closed, except kill, channelPreDelete and userPreQuit pass
+on failure so cleanup cannot be blocked by a disabled script. Observational
+failures do not undo native actions. No native mutation support is implied for
+mutable-reference arguments outside the existing command rewrite API.</p>
+<p>Inventory/ABI checks:</p>
+<pre><code class="language-sh">python3 tools/generate_module_hooks.py --check --upstream /path/to/inspircd/include/modules.h
+python3 tests/test_generate_module_hooks.py
+</code></pre>
+<p>The synthetic native suite additionally requires the test-only <code>m_js_hook_probe</code>
+module (optional image build arg <code>TEST_HOOK_PROBE=1</code>). It invokes all adapters,
+checks snapshots after native stack destruction, exercises every ModResult
+pass/deny/admin-allow decision, and sends real lifecycle/message traffic.
+The normal optional image excludes this probe and remains unloaded by default.</p>
+<h2 id="hook-inventory">Hook inventory</h2>
+<p>All 74 Implementation events plus the direct OnCleanup callback. Native references are owned read-only snapshots; only command rewrites and explicit queued effects mutate native state.</p>
+<table>
+<thead>
+<tr>
+<th>Native hook</th>
+<th>JS stage</th>
+<th>Result</th>
+<th>Callback failure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OnUserConnect</td>
+<td><code>userConnect</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserPreQuit</td>
+<td><code>userPreQuit</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>OnUserQuit</td>
+<td><code>userQuit</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserDisconnect</td>
+<td><code>userDisconnect</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnChannelPreDelete</td>
+<td><code>channelPreDelete</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>OnChannelDelete</td>
+<td><code>channelDelete</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserJoin</td>
+<td><code>userJoin</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnPostJoin</td>
+<td><code>postJoin</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserPart</td>
+<td><code>userPart</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnPreRehash</td>
+<td><code>preRehash</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnModuleRehash</td>
+<td><code>moduleRehash</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnSendSnotice</td>
+<td><code>sendSnotice</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnUserPreJoin</td>
+<td><code>userPreJoin</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnUserPreKick</td>
+<td><code>userPreKick</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnUserKick</td>
+<td><code>userKick</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserPreInvite</td>
+<td><code>userPreInvite</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnUserInvite</td>
+<td><code>userInvite</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserPreMessage</td>
+<td><code>userPreMessage</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnBuildNeighborList</td>
+<td><code>buildNeighborList</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserPreNick</td>
+<td><code>userPreNick</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnUserPostMessage</td>
+<td><code>userPostMessage</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserMessage</td>
+<td><code>userMessage</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserMessageBlocked</td>
+<td><code>userMessageBlocked</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnMode</td>
+<td><code>mode</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnDecodeMetadata</td>
+<td><code>decodeMetadata</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnChangeHost</td>
+<td><code>changeHost</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnChangeRealHost</td>
+<td><code>changeRealHost</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnPostChangeRealHost</td>
+<td><code>postChangeRealHost</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnChangeRealName</td>
+<td><code>changeRealName</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnChangeUser</td>
+<td><code>changeUser</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnChangeRealUser</td>
+<td><code>changeRealUser</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnPostChangeRealUser</td>
+<td><code>postChangeRealUser</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnAddLine</td>
+<td><code>addLine</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnDelLine</td>
+<td><code>delLine</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnExpireLine</td>
+<td><code>expireLine</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnCleanup</td>
+<td><code>cleanup</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserPostNick</td>
+<td><code>userPostNick</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnPreMode</td>
+<td><code>preMode</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnKill</td>
+<td><code>kill</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>OnLoadModule</td>
+<td><code>loadModule</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUnloadModule</td>
+<td><code>unloadModule</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnBackgroundTimer</td>
+<td><code>backgroundTimer</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnPreCommand</td>
+<td><code>preCommand</code></td>
+<td>pass/deny</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnPostCommand</td>
+<td><code>postCommand</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnCommandBlocked</td>
+<td><code>commandBlocked</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserInit</td>
+<td><code>userInit</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserPostInit</td>
+<td><code>userPostInit</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnCheckReady</td>
+<td><code>checkReady</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnUserRegister</td>
+<td><code>userRegister</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnCheckInvite</td>
+<td><code>checkInvite</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnRawMode</td>
+<td><code>rawMode</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnCheckKey</td>
+<td><code>checkKey</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnCheckLimit</td>
+<td><code>checkLimit</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnCheckChannelBan</td>
+<td><code>checkChannelBan</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnCheckBan</td>
+<td><code>checkBan</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnCheckPassword</td>
+<td><code>checkPassword</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnPreTopicChange</td>
+<td><code>preTopicChange</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnPostTopicChange</td>
+<td><code>postTopicChange</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnPostConnect</td>
+<td><code>postConnect</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnAcceptConnection</td>
+<td><code>acceptConnection</code></td>
+<td>pass/deny</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnGarbageCollect</td>
+<td><code>garbageCollect</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnNumeric</td>
+<td><code>numeric</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnChangeRemoteAddress</td>
+<td><code>changeRemoteAddress</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnServiceAdd</td>
+<td><code>serviceAdd</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnServiceDel</td>
+<td><code>serviceDel</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnUserWrite</td>
+<td><code>userWrite</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnShutdown</td>
+<td><code>shutdown</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnPreOperLogin</td>
+<td><code>preOperLogin</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnOperLogin</td>
+<td><code>operLogin</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnPostOperLogin</td>
+<td><code>postOperLogin</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnOperLogout</td>
+<td><code>operLogout</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnPostOperLogout</td>
+<td><code>postOperLogout</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnPreChangeConnectClass</td>
+<td><code>preChangeConnectClass</code></td>
+<td>pass/deny/allow (admin)</td>
+<td>deny</td>
+</tr>
+<tr>
+<td>OnChangeConnectClass</td>
+<td><code>changeConnectClass</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+<tr>
+<td>OnPostChangeConnectClass</td>
+<td><code>postChangeConnectClass</code></td>
+<td>observe</td>
+<td>observe only</td>
+</tr>
+</tbody>
+</table>
+<h2 id="complete-typescript-hook-declarations">Complete TypeScript hook declarations</h2>
+<pre><code class="language-typescript">/// &lt;reference path=&quot;js_generated/module_hooks.d.ts&quot; /&gt;
+/** Prefix copies: bytes are exact only when truncated=false. Invalid UTF-8 -&gt; null. */
+interface HookText {text: string | null; bytes: Uint8Array; byteLength: number; truncated: boolean}
+interface HookList&lt;T&gt; {items: T[]; length: number; truncated: boolean}
+interface HookUser {id: string; nick: HookText; local: boolean; quitting: boolean; address: HookText}
+interface HookChannel {name: HookText}
+interface HookMembership {user: HookUser | null; channel: HookChannel | null; prefixes: HookText}
+interface HookExtensible {kind: HookText; value: HookUser | HookChannel | HookMembership}
+interface HookTarget {
+  type: number; name: HookText; status: HookText; originalStatus: HookText;
+  user: HookUser | null; channel: HookChannel | null;
+}
+interface HookMessageDetails {
+  type: number; text: HookText; originalText: HookText; echo: boolean; echoOriginal: boolean;
+  updateIdle: boolean; exemptions: HookList&lt;HookUser | null&gt;;
+  tagsIn: HookList&lt;{name: HookText; value: HookText}&gt;; tagsOut: HookList&lt;{name: HookText; value: HookText}&gt;;
+}
+interface HookMode {adding: boolean; mode: HookText; name: HookText; parameter: HookText}
+interface HookXLine {
+  type: HookText; mask: HookText; source: HookText; reason: HookText;
+  setTime: number; duration: number; expiry: number; fromConfig: boolean;
+}
+interface HookModule {file: HookText; description: HookText; version: HookText; dying: boolean}
+interface HookAddress {address: HookText; port: number; family: number}
+interface HookListener {address: HookAddress; protocol: number}
+interface HookNumeric {code: number; params: HookList&lt;HookText&gt;}
+interface HookService {name: HookText; type: number}
+interface HookWireMessage {
+  command: HookText; params: HookList&lt;HookText&gt;; source: HookText | null;
+  tags: HookList&lt;{name: HookText; value: HookText}&gt;;
+}
+type HookDecision = {action: 'pass' | 'deny' | 'allow'};
+type ModuleHookEvent&lt;K extends keyof ModuleHookEvents&gt; = ModuleHookEvents[K] &amp; {stage: K; userId: string | null};
+interface IrcdApi {
+  /** Native result semantics apply. allow requires authority=admin, never accepts socket ownership.
+   * Void hooks ignore synchronous return values. All snapshots are detached copies, not native handles.
+   */
+  on&lt;K extends keyof ModuleHookEvents&gt;(stage: K, callback: (event: ModuleHookEvent&lt;K&gt;) =&gt; HookDecision | void): void;
+}
+// Generated by tools/generate_module_hooks.py; do not edit.
+interface ModuleHookEvents {
+  userConnect: {user: HookUser | null};
+  userPreQuit: {user: HookUser | null; message: HookText; oper_message: HookText};
+  userQuit: {user: HookUser | null; message: HookText; oper_message: HookText};
+  userDisconnect: {user: HookUser | null};
+  channelPreDelete: {chan: HookChannel | null};
+  channelDelete: {chan: HookChannel | null};
+  userJoin: {memb: HookMembership | null; sync: boolean; created: boolean; except_list: HookList&lt;HookUser | null&gt;};
+  postJoin: {memb: HookMembership | null};
+  userPart: {memb: HookMembership | null; partmessage: HookText; except_list: HookList&lt;HookUser | null&gt;};
+  preRehash: {user: HookUser | null; parameter: HookText};
+  moduleRehash: {user: HookUser | null; parameter: HookText};
+  sendSnotice: {snomask: HookText; type: HookText; message: HookText};
+  userPreJoin: {user: HookUser | null; chan: HookChannel | null; cname: HookText; privs: HookText; keygiven: HookText; override: boolean};
+  userPreKick: {source: HookUser | null; memb: HookMembership | null; reason: HookText};
+  userKick: {source: HookUser | null; memb: HookMembership | null; reason: HookText; except_list: HookList&lt;HookUser | null&gt;};
+  userPreInvite: {source: HookUser | null; dest: HookUser | null; channel: HookChannel | null; timeout: number};
+  userInvite: {source: HookUser | null; dest: HookUser | null; channel: HookChannel | null; timeout: number; notifyrank: number; notifyexcepts: HookList&lt;HookUser | null&gt;};
+  userPreMessage: {user: HookUser | null; target: HookTarget; details: HookMessageDetails};
+  buildNeighborList: {source: HookUser | null; include: HookList&lt;HookMembership | null&gt;; exceptions: HookList&lt;{user: HookUser | null; include: boolean}&gt;};
+  userPreNick: {user: HookUser | null; newnick: HookText};
+  userPostMessage: {user: HookUser | null; target: HookTarget; details: HookMessageDetails};
+  userMessage: {user: HookUser | null; target: HookTarget; details: HookMessageDetails};
+  userMessageBlocked: {user: HookUser | null; target: HookTarget; details: HookMessageDetails};
+  mode: {user: HookUser | null; usertarget: HookUser | null; chantarget: HookChannel | null; changelist: HookList&lt;HookMode&gt;; processflags: number};
+  decodeMetadata: {target: HookExtensible | null; extname: HookText; extdata: HookText};
+  changeHost: {user: HookUser | null; newhost: HookText};
+  changeRealHost: {user: HookUser | null; newhost: HookText};
+  postChangeRealHost: {user: HookUser | null};
+  changeRealName: {user: HookUser | null; real: HookText};
+  changeUser: {user: HookUser | null; newuser: HookText};
+  changeRealUser: {user: HookUser | null; newuser: HookText};
+  postChangeRealUser: {user: HookUser | null};
+  addLine: {source: HookUser | null; line: HookXLine | null};
+  delLine: {source: HookUser | null; line: HookXLine | null};
+  expireLine: {line: HookXLine | null};
+  cleanup: {type: number; item: HookExtensible | null};
+  userPostNick: {user: HookUser | null; oldnick: HookText};
+  preMode: {source: HookUser | null; dest: HookUser | null; channel: HookChannel | null; modes: HookList&lt;HookMode&gt;};
+  kill: {source: HookUser | null; dest: HookUser | null; reason: HookText};
+  loadModule: {mod: HookModule | null};
+  unloadModule: {mod: HookModule | null};
+  backgroundTimer: {curtime: number};
+  commandBlocked: {command: HookText; parameters: HookList&lt;HookText&gt;; user: HookUser | null};
+  userInit: {user: HookUser | null};
+  userPostInit: {user: HookUser | null};
+  checkReady: {user: HookUser | null};
+  userRegister: {user: HookUser | null};
+  checkInvite: {user: HookUser | null; chan: HookChannel | null};
+  rawMode: {user: HookUser | null; chan: HookChannel | null; change: HookMode};
+  checkKey: {user: HookUser | null; chan: HookChannel | null; keygiven: HookText};
+  checkLimit: {user: HookUser | null; chan: HookChannel | null};
+  checkChannelBan: {user: HookUser | null; chan: HookChannel | null};
+  checkBan: {user: HookUser | null; chan: HookChannel | null; mask: HookText};
+  checkPassword: {password: HookText; passwordhash: HookText; value: HookText};
+  preTopicChange: {user: HookUser | null; chan: HookChannel | null; topic: HookText};
+  postTopicChange: {user: HookUser | null; chan: HookChannel | null; topic: HookText};
+  postConnect: {user: HookUser | null};
+  acceptConnection: {fd: number; sock: HookListener | null; client: HookAddress; server: HookAddress};
+  garbageCollect: {};
+  numeric: {user: HookUser | null; numeric: HookNumeric};
+  changeRemoteAddress: {user: HookUser | null};
+  serviceAdd: {service: HookService};
+  serviceDel: {service: HookService};
+  userWrite: {user: HookUser | null; msg: HookWireMessage};
+  shutdown: {reason: HookText};
+  preOperLogin: {user: HookUser | null; oper: {name: HookText; type: HookText} | null; automatic: boolean};
+  operLogin: {user: HookUser | null; oper: {name: HookText; type: HookText} | null; automatic: boolean};
+  postOperLogin: {user: HookUser | null; automatic: boolean};
+  operLogout: {user: HookUser | null};
+  postOperLogout: {user: HookUser | null; oper: {name: HookText; type: HookText} | null};
+  preChangeConnectClass: {user: HookUser | null; klass: {name: HookText} | null; errnum: HookNumeric | null};
+  changeConnectClass: {user: HookUser | null; klass: {name: HookText} | null; force: boolean};
+  postChangeConnectClass: {user: HookUser | null; force: boolean};
+}
+
+</code></pre></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

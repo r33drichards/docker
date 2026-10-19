@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://r33drichards.github.io/docker/reference/api/">
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Native API and authority - InspIRCd JavaScript module</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">InspIRCd JavaScript module</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Tutorials</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">How-to guides</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../how-to/configure/" class="dropdown-item">Build and configure</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/reload/" class="dropdown-item">Reload and recover</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/wasm/" class="dropdown-item">Use WebAssembly</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/documentation/" class="dropdown-item">Maintain and publish docs</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../configuration/" class="dropdown-item">Configuration</a>
+</li>
+                                    
+<li>
+    <a href="../commands/" class="dropdown-item">Command hooks</a>
+</li>
+                                    
+<li>
+    <a href="../hooks/" class="dropdown-item">Core Module hooks</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Native API and authority</a>
+</li>
+                                    
+<li>
+    <a href="../limits/" class="dropdown-item">Execution and failure limits</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../explanation/trust/" class="dropdown-item">Trust and containment</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../hooks/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../limits/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/r33drichards/docker/edit/feat/local-echo-command/site-docs/reference/api.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#native-api-and-authority" class="nav-link">Native API and authority</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#typescript-assets" class="nav-link">TypeScript assets</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<!-- Generated by tools/generate_docs_reference.py; edit JAVASCRIPT.md or the binding sources. -->
+<h1 id="native-api-and-authority">Native API and authority</h1>
+<p>The manifest <code>bindings/inspircd.json</code> generates registration rows, utility
+TypeScript declarations, and a coverage inventory:</p>
+<pre><code>python3 tools/generate_js_bindings.py
+python3 tools/generate_js_bindings.py --check
+</code></pre>
+<p>Six audited utility wrappers are implemented: <code>match</code>, <code>matchCIDR</code>, <code>isNick</code>,
+<code>isChannel</code>, <code>stripColor</code>, and <code>time</code>. Inputs have strict arity/types, copied
+ownership, and explicit conversions. NUL is rejected for native glob/CIDR
+functions with NUL-terminated internals. The manifest tracks reviewed declarations,
+manual-wrapper candidates, exclusions, and pending mutations. It is a systematic
+allowlist and coverage inventory, <strong>not an automatic binding of every function in
+inspircd.h or the whole SDK</strong>. New bindings require explicit conversion, lifetime,
+effect, and authorization policy plus an implementation and tests.</p>
+<p>Additional explicit host methods:</p>
+<ul>
+<li><code>userById(uuid)</code> returns an owned <code>{ id, nick }</code> snapshot or null.</li>
+<li><code>notice(targetUuid, text)</code> queues a server notice (maximum 400 UTF-8 bytes).</li>
+<li><code>rename(targetUuid, nick)</code> queues a validated nickname change.</li>
+<li><code>wasm(name)</code> returns a fresh Uint8Array of a configured asset's bytes.</li>
+</ul>
+<p>Default <code>authority="user"</code> restricts notice/rename targets to the triggering
+client. Rename runs ordinary NICK processing as that client, retaining native
+restrictions. Explicit <code>authority="admin"</code> permits targeting other local users;
+rename directly invokes the native administrative nickname change after nickname
+validation. No credential, operator identity, or permission is granted to a user.
+Queued operations re-resolve the original actor and target UUIDs and skip users
+who disconnected. Only local targets are changed in this initial API.</p>
+<p>At most 16 effects can be queued per file/event. All effects for the event are
+discarded on pre denial/error. Accepted effects run at the main-loop safe point,
+after the current parser stack unwinds. They may still be skipped/rejected by
+native checks; queuing is not a success receipt or an atomic transaction, and a
+later core command rejection does not retract accepted queued effects. Native
+effects and commands they synchronously trigger do not invoke JS hooks, avoiding
+unbounded feedback loops; ordinary core/native-module checks still apply.</p>
+<h2 id="typescript-assets">TypeScript assets</h2>
+<p><a href="../../assets/js_api.d.ts">API declarations</a>, <a href="../../assets/js_hooks.d.ts">snapshot types</a>, <a href="../../assets/js_generated/module_hooks.d.ts">hook declarations</a>, <a href="../../assets/js_generated/inspircd.d.ts">utility declarations</a>. Preserve this directory layout for triple-slash references.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>
