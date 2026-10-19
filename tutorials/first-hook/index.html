@@ -186,14 +186,14 @@ must be free; allow time and disk space for a native V8/InspIRCd build.</p>
 <p>Run from a fresh checkout (skip cloning if already in this repository):</p>
 <pre><code class="language-sh">git clone --branch feat/local-echo-command https://github.com/r33drichards/docker.git
 cd docker
-docker build -f Dockerfile.javascript -t inspircd:javascript .
+docker build -t inspircd:local .
 </code></pre>
-<p>The optional image contains the module but will load it only because our lesson
+<p>The primary image contains the module but will load it only because our lesson
 configuration explicitly requests it. A build must finish successfully before continuing.
 If a pinned Alpine dependency is unavailable, stop and consult the maintainer rather
 than substituting mismatched headers and libraries.</p>
 <h2 id="2-start-your-isolated-server">2. Start your isolated server</h2>
-<pre><code class="language-sh">docker run -d --name js-lesson --workdir /inspircd   -p 127.0.0.1:16667:6667   -v &quot;$PWD/examples/javascript/tutorial:/lab:ro&quot;   --entrypoint /inspircd/bin/inspircd inspircd:javascript   --nofork --config /lab/inspircd.conf
+<pre><code class="language-sh">docker run -d --name js-lesson --workdir /inspircd   -p 127.0.0.1:16667:6667   -v &quot;$PWD/examples/javascript/tutorial:/lab:ro&quot;   --entrypoint /inspircd/bin/inspircd inspircd:local   --nofork --config /lab/inspircd.conf
 </code></pre>
 <p>The mount is read-only. The container runs as UID 10000, so the example directory
 must be traversable and its files readable by that UID. Only host loopback port

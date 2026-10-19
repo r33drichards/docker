@@ -172,7 +172,7 @@ For ABI parity against an inspected SDK:</p>
 <pre><code class="language-sh">python3 tools/generate_module_hooks.py --check --upstream /path/to/inspircd/include/modules.h
 </code></pre>
 <p>The full native suite needs an isolated installation with both <code>m_javascript.so</code>
-and the test-only <code>m_js_hook_probe.so</code>. The optional Docker build supports
+and the test-only <code>m_js_hook_probe.so</code>. The primary Dockerfile supports
 <code>--build-arg TEST_HOOK_PROBE=1</code> for this purpose; never ship that probe in a normal image.</p>
 <pre><code class="language-sh">INSPIRCD_NATIVE=/path/to/installation sh tests/javascript.sh
 </code></pre>

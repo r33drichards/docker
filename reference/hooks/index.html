@@ -208,7 +208,7 @@ python3 tests/test_generate_module_hooks.py
 module (optional image build arg <code>TEST_HOOK_PROBE=1</code>). It invokes all adapters,
 checks snapshots after native stack destruction, exercises every ModResult
 pass/deny/admin-allow decision, and sends real lifecycle/message traffic.
-The normal optional image excludes this probe and remains unloaded by default.</p>
+The normal primary image excludes this probe and remains unloaded by default.</p>
 <h2 id="hook-inventory">Hook inventory</h2>
 <p>All 74 Implementation events plus the direct OnCleanup callback. Native references are owned read-only snapshots; only command rewrites and explicit queued effects mutate native state.</p>
 <table>
