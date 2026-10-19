@@ -50,7 +50,7 @@ The synthetic native suite additionally requires the test-only `m_js_hook_probe`
 module (optional image build arg `TEST_HOOK_PROBE=1`). It invokes all adapters,
 checks snapshots after native stack destruction, exercises every ModResult
 pass/deny/admin-allow decision, and sends real lifecycle/message traffic.
-The normal optional image excludes this probe and remains unloaded by default.
+The normal primary image excludes this probe and remains unloaded by default.
 
 ## Hook inventory
 

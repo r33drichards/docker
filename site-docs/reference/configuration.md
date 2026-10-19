@@ -2,15 +2,19 @@
 # Configuration
 
 ```
-docker build -f Dockerfile.javascript -t inspircd:javascript .
+docker build -t inspircd:local .
 ```
 
-The optional image uses Alpine 3.22, InspIRCd v4.12.1 by default, and matching
+The primary image uses Alpine 3.22, InspIRCd v4.12.1 by default, and matching
 `nodejs-dev`/`nodejs-libs` 22.23.2-r0. Only V8 APIs are used; no Node environment,
 `process`, `require`, filesystem API, network API, or WASI is installed in scripts.
-The original Dockerfile stays unchanged and does not enable the extra module.
-Update both dependency pins together for security updates. The optional Dockerfile
-checks that the built module links libnode and has the ELF NODELETE flag.
+The root `Dockerfile` includes the compiled module and its runtime library, but
+leaves it unloaded until explicitly configured. No scripts are installed or enabled
+by default. `Dockerfile.javascript` has been retired; downstream Railway projects
+can build the root Dockerfile and supply their own configuration and scripts.
+Existing `/inspircd/conf/` volumes are preserved by the unchanged entrypoint.
+Update `NODEJS_VERSION` for both stages together for security updates. The build
+checks that the module links libnode and has the ELF NODELETE flag.
 
 Example configuration (files must already exist):
 

@@ -63,11 +63,11 @@ check_python \
     tools/generate_js_bindings.py tools/generate_module_hooks.py \
     tests/test_generate_module_hooks.py tests/test_generate_js_bindings.py tests/test_authorize_heavy.py \
     tests/javascript_native.py tests/precommand_client.py tests/test_precommand_client.py \
-    tests/precommand_log.py \
+    tests/precommand_log.py tests/primary_image.py \
     tests/ci/*.py tests/fuzz/*.py
 
 "$SHELLCHECK" --severity=style \
-    tests/javascript.sh tests/js_bindings.sh tests/js_runtime.sh \
+    tests/primaryImage.sh tests/javascript.sh tests/js_bindings.sh tests/js_runtime.sh \
     tests/js_script_loader.sh tests/precommand.sh tests/precommand_struct.sh \
     tests/ci/*.sh tests/fuzz/*.sh
 

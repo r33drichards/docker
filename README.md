@@ -351,6 +351,16 @@ You can put the sources these modules in the modules directory of this repositor
 It also allows you to overwrite modules.
 
 
+### Included JavaScript module (InspIRCd 4)
+
+The primary `Dockerfile` includes `m_javascript.so` and its matching V8 runtime.
+The module is **not loaded by default**, and no scripts are enabled automatically.
+Downstream projects, including Railway services building this Dockerfile, can
+load it explicitly and supply their own scripts through their configuration.
+Existing configuration volumes and entrypoint behavior are unchanged. See
+[JavaScript build and configuration](JAVASCRIPT.md#build-and-configure) before
+enabling trusted administrator-authored scripts.
+
 ### Included pre/post-command debug hooks (InspIRCd 4)
 
 **Warning: this opt-in debugging module logs unredacted command parameters.**

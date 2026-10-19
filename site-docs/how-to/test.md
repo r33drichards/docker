@@ -20,7 +20,7 @@ python3 tools/generate_module_hooks.py --check --upstream /path/to/inspircd/incl
 ~~~
 
 The full native suite needs an isolated installation with both `m_javascript.so`
-and the test-only `m_js_hook_probe.so`. The optional Docker build supports
+and the test-only `m_js_hook_probe.so`. The primary Dockerfile supports
 `--build-arg TEST_HOOK_PROBE=1` for this purpose; never ship that probe in a normal image.
 
 ~~~sh

@@ -13,10 +13,10 @@ Run from a fresh checkout (skip cloning if already in this repository):
 ~~~sh
 git clone --branch feat/local-echo-command https://github.com/r33drichards/docker.git
 cd docker
-docker build -f Dockerfile.javascript -t inspircd:javascript .
+docker build -t inspircd:local .
 ~~~
 
-The optional image contains the module but will load it only because our lesson
+The primary image contains the module but will load it only because our lesson
 configuration explicitly requests it. A build must finish successfully before continuing.
 If a pinned Alpine dependency is unavailable, stop and consult the maintainer rather
 than substituting mismatched headers and libraries.
@@ -25,7 +25,7 @@ than substituting mismatched headers and libraries.
 
 
 ~~~sh
-docker run -d --name js-lesson --workdir /inspircd   -p 127.0.0.1:16667:6667   -v "$PWD/examples/javascript/tutorial:/lab:ro"   --entrypoint /inspircd/bin/inspircd inspircd:javascript   --nofork --config /lab/inspircd.conf
+docker run -d --name js-lesson --workdir /inspircd   -p 127.0.0.1:16667:6667   -v "$PWD/examples/javascript/tutorial:/lab:ro"   --entrypoint /inspircd/bin/inspircd inspircd:local   --nofork --config /lab/inspircd.conf
 ~~~
 
 The mount is read-only. The container runs as UID 10000, so the example directory

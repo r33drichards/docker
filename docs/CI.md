@@ -3,10 +3,13 @@
 Every pull-request update runs the quick suite: formatting and static checks,
 generator/label-selector unit tests, ASan/UBSan ownership and V8 tests, native
 Valgrind ownership tests, three 10-second libFuzzer targets, and actual module
-compilation against the pinned InspIRCd 4.12.1 commit. Both Dockerfiles default
-to v4.12.1, and default-image CI builds and tests that same release.
+compilation against the pinned InspIRCd 4.12.1 commit. The primary Dockerfile defaults
+to v4.12.1, and image CI builds and tests that same release.
 
 The default-image runner discovers only top-level `tests/*.sh` unattended tests.
+The primary-image smoke test checks the packaged JavaScript runtime, unloaded
+defaults, explicit module loading, ordinary IRC, and persisted configuration
+across a restart without installing any policy hooks.
 Interactive helpers live in `tests/manual/`; run the bot helper with
 `bash tests/manual/run_bot_test.sh` against a separately configured test server.
 It prompts for confirmation and is not part of automated CI discovery.
@@ -46,7 +49,7 @@ Permission tests run as non-root. Leak detection cannot be disabled in CI.
 Action revisions are full-SHA pinned. Clang/clang-format 19 and GCC 14 are selected
 explicitly; Ruff and actionlint are exact-version pinned, and actionlint's archive
 is SHA-256 verified. Debian trixie package security revisions can advance; native
-jobs record installed versions. Optional Alpine builds use the Dockerfile's
+jobs record installed versions. Alpine image builds use the primary Dockerfile's
 matched, version-pinned Node/V8 development and runtime packages. These are not
 claims of bit-for-bit reproducible toolchains.
 

@@ -3,10 +3,10 @@
 Use this guide when adding trusted scripts to an existing InspIRCd 4.12.1 setup.
 Review [trust and containment](../explanation/trust.md) before enabling it.
 
-1. Build the optional image from the repository root:
+1. Build the primary image from the repository root:
 
    ~~~sh
-   docker build -f Dockerfile.javascript -t inspircd:javascript .
+   docker build -t inspircd:local .
    ~~~
 
 2. Make your script files readable by the daemon user. Put them under your
