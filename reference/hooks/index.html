@@ -44,6 +44,10 @@
 <li>
     <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
 </li>
+                                    
+<li>
+    <a href="../../tutorials/command-and-timer/" class="dropdown-item">Register a command and timer</a>
+</li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
@@ -59,11 +63,31 @@
 </li>
                                     
 <li>
+    <a href="../../how-to/rss/" class="dropdown-item">Subscribe channels to RSS</a>
+</li>
+                                    
+<li>
     <a href="../../how-to/wasm/" class="dropdown-item">Use WebAssembly</a>
 </li>
                                     
 <li>
     <a href="../../how-to/test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/native-host-api/" class="dropdown-item">Native host APIs</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/fetch-and-webhooks/" class="dropdown-item">Fetch and authenticated webhooks</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/replay/" class="dropdown-item">Replay and assert heap state</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/agent-onboarding/" class="dropdown-item">Agent onboarding and MOTD</a>
 </li>
                                     
 <li>
@@ -100,6 +124,14 @@
 </li>
                                     
 <li>
+    <a href="../callable-api/" class="dropdown-item">Callable method signatures</a>
+</li>
+                                    
+<li>
+    <a href="../features/" class="dropdown-item">Feature and branch matrix</a>
+</li>
+                                    
+<li>
     <a href="../limits/" class="dropdown-item">Execution and failure limits</a>
 </li>
                                 </ul>
@@ -114,6 +146,10 @@
                                     
 <li>
     <a href="../../explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/host-lifecycle/" class="dropdown-item">Host authority and lifecycle</a>
 </li>
                                 </ul>
                             </li>
@@ -199,7 +235,7 @@ Snapshots expose no native handles and changing them never changes native state.
 Text is capped at 64 KiB per value and 256 KiB per event; lists at 256 entries.
 Each event has <code>stage</code> and nullable <code>userId</code>; server events may have no actor.
 User-authority effects require a local actor; explicit admin authority permits
-local-target effects without an actor. The same queued-effect/reentrancy rules
+user/channel messaging without an actor (renames remain local-only). The same queued-effect/reentrancy rules
 apply to all events.</p>
 <p>Void hooks observe only unless listed as mutable below; other return values are
 ignored except unsupported Promises.

@@ -44,6 +44,10 @@
 <li>
     <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
 </li>
+                                    
+<li>
+    <a href="../../tutorials/command-and-timer/" class="dropdown-item">Register a command and timer</a>
+</li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
@@ -59,11 +63,31 @@
 </li>
                                     
 <li>
+    <a href="../rss/" class="dropdown-item">Subscribe channels to RSS</a>
+</li>
+                                    
+<li>
     <a href="../wasm/" class="dropdown-item">Use WebAssembly</a>
 </li>
                                     
 <li>
     <a href="../test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../native-host-api/" class="dropdown-item">Native host APIs</a>
+</li>
+                                    
+<li>
+    <a href="../fetch-and-webhooks/" class="dropdown-item">Fetch and authenticated webhooks</a>
+</li>
+                                    
+<li>
+    <a href="../replay/" class="dropdown-item">Replay and assert heap state</a>
+</li>
+                                    
+<li>
+    <a href="../agent-onboarding/" class="dropdown-item">Agent onboarding and MOTD</a>
 </li>
                                     
 <li>
@@ -100,6 +124,14 @@
 </li>
                                     
 <li>
+    <a href="../../reference/callable-api/" class="dropdown-item">Callable method signatures</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/features/" class="dropdown-item">Feature and branch matrix</a>
+</li>
+                                    
+<li>
     <a href="../../reference/limits/" class="dropdown-item">Execution and failure limits</a>
 </li>
                                 </ul>
@@ -115,6 +147,10 @@
 <li>
     <a href="../../explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
 </li>
+                                    
+<li>
+    <a href="../../explanation/host-lifecycle/" class="dropdown-item">Host authority and lifecycle</a>
+</li>
                                 </ul>
                             </li>
                         </ul>
@@ -126,7 +162,7 @@
                             </a>
                         </li>
                             <li class="nav-item">
-                                <a rel="prev" href="../test/" class="nav-link">
+                                <a rel="prev" href="../agent-onboarding/" class="nav-link">
                                     <i class="fa fa-arrow-left"></i> Previous
                                 </a>
                             </li>
@@ -170,6 +206,7 @@
 <pre><code class="language-sh">python3 -m venv .venv-docs
 .venv-docs/bin/pip install -r requirements-docs.txt
 python3 tools/generate_docs_reference.py
+python3 tests/test_docs_contract.py
 .venv-docs/bin/mkdocs build --strict
 .venv-docs/bin/mkdocs serve --dev-addr 127.0.0.1:8000
 </code></pre>
@@ -189,7 +226,11 @@ to publish docs. An administrator can publish a reviewed checkout manually:</p>
 </code></pre>
 <p>Use an ephemeral approved Git credential, not a token in a URL or committed file.
 This command changes the documentation branch only. Site publication is not an
-IRC daemon/module deployment, and a successful build alone does not prove Pages is live.</p></div>
+IRC daemon/module deployment, and a successful build alone does not prove Pages is live.</p>
+<p>The docs contract checks complete declaration coverage, MOTD source wiring and JavaScript
+example syntax, and executes the replay example against the modeled host. This is not
+a TypeScript typecheck or live-server deployment check. Review semantics against the
+native bridge and run native integration when changing behavior.</p></div>
             </div>
         </div>
 

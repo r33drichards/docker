@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://r33drichards.github.io/docker/reference/callable-api/">
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Callable method signatures - InspIRCd JavaScript module</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">InspIRCd JavaScript module</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Tutorials</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
+</li>
+                                    
+<li>
+    <a href="../../tutorials/command-and-timer/" class="dropdown-item">Register a command and timer</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">How-to guides</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../how-to/configure/" class="dropdown-item">Build and configure</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/reload/" class="dropdown-item">Reload and recover</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/rss/" class="dropdown-item">Subscribe channels to RSS</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/wasm/" class="dropdown-item">Use WebAssembly</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/native-host-api/" class="dropdown-item">Native host APIs</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/fetch-and-webhooks/" class="dropdown-item">Fetch and authenticated webhooks</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/replay/" class="dropdown-item">Replay and assert heap state</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/agent-onboarding/" class="dropdown-item">Agent onboarding and MOTD</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/documentation/" class="dropdown-item">Maintain and publish docs</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../configuration/" class="dropdown-item">Configuration</a>
+</li>
+                                    
+<li>
+    <a href="../commands/" class="dropdown-item">Command hooks</a>
+</li>
+                                    
+<li>
+    <a href="../hooks/" class="dropdown-item">Core Module hooks</a>
+</li>
+                                    
+<li>
+    <a href="../events/" class="dropdown-item">Separate event-provider hooks</a>
+</li>
+                                    
+<li>
+    <a href="../api/" class="dropdown-item">Native API and authority</a>
+</li>
+                                    
+<li>
+    <a href="../sqlite/" class="dropdown-item">SQLite databases</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Callable method signatures</a>
+</li>
+                                    
+<li>
+    <a href="../features/" class="dropdown-item">Feature and branch matrix</a>
+</li>
+                                    
+<li>
+    <a href="../limits/" class="dropdown-item">Execution and failure limits</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../explanation/trust/" class="dropdown-item">Trust and containment</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/host-lifecycle/" class="dropdown-item">Host authority and lifecycle</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../sqlite/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../features/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/r33drichards/docker/edit/master/site-docs/reference/callable-api.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#callable-javascript-api" class="nav-link">Callable JavaScript API</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#method-index" class="nav-link">Method index</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#host-methods-and-data-types" class="nav-link">Host methods and data types</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#asynchronous-fetch-jobs" class="nav-link">Asynchronous fetch jobs</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#explicit-sqlite-databases" class="nav-link">Explicit SQLite databases</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#generated-native-utilities" class="nav-link">Generated native utilities</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<!-- Generated by tools/generate_docs_reference.py; edit the declaration sources. -->
+
+<h1 id="callable-javascript-api">Callable JavaScript API</h1>
+<p>These declarations describe this checkout, not every deployed server. See <a href="../../explanation/host-lifecycle/">authority and lifecycle</a> before enabling admin scripts. Event callbacks are documented separately in <a href="../hooks/">core hooks</a> and <a href="../events/">event providers</a>.</p>
+<h2 id="method-index">Method index</h2>
+<p><code>addBan</code>, <code>cancelFetch</code>, <code>channelByName</code>, <code>channels</code>, <code>clearTimer</code>, <code>close</code>, <code>defaultIsNick</code>, <code>defaultIsUser</code>, <code>disconnect</code>, <code>exec</code>, <code>fetch</code>, <code>isChannel</code>, <code>isFQDN</code>, <code>isHost</code>, <code>isNick</code>, <code>isSID</code>, <code>isUser</code>, <code>isValidMask</code>, <code>join</code>, <code>kick</code>, <code>loadModule</code>, <code>match</code>, <code>matchCIDR</code>, <code>matchMask</code>, <code>notice</code>, <code>on</code>, <code>part</code>, <code>postWebhook</code>, <code>privmsg</code>, <code>processColors</code>, <code>query</code>, <code>randomInt</code>, <code>randomString</code>, <code>registerCommand</code>, <code>rehash</code>, <code>removeBan</code>, <code>rename</code>, <code>setHost</code>, <code>setModes</code>, <code>setRealname</code>, <code>setTimer</code>, <code>setTopic</code>, <code>setUsername</code>, <code>shutdown</code>, <code>sqlite.open</code>, <code>stripColor</code>, <code>takeFetchResult</code>, <code>time</code>, <code>timeNanoseconds</code>, <code>timingSafeCompare</code>, <code>transaction</code>, <code>unloadModule</code>, <code>userById</code>, <code>userByNick</code>, <code>wasm</code>, <code>webhookStats</code></p>
+<h2 id="host-methods-and-data-types">Host methods and data types</h2>
+<p>Source: <code>modules/js_api.d.ts</code>.</p>
+<pre><code class="language-typescript">
+/// &lt;reference path=&quot;js_fetch.d.ts&quot; /&gt;
+/// &lt;reference path=&quot;js_sqlite.d.ts&quot; /&gt;
+/// &lt;reference path=&quot;js_events.d.ts&quot; /&gt;
+/// &lt;reference path=&quot;js_hooks.d.ts&quot; /&gt;
+/// &lt;reference path=&quot;js_generated/inspircd.d.ts&quot; /&gt;
+/** Owned snapshots. Text is null for invalid UTF-8; raw byte arrays are exact. */
+interface CommandEvent {
+  command: string | null;
+  commandBytes: Uint8Array;
+  params: (string | null)[];
+  paramBytes: Uint8Array[];
+  userId: string;
+  stage: 'preCommand' | 'postCommand';
+  validated: boolean;
+  result: 'SUCCESS' | 'FAILURE' | 'INVALID' | null;
+  loop: boolean;
+}
+type CommandDecision = { action: 'deny' } | {
+  action: 'pass'; command?: string; params?: (string | Uint8Array)[];
+};
+// Additional methods on the global ircd object; authority comes only from config.
+interface IrcdApi {
+  on(stage: 'preCommand', callback: (event: CommandEvent) =&gt; CommandDecision | void): void;
+  on(stage: 'postCommand', callback: (event: CommandEvent) =&gt; void): void;
+  /** Admin callback only. JSON object &lt;=16KiB. true is staged, not delivered; false is queue-full. */
+  postWebhook(name: string, json: string): boolean;
+  /** Aggregate process/module-lifetime counters; never URLs, headers or payloads. */
+  webhookStats(): {pending: number; sent: number; failed: number; discarded: number};
+  wasm(name: string): Uint8Array;
+  userById(id: string): { id: string; nick: string | null; isOper: boolean } | null;
+  /** User UUID, or existing #channel for admin authority. Queued, not delivery acknowledgement. */
+  notice(targetId: string, text: string): void;
+  /** Same target/authority/queue rules as notice; emits PRIVMSG instead. */
+  privmsg(targetId: string, text: string): void;
+  rename(targetId: string, nick: string): void;
+}
+
+/** Native host methods. Mutations are staged, not delivered; admin authority is configured by the server. */
+interface NativeUserSnapshot {
+  id: string; nick: string | null; username: string | null; hostname: string | null;
+  realname: string | null; local: boolean; oper: boolean;
+}
+interface NativeChannelSnapshot {
+  name: string | null; topic: string | null; modes: string | null; created: number;
+  members: (NativeUserSnapshot &amp; {rank: number; prefix: string | null})[]; truncated: boolean;
+}
+interface IrcdApi {
+  userByNick(nick: string): NativeUserSnapshot | null;
+  channelByName(name: string): NativeChannelSnapshot | null;
+  channels(): string[];
+  /** Initialization only, admin scripts only. Refuses native/other-script command conflicts. */
+  registerCommand(name: string, minParams: number, maxParams: number, operOnly: boolean,
+    callback: (event: {userId: string; params: string[]}) =&gt; void): void;
+  /** Seconds, 1..86400. At most 32 timers per script; no catch-up bursts. */
+  setTimer(seconds: number, repeat: boolean, callback: (event: {userId: null; params: []}) =&gt; void): number;
+  clearTimer(id: number): boolean;
+  join(userId: string, channel: string, key: string): boolean;
+  part(userId: string, channel: string, reason: string): boolean;
+  kick(userId: string, channel: string, reason: string): boolean;
+  setTopic(channel: string, topic: string): boolean;
+  setModes(channel: string, modesAndParams: string): boolean;
+  setHost(userId: string, hostname: string): boolean;
+  setUsername(userId: string, username: string): boolean;
+  setRealname(userId: string, realname: string): boolean;
+  disconnect(userId: string, reason: string): boolean;
+  /** Duration is a decimal seconds string, 0 for permanent. */
+  addBan(type: string, mask: string, duration: string, reason: string): boolean;
+  removeBan(type: string, mask: string): boolean;
+  loadModule(name: string): boolean;
+  unloadModule(name: string): boolean;
+  rehash(): boolean;
+  shutdown(): boolean;
+}
+
+</code></pre>
+<h2 id="asynchronous-fetch-jobs">Asynchronous fetch jobs</h2>
+<p>Source: <code>modules/js_fetch.d.ts</code>.</p>
+<pre><code class="language-typescript">
+/** Native asynchronous jobs, not browser Fetch/Promises. Fetch creation requires an active admin callback; polling/cancel require admin authority. */
+interface IrcdApi {
+  fetch(url: string, options?: {method?: 'GET' | 'POST'; body?: string}): string;
+  /** null pending; ready results consumed. body null for invalid UTF-8, bodyBytes exact. */
+  takeFetchResult(id: string): {ok: boolean; status: number; body: string | null; bodyBytes: Uint8Array; error: string | null} | null;
+  /** Best-effort; cannot undo an already transmitted POST. */
+  cancelFetch(id: string): boolean;
+}
+
+</code></pre>
+<h2 id="explicit-sqlite-databases">Explicit SQLite databases</h2>
+<p>Source: <code>modules/js_sqlite.d.ts</code>.</p>
+<pre><code class="language-typescript">
+/** Additional declaration merging for the explicit SQLite API. */
+type SqliteValue = null | number | bigint | string | Uint8Array;
+interface SqliteResult {
+  columns: string[];
+  rows: SqliteValue[][];
+  changes: bigint;
+  lastInsertRowid: bigint;
+}
+interface SqliteDatabase {
+  query(sql: string, params?: SqliteValue[]): SqliteResult;
+  exec(sql: string, params?: SqliteValue[]): SqliteResult;
+  transaction&lt;T&gt;(callback: () =&gt; T): T;
+  close(): void;
+}
+interface IrcdApi {
+  readonly sqlite: {open(name: string): SqliteDatabase};
+}
+
+</code></pre>
+<h2 id="generated-native-utilities">Generated native utilities</h2>
+<p>Source: <code>modules/js_generated/inspircd.d.ts</code>.</p>
+<pre><code class="language-typescript">
+// Generated by tools/generate_js_bindings.py; do not edit.
+// Source: bindings/inspircd.json (InspIRCd v4.12.1).
+// Manifest SHA-256: 64297820b154d0f773ae4d3395ec816b238ff29a24ffa2e11d9a323352070b96
+/** Audited utility surface. Inventory-only and pending mutation APIs are absent.
+ * All methods enforce exact arity and strict primitive argument types.
+ * Arguments are owned copies; native objects and pointers are never returned.
+ */
+interface IrcdApi {
+  /**
+   * Validate using the built-in nickname rules, bypassing custom hooks.
+   * Native: InspIRCd::DefaultIsNick
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   * @param value Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.
+   */
+  defaultIsNick(value: string): boolean;
+  /**
+   * Validate using the built-in username rules, bypassing custom hooks.
+   * Native: InspIRCd::DefaultIsUser
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   * @param value Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.
+   */
+  defaultIsUser(value: string): boolean;
+  /**
+   * Call the current configurable channel validator; any string_view remains valid only during the call.
+   * Native: ChannelManager::IsChannel
+   * Return conversion: Copy the native bool into a primitive JS boolean.
+   * @param value Require a primitive JS string; reject unpaired UTF-16 surrogates; copy UTF-8 bytes including embedded NUL using explicit lengths into std::string.
+   */
+  isChannel(value: string): boolean;
+  /**
+   * Validate a fully qualified hostname.
+   * Native: InspIRCd::IsFQDN
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   * @param value Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.
+   */
+  isFQDN(value: string): boolean;
+  /**
+   * Validate a hostname with explicit simple-hostname policy.
+   * Native: InspIRCd::IsHost
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   * @param value Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.
+   * @param allowsimple Strict primitive boolean; no coercion.
+   */
+  isHost(value: string, allowsimple: boolean): boolean;
+  /**
+   * Call the current configurable nickname validator; do not bypass it by calling DefaultIsNick.
+   * Native: InspIRCd::IsNick
+   * Return conversion: Copy the native bool into a primitive JS boolean.
+   * @param value Require a primitive JS string; reject unpaired UTF-16 surrogates; copy UTF-8 bytes including embedded NUL using explicit lengths into std::string.
+   */
+  isNick(value: string): boolean;
+  /**
+   * Validate a server identifier.
+   * Native: InspIRCd::IsSID
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   * @param value Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.
+   */
+  isSID(value: string): boolean;
+  /**
+   * Validate using the current username hook.
+   * Native: InspIRCd::IsUser
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   * @param value Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.
+   */
+  isUser(value: string): boolean;
+  /**
+   * Validate a nickname!username@hostname mask.
+   * Native: InspIRCd::IsValidMask
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   * @param value Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.
+   */
+  isValidMask(value: string): boolean;
+  /**
+   * Match a string using the server case map; the native map parameter is fixed to nullptr and is never exposed.
+   * Native: InspIRCd::Match
+   * Return conversion: Copy the native bool into a primitive JS boolean.
+   * @param str Require a primitive JS string; reject unpaired UTF-16 surrogates and embedded NUL with TypeError; copy UTF-8 bytes into std::string. Native matching uses NUL-terminated internals even for its std::string overload.
+   * @param pattern Require a primitive JS string; reject unpaired UTF-16 surrogates and embedded NUL with TypeError; copy UTF-8 bytes into std::string. Native matching uses NUL-terminated internals even for its std::string overload.
+   */
+  match(str: string, pattern: string): boolean;
+  /**
+   * Match a string using glob/CIDR matching and the server case map; the native map parameter is fixed to nullptr.
+   * Native: InspIRCd::MatchCIDR
+   * Return conversion: Copy the native bool into a primitive JS boolean.
+   * @param str Require a primitive JS string; reject unpaired UTF-16 surrogates and embedded NUL with TypeError; copy UTF-8 bytes into std::string. Native matching uses NUL-terminated internals even for its std::string overload.
+   * @param pattern Require a primitive JS string; reject unpaired UTF-16 surrogates and embedded NUL with TypeError; copy UTF-8 bytes into std::string. Native matching uses NUL-terminated internals even for its std::string overload.
+   */
+  matchCIDR(str: string, pattern: string): boolean;
+  /**
+   * Match host and address against a space-separated mask list.
+   * Native: InspIRCd::MatchMask
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   * @param masks Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.
+   * @param hostname Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.
+   * @param address Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.
+   */
+  matchMask(masks: string, hostname: string, address: string): boolean;
+  /**
+   * Expand color escapes in an owned string copy.
+   * Native: InspIRCd::ProcessColors
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   * @param value Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Preserve embedded NUL.
+   */
+  processColors(value: string): string;
+  /**
+   * Return an integer in [0, maximum). Native modulo reduction may be biased; not a cryptographic API guarantee.
+   * Native: InspIRCd::GenRandomInt
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   * @param maximum Require uint32 in 1..4294967295.
+   */
+  randomInt(maximum: number): number;
+  /**
+   * Return an alphanumeric random string of length 0..4096; uses server randomness, not a cryptographic API guarantee.
+   * Native: InspIRCd::GenRandomStr
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   * @param length Require uint32 in 0..4096.
+   */
+  randomString(length: number): string;
+  /**
+   * Return a color-stripped owned string without modifying the caller or any IRC state.
+   * Native: InspIRCd::StripColor
+   * Return conversion: Copy the argument into value_copy, mutate only that copy, then create a JS-owned UTF-8 string with an explicit byte length; reject lengths unsupported by V8.
+   * @param value Require a primitive JS string; reject unpaired UTF-16 surrogates; copy UTF-8 bytes including embedded NUL using explicit lengths into std::string.
+   */
+  stripColor(value: string): string;
+  /**
+   * Return cached whole seconds since the UNIX epoch; this value updates once per server main-loop iteration.
+   * Native: InspIRCd::Time
+   * Return conversion: Range-check the native integer against [-9007199254740991, 9007199254740991] before conversion to double; throw RangeError instead of rounding or truncating.
+   */
+  time(): number;
+  /**
+   * Return the fractional nanosecond component of cached server time, not an epoch timestamp.
+   * Native: InspIRCd::Time_ns
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   */
+  timeNanoseconds(): number;
+  /**
+   * Native equal-length comparison is timing-safe; length and JavaScript conversion are not constant-time.
+   * Native: InspIRCd::TimingSafeCompare
+   * Return conversion: Return owned primitive value; output is bounded by the documented argument and native result limits.
+   * @param first Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Preserve embedded NUL.
+   * @param second Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Preserve embedded NUL.
+   */
+  timingSafeCompare(first: string, second: string): boolean;
+}
+
+declare const ircd: Readonly&lt;IrcdApi&gt;;
+
+</code></pre></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

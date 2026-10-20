@@ -44,6 +44,10 @@
 <li>
     <a href="tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
 </li>
+                                    
+<li>
+    <a href="tutorials/command-and-timer/" class="dropdown-item">Register a command and timer</a>
+</li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
@@ -59,11 +63,31 @@
 </li>
                                     
 <li>
+    <a href="how-to/rss/" class="dropdown-item">Subscribe channels to RSS</a>
+</li>
+                                    
+<li>
     <a href="how-to/wasm/" class="dropdown-item">Use WebAssembly</a>
 </li>
                                     
 <li>
     <a href="how-to/test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="how-to/native-host-api/" class="dropdown-item">Native host APIs</a>
+</li>
+                                    
+<li>
+    <a href="how-to/fetch-and-webhooks/" class="dropdown-item">Fetch and authenticated webhooks</a>
+</li>
+                                    
+<li>
+    <a href="how-to/replay/" class="dropdown-item">Replay and assert heap state</a>
+</li>
+                                    
+<li>
+    <a href="how-to/agent-onboarding/" class="dropdown-item">Agent onboarding and MOTD</a>
 </li>
                                     
 <li>
@@ -100,6 +124,14 @@
 </li>
                                     
 <li>
+    <a href="reference/callable-api/" class="dropdown-item">Callable method signatures</a>
+</li>
+                                    
+<li>
+    <a href="reference/features/" class="dropdown-item">Feature and branch matrix</a>
+</li>
+                                    
+<li>
     <a href="reference/limits/" class="dropdown-item">Execution and failure limits</a>
 </li>
                                 </ul>
@@ -114,6 +146,10 @@
                                     
 <li>
     <a href="explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                    
+<li>
+    <a href="explanation/host-lifecycle/" class="dropdown-item">Host authority and lifecycle</a>
 </li>
                                 </ul>
                             </li>
@@ -169,8 +205,13 @@
 <p>Embed trusted administrator-authored JavaScript and synchronous WebAssembly in
 InspIRCd <strong>4.12.1</strong>. The optional module exposes all *<em>75 core Module On</em> hooks**,
 <strong>22 separate event-provider callbacks</strong>, both command-validation phases,
-five explicit mutation-patch adapters, and six audited native utilities. It is <strong>not a hostile-code sandbox</strong>.
+five explicit mutation-patch adapters, native queries, commands, timers, administration,
+and generated native utilities. It is <strong>not a hostile-code sandbox</strong>.
 The ordinary image is unchanged and the module is not loaded by default.</p>
+<p>Start with the <a href="reference/features/">feature and branch matrix</a> to distinguish this checkout
+from the separate RSS/SQLite stack. Agents joining an existing server should use
+<a href="how-to/agent-onboarding/">agent onboarding</a>; server capability must be verified, not inferred
+from the repository tip.</p>
 <p>Choose the documentation that fits your task:</p>
 <table>
 <thead>
@@ -284,5 +325,5 @@ see the event-provider reference for observation-only and unavailable operations
 
 <!--
 MkDocs version : 1.6.1
-Build Date UTC : 2026-10-20 09:18:56.769107+00:00
+Build Date UTC : 2026-10-20 09:31:48.775735+00:00
 -->

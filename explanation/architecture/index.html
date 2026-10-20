@@ -44,6 +44,10 @@
 <li>
     <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
 </li>
+                                    
+<li>
+    <a href="../../tutorials/command-and-timer/" class="dropdown-item">Register a command and timer</a>
+</li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
@@ -59,11 +63,31 @@
 </li>
                                     
 <li>
+    <a href="../../how-to/rss/" class="dropdown-item">Subscribe channels to RSS</a>
+</li>
+                                    
+<li>
     <a href="../../how-to/wasm/" class="dropdown-item">Use WebAssembly</a>
 </li>
                                     
 <li>
     <a href="../../how-to/test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/native-host-api/" class="dropdown-item">Native host APIs</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/fetch-and-webhooks/" class="dropdown-item">Fetch and authenticated webhooks</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/replay/" class="dropdown-item">Replay and assert heap state</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/agent-onboarding/" class="dropdown-item">Agent onboarding and MOTD</a>
 </li>
                                     
 <li>
@@ -100,6 +124,14 @@
 </li>
                                     
 <li>
+    <a href="../../reference/callable-api/" class="dropdown-item">Callable method signatures</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/features/" class="dropdown-item">Feature and branch matrix</a>
+</li>
+                                    
+<li>
     <a href="../../reference/limits/" class="dropdown-item">Execution and failure limits</a>
 </li>
                                 </ul>
@@ -114,6 +146,10 @@
                                     
 <li>
     <a href="./" class="dropdown-item active" aria-current="page">Snapshots, ordering and effects</a>
+</li>
+                                    
+<li>
+    <a href="../host-lifecycle/" class="dropdown-item">Host authority and lifecycle</a>
 </li>
                                 </ul>
                             </li>
@@ -131,7 +167,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" class="nav-link disabled">
+                                <a rel="next" href="../host-lifecycle/" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -180,7 +216,7 @@ observer from seeing an event, and per-target/core-generated command callbacks m
 appear more than once. Therefore the hook stream is neither an exactly-once audit
 log nor proof that another client received a message.</p>
 <p>Calling arbitrary native operations synchronously could recurse into the same hooks with partially
-processed native state. Notices and renames instead queue explicit effects to a
+processed native state. Notices, renames, channel/user/admin operations and fetch starts queue explicit effects to a
 safe main-loop point, re-resolve actors/targets, and suppress JS feedback while the
 effect runs. This avoids unbounded recursion but also means queuing an effect is
 not a success receipt or transaction. Later native rejection does not retract an

@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://r33drichards.github.io/docker/explanation/host-lifecycle/">
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Host authority and lifecycle - InspIRCd JavaScript module</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">InspIRCd JavaScript module</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Tutorials</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
+</li>
+                                    
+<li>
+    <a href="../../tutorials/command-and-timer/" class="dropdown-item">Register a command and timer</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">How-to guides</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../how-to/configure/" class="dropdown-item">Build and configure</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/reload/" class="dropdown-item">Reload and recover</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/rss/" class="dropdown-item">Subscribe channels to RSS</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/wasm/" class="dropdown-item">Use WebAssembly</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/native-host-api/" class="dropdown-item">Native host APIs</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/fetch-and-webhooks/" class="dropdown-item">Fetch and authenticated webhooks</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/replay/" class="dropdown-item">Replay and assert heap state</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/agent-onboarding/" class="dropdown-item">Agent onboarding and MOTD</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/documentation/" class="dropdown-item">Maintain and publish docs</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../reference/configuration/" class="dropdown-item">Configuration</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/commands/" class="dropdown-item">Command hooks</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/hooks/" class="dropdown-item">Core Module hooks</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/events/" class="dropdown-item">Separate event-provider hooks</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/api/" class="dropdown-item">Native API and authority</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/sqlite/" class="dropdown-item">SQLite databases</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/callable-api/" class="dropdown-item">Callable method signatures</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/features/" class="dropdown-item">Feature and branch matrix</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/limits/" class="dropdown-item">Execution and failure limits</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../trust/" class="dropdown-item">Trust and containment</a>
+</li>
+                                    
+<li>
+    <a href="../architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Host authority and lifecycle</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../architecture/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" class="nav-link disabled">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/r33drichards/docker/edit/master/site-docs/explanation/host-lifecycle.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#host-authority-effects-and-lifecycle" class="nav-link">Host authority, effects and lifecycle</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#two-authority-levels" class="nav-link">Two authority levels</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#three-different-kinds-of-state" class="nav-link">Three different kinds of state</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#dispatch-and-revalidation" class="nav-link">Dispatch and revalidation</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#reload-is-replacement-not-a-heap-checkpoint" class="nav-link">Reload is replacement, not a heap checkpoint</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#limits-and-failures" class="nav-link">Limits and failures</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="host-authority-effects-and-lifecycle">Host authority, effects and lifecycle</h1>
+<h2 id="two-authority-levels">Two authority levels</h2>
+<p>The administrator assigns <code>authority="user"</code> or <code>authority="admin"</code> when loading a
+script. Code cannot promote itself by passing a boolean or a different user ID.
+User scripts may observe allowed snapshots and use their restricted existing actions.
+Admin scripts may use the wider host surface and are trusted like native modules.
+The bridge is not a hostile-code security sandbox.</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>When allowed</th>
+<th>Result meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Read-only admin queries</td>
+<td>Initialization or callback</td>
+<td>Owned point-in-time data; can already be stale when used</td>
+</tr>
+<tr>
+<td><code>registerCommand</code></td>
+<td>Admin initialization only</td>
+<td>Candidate registration, installed after successful configuration load</td>
+</tr>
+<tr>
+<td>Managed timer creation/cancellation</td>
+<td>Admin initialization or active callback</td>
+<td>Timer state change, not a durable reservation</td>
+</tr>
+<tr>
+<td>Native mutations and administration</td>
+<td>Admin active callback</td>
+<td><code>true</code> means staged, not executed or delivered</td>
+</tr>
+<tr>
+<td>HTTP request creation</td>
+<td>Admin active callback</td>
+<td>Token identifies owned asynchronous work, not a response</td>
+</tr>
+<tr>
+<td>Result polling/cancellation</td>
+<td>Admin initialization or callback</td>
+<td>Results are consumed; cancellation is best effort</td>
+</tr>
+</tbody>
+</table>
+<h2 id="three-different-kinds-of-state">Three different kinds of state</h2>
+<ol>
+<li><strong>JavaScript heap:</strong> a <code>Map.set</code> or closure mutation happens in the realm. A later
+   exception does not undo it.</li>
+<li><strong>Staged host effects:</strong> mutations, fetch commitments and managed timer changes
+   follow their acceptance/rollback rules. Failed or vetoed callbacks discard staged
+   effects. Timer changes are restored on rollback; heap changes are not.</li>
+<li><strong>External effects:</strong> an HTTP request already transmitted or an accepted database
+   transaction cannot be recalled by pretending the event never happened.</li>
+</ol>
+<p>Write tests for all three. Never use a queued return value as a delivery receipt or
+assume database commit and IRC posting form one atomic transaction.</p>
+<h2 id="dispatch-and-revalidation">Dispatch and revalidation</h2>
+<p>Native actions execute after JavaScript returns at a safe main-loop point. Arguments
+are copied, actor and target identities are resolved again, and disappearing targets
+are skipped. Script-owned effects carry generation identity. Native operations do not
+recursively invoke the same JavaScript hooks; ordinary daemon checks still apply.</p>
+<p>Accepted self-unload invalidates the dispatch state and generation before the deferred
+destructor runs. Subsequent callback entries and later queued effects are rejected.
+HTTP commits use this ordered action queue too. A request committed before self-unload
+may already have transmitted data and cannot be undone.</p>
+<h2 id="reload-is-replacement-not-a-heap-checkpoint">Reload is replacement, not a heap checkpoint</h2>
+<p>A candidate configuration is constructed before activation. Failed rehash retains the
+last-good generation; successful replacement retires the old scripts, jobs, callbacks
+and timers. Rebuild commands, timers and transient job state during initialization.
+A poisoned/disabled script also retires its queued and in-flight HTTP jobs; already
+transmitted requests are irreversible. No native timer or network handle should be serialized as application state.</p>
+<p>The separate SQLite/RSS stack rebuilds transient Maps from explicitly stored data.
+Its transactions are independent of IRC effect rollback. Persistence does not provide
+exactly-once posting across a crash between database commit and channel transmission.
+See the <a href="../../reference/features/">branch matrix</a>.</p>
+<h2 id="limits-and-failures">Limits and failures</h2>
+<p>Host mutations accept strict arguments, use bounded queues, and reject malformed wire
+text. Admin mutation string arguments are at most 400 UTF-8 bytes; per-file/event effects
+are bounded. Query snapshots never expose secret channel mode parameters or native
+pointers. Fetch requests have independent body, response, queue and network deadlines.
+A deadline is not a hard real-time guarantee for OS scheduling or storage I/O.</p>
+<p>Consult <a href="../../reference/limits/">execution limits</a>, <a href="../../reference/callable-api/">method declarations</a>
+and <a href="../../how-to/fetch-and-webhooks/">fetch behavior</a> for the exact interface.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

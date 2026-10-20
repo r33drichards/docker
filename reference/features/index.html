@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://r33drichards.github.io/docker/reference/features/">
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Feature and branch matrix - InspIRCd JavaScript module</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">InspIRCd JavaScript module</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Tutorials</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
+</li>
+                                    
+<li>
+    <a href="../../tutorials/command-and-timer/" class="dropdown-item">Register a command and timer</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">How-to guides</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../how-to/configure/" class="dropdown-item">Build and configure</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/reload/" class="dropdown-item">Reload and recover</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/rss/" class="dropdown-item">Subscribe channels to RSS</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/wasm/" class="dropdown-item">Use WebAssembly</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/native-host-api/" class="dropdown-item">Native host APIs</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/fetch-and-webhooks/" class="dropdown-item">Fetch and authenticated webhooks</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/replay/" class="dropdown-item">Replay and assert heap state</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/agent-onboarding/" class="dropdown-item">Agent onboarding and MOTD</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/documentation/" class="dropdown-item">Maintain and publish docs</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../configuration/" class="dropdown-item">Configuration</a>
+</li>
+                                    
+<li>
+    <a href="../commands/" class="dropdown-item">Command hooks</a>
+</li>
+                                    
+<li>
+    <a href="../hooks/" class="dropdown-item">Core Module hooks</a>
+</li>
+                                    
+<li>
+    <a href="../events/" class="dropdown-item">Separate event-provider hooks</a>
+</li>
+                                    
+<li>
+    <a href="../api/" class="dropdown-item">Native API and authority</a>
+</li>
+                                    
+<li>
+    <a href="../sqlite/" class="dropdown-item">SQLite databases</a>
+</li>
+                                    
+<li>
+    <a href="../callable-api/" class="dropdown-item">Callable method signatures</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Feature and branch matrix</a>
+</li>
+                                    
+<li>
+    <a href="../limits/" class="dropdown-item">Execution and failure limits</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../explanation/trust/" class="dropdown-item">Trust and containment</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/host-lifecycle/" class="dropdown-item">Host authority and lifecycle</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../callable-api/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../limits/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/r33drichards/docker/edit/master/site-docs/reference/features.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#feature-and-branch-matrix" class="nav-link">Feature and branch matrix</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#review-stacks" class="nav-link">Review stacks</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#callable-capabilities-in-this-stack" class="nav-link">Callable capabilities in this stack</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#remaining-limits" class="nav-link">Remaining limits</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="feature-and-branch-matrix">Feature and branch matrix</h1>
+<p>This documentation describes its own source tree. A passing test or open pull request
+is not a release, merge, deployment, or permission to operate a server.</p>
+<h2 id="review-stacks">Review stacks</h2>
+<table>
+<thead>
+<tr>
+<th>Stack</th>
+<th>Scope</th>
+<th>What it does not imply</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/r33drichards/docker/pull/9">Native APIs #9</a> → <a href="https://github.com/r33drichards/docker/pull/11">webhook/fetch #11</a> → documentation</td>
+<td>Callable host APIs, managed jobs/timers, authenticated fetch transport, replay tooling and onboarding</td>
+<td>SQLite and RSS are not bundled into this branch</td>
+</tr>
+<tr>
+<td><a href="https://github.com/r33drichards/docker/pull/13">Persistent state #13</a></td>
+<td>Incorporates SQLite #10 plus opt-in persistent configuration/data/log layout</td>
+<td>Not included by the API/webhook/docs stack; volume/import/deployment require separate authorization</td>
+</tr>
+<tr>
+<td><a href="https://github.com/r33drichards/docker/pull/10">SQLite #10</a> → <a href="https://github.com/r33drichards/docker/pull/8">RSS #8</a></td>
+<td>Explicit durable database state and RSS subscriptions/seen IDs</td>
+<td>Native JavaScript heap snapshots and exactly-once delivery are not provided</td>
+</tr>
+</tbody>
+</table>
+<p>The repository default branch is <code>master</code>. Each stacked PR targets its predecessor,
+not a published release. Review PR base/head and the actual checkout before copying an
+example. These parallel branches touch bridge declarations, build files and transport integration;
+merging one does not validate the other. Resolve those overlaps, regenerate references,
+and rerun combined native/restart tests before any deployment. Do not blindly apply
+both copies of their shared generic-fetch prerequisite.</p>
+<h2 id="callable-capabilities-in-this-stack">Callable capabilities in this stack</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Methods</th>
+<th>Boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Observe events</td>
+<td><code>on</code></td>
+<td>Core and provider events expose owned snapshots; observation does not initiate a native operation</td>
+</tr>
+<tr>
+<td>Basic user actions</td>
+<td><code>userById</code>, <code>notice</code>, <code>rename</code></td>
+<td>User-authority effects are restricted to the triggering local client</td>
+</tr>
+<tr>
+<td>Queries</td>
+<td><code>userByNick</code>, <code>channelByName</code>, <code>channels</code></td>
+<td>Admin only; copied values, not live native objects</td>
+</tr>
+<tr>
+<td>Commands</td>
+<td><code>registerCommand</code></td>
+<td>Admin initialization; local-only; no replacement of native or other-script commands</td>
+</tr>
+<tr>
+<td>Timers</td>
+<td><code>setTimer</code>, <code>clearTimer</code></td>
+<td>Admin; main-loop callbacks; no catch-up bursts or durable handles</td>
+</tr>
+<tr>
+<td>HTTP</td>
+<td><code>fetch</code>, <code>takeFetchResult</code>, <code>cancelFetch</code></td>
+<td>Admin active callbacks; bounded asynchronous jobs, not browser Fetch/Promises</td>
+</tr>
+<tr>
+<td>Compatibility webhooks</td>
+<td><code>postWebhook</code>, <code>webhookStats</code></td>
+<td>Configured destinations and JSON schema; aggregate counters are not delivery receipts</td>
+</tr>
+<tr>
+<td>Channel changes</td>
+<td><code>join</code>, <code>part</code>, <code>kick</code>, <code>setTopic</code>, <code>setModes</code></td>
+<td>Admin active callbacks; revalidated deferred operations</td>
+</tr>
+<tr>
+<td>User administration</td>
+<td><code>setHost</code>, <code>setUsername</code>, <code>setRealname</code>, <code>disconnect</code></td>
+<td>Displayed identity changes; no operator identity or credentials are returned</td>
+</tr>
+<tr>
+<td>Server administration</td>
+<td><code>addBan</code>, <code>removeBan</code>, <code>loadModule</code>, <code>unloadModule</code>, <code>rehash</code>, <code>shutdown</code></td>
+<td>Trusted admin scripts only; potentially destructive</td>
+</tr>
+<tr>
+<td>Utilities/assets</td>
+<td>Generated validators/matchers/time/color/random helpers, <code>wasm</code></td>
+<td>Strict conversions and copied values; random helpers are not a cryptographic guarantee</td>
+</tr>
+</tbody>
+</table>
+<p>Use the generated <a href="../callable-api/">callable reference</a> for exact signatures and types.
+Paired channel <code>privmsg</code>/<code>notice</code> support belongs to the separate RSS stack; do not
+assume it is available on the native-API branch alone.</p>
+<h2 id="remaining-limits">Remaining limits</h2>
+<p>No raw native pointers, arbitrary SDK binding, standalone DNS resolver, user-mode
+setter, real-host setter, browser Promise/microtask API, or automatic native resource
+persistence is promised. Header injection is host-configured, not arbitrary JavaScript
+header access. SQLite uses explicit data persistence, not preservation of closures,
+Maps, timer handles, sockets or in-flight fetches.</p>
+<p>The checked-in tests describe reproducible coverage. CI can skip label-gated heavy
+jobs; a green quick check does not mean every container, fuzz or live-network job ran.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

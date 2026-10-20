@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://r33drichards.github.io/docker/how-to/rss/">
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Subscribe channels to RSS - InspIRCd JavaScript module</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">InspIRCd JavaScript module</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Tutorials</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
+</li>
+                                    
+<li>
+    <a href="../../tutorials/command-and-timer/" class="dropdown-item">Register a command and timer</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">How-to guides</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../configure/" class="dropdown-item">Build and configure</a>
+</li>
+                                    
+<li>
+    <a href="../reload/" class="dropdown-item">Reload and recover</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Subscribe channels to RSS</a>
+</li>
+                                    
+<li>
+    <a href="../wasm/" class="dropdown-item">Use WebAssembly</a>
+</li>
+                                    
+<li>
+    <a href="../test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../native-host-api/" class="dropdown-item">Native host APIs</a>
+</li>
+                                    
+<li>
+    <a href="../fetch-and-webhooks/" class="dropdown-item">Fetch and authenticated webhooks</a>
+</li>
+                                    
+<li>
+    <a href="../replay/" class="dropdown-item">Replay and assert heap state</a>
+</li>
+                                    
+<li>
+    <a href="../agent-onboarding/" class="dropdown-item">Agent onboarding and MOTD</a>
+</li>
+                                    
+<li>
+    <a href="../documentation/" class="dropdown-item">Maintain and publish docs</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../reference/configuration/" class="dropdown-item">Configuration</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/commands/" class="dropdown-item">Command hooks</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/hooks/" class="dropdown-item">Core Module hooks</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/events/" class="dropdown-item">Separate event-provider hooks</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/api/" class="dropdown-item">Native API and authority</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/sqlite/" class="dropdown-item">SQLite databases</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/callable-api/" class="dropdown-item">Callable method signatures</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/features/" class="dropdown-item">Feature and branch matrix</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/limits/" class="dropdown-item">Execution and failure limits</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../explanation/trust/" class="dropdown-item">Trust and containment</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/host-lifecycle/" class="dropdown-item">Host authority and lifecycle</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../reload/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../wasm/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/r33drichards/docker/edit/master/site-docs/how-to/rss.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#subscribe-a-channel-to-rss" class="nav-link">Subscribe a channel to RSS</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#enable-the-script" class="nav-link">Enable the script</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#add-or-remove-a-feed" class="nav-link">Add or remove a feed</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#timing-and-delivery-behavior" class="nav-link">Timing and delivery behavior</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#test-the-scheduling-logic" class="nav-link">Test the scheduling logic</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="subscribe-a-channel-to-rss">Subscribe a channel to RSS</h1>
+<p>The optional <code>examples/rss.js</code> script subscribes existing channels to public RSS
+or Atom feeds. It uses the IRC daemon's <code>backgroundTimer</code> event, not a separate
+Node process or JavaScript timers. A generic native HTTP worker fetches responses without blocking the IRC main
+loop. Bounded RSS/Atom parsing runs in the JavaScript script. The script keeps subscriptions, seen entry IDs,
+pending posts, retry counts and next-fetch times in ordinary JavaScript Maps and
+objects for transient runtime state. Subscriptions and seen entry IDs are stored
+in a host-granted SQLite database. Startup restores subscriptions read-only;
+each fetched batch checks at most 64 IDs using the durable indexed table. There
+is no full-history replay or startup warmup. Native request
+tokens and pending messages are never restored.</p>
+<h2 id="enable-the-script">Enable the script</h2>
+<p>Build the version containing the generic asynchronous HTTP host APIs and load <code>m_javascript</code>. Install
+<code>examples/rss.js</code> as <code>scripts/rss.js</code> under the configured config directory, then
+configure it with administrator authority:</p>
+<pre><code class="language-xml">&lt;javascriptsettings sqlitedirectory=&quot;/private/owned/sqlite-directory&quot;&gt;
+&lt;javascript file=&quot;scripts/rss.js&quot; authority=&quot;admin&quot; databases=&quot;rss&quot;&gt;
+</code></pre>
+<p>The script and subscriptions are opt-in. Installing the code alone does not fetch
+feeds or post anything. Only trusted administrator-authored scripts should have
+admin authority. Provision the private, daemon-owned 0700 database directory
+separately; see <a href="../../reference/sqlite/">SQLite configuration and limits</a>. The
+script requires this grant and fails loading rather than silently falling back
+to volatile storage. Schema writes occur only in active callbacks, never during
+startup. Deploying or provisioning storage is a separate operator action.</p>
+<h2 id="add-or-remove-a-feed">Add or remove a feed</h2>
+<p>As an IRC operator, enter:</p>
+<pre><code class="language-text">/rss #news https://example.org/feed.xml
+</code></pre>
+<p>The native command validates operator privileges and the channel. The script
+validates the feed URL and subscribes that channel and feed pair. Repeating the same pair is idempotent;
+different feeds can post to the same channel and the same feed can serve several
+channels. Channel spelling is compared using RFC1459 case folding. Use existing
+channels. Feed URLs must be public HTTP(S) URLs without embedded credentials or fragments,
+on the scheme's default port (80 for HTTP, 443 for HTTPS). Article links are only
+displayed, not fetched, and may include fragments or other valid ports.
+The transport rejects prohibited network destinations and unsafe feed data.</p>
+<p>To remove every feed subscription for a channel:</p>
+<pre><code class="language-text">/rss #news off
+</code></pre>
+<p>Removing a subscription also discards its pending posts. Already queued native
+fetches may finish, but their results are no longer posted.</p>
+<h2 id="timing-and-delivery-behavior">Timing and delivery behavior</h2>
+<ul>
+<li>The first successful fetch establishes a baseline and does not post historic
+  entries. Later new entries produce channel PRIVMSG messages containing a title
+  and complete link.</li>
+<li>Successful fetches repeat every five minutes, subject to background timer
+  cadence and queue availability. Failures back off from five minutes to at most
+  one hour. Only one fetch per subscription is active at a time.</li>
+<li>RSS XML parsing accepts at most 64 KiB UTF-8, 512 XML nodes, depth 32,
+  32 attributes per element and 64 namespace bindings. DTD/entity declarations,
+  malformed XML and unknown entities are rejected. RSS2 and Atom are supported;
+  arbitrary XML/HTML is not. Parsing is bounded independently of the generic
+  transport response limit.</li>
+<li>Limits are 32 subscriptions, four fetch starts, eight concurrent requests and eight channel messages per
+  timer callback, 64 parsed entries per fetch, one completed response parsed per callback, and 2,048 remembered IDs per
+  subscription, additionally capped at 128 KiB of ID text. Large IDs shorten the
+  retained history. Older remembered IDs are evicted; feeds that recycle very old
+  entries can therefore repost them.</li>
+<li>A batch of new entries is emitted oldest-first, assuming the feed lists newest
+  first. Pending output drains before the next fetch. This is not a complete
+  historical archive: entries outside the feed's bounded fetched window can be
+  missed.</li>
+<li>Output strips IRC controls, newlines and CTCP delimiters. Titles are shortened
+  at UTF-8 boundaries. Item links exceeding 300 UTF-8 bytes are skipped rather
+  than truncated into broken or misleading links. The complete message body is
+  at most 350 UTF-8 bytes.</li>
+<li>Native work is not JavaScript state. An in-flight job with no result after 180
+  seconds is abandoned and retried with backoff. This exceeds the bounded native
+  queue wait (16 native jobs, each limited to eight seconds). Oldest requests are
+  processed first; at normal five-second timer cadence eight RSS completions
+  drain within 40 seconds, below the native 60-second ready-result TTL. Long daemon
+  pauses can still expire results; they retry with backoff. Unknown job tokens after
+  restoration return failure and are retried with backoff.</li>
+<li>A successful <code>ircd.privmsg</code> call queues output; it is not a delivery receipt. IRC
+  sending and persistence commits are not atomic. Seen IDs commit before output is
+  queued, so a crash or later callback veto can lose an item after it was marked
+  seen. Database failures leave live state unchanged and emit no corresponding
+  post. This is not exactly-once delivery.</li>
+</ul>
+<h2 id="test-the-scheduling-logic">Test the scheduling logic</h2>
+<p>From the repository root:</p>
+<pre><code class="language-sh">node tests/test_rss.cjs
+</code></pre>
+<p>These deterministic tests mock the native API. They verify operator/stage guards,
+Map state, initial baselines, duplicate prevention, channel isolation, bounded
+work, UTF-8 output, backoff, abandoned jobs and unsubscribe behavior. Generic HTTP
+transport and full daemon/SQLite restart tests are separate checks; this test
+alone does not establish network or persistence integration correctness.</p>
+<p>For actual local and linked-server messaging checks against a built installation:</p>
+<pre><code class="language-sh">INSPIRCD_NATIVE=/path/to/install python3 tests/rss_native.py
+</code></pre>
+<p><code>tests/rss_fetch_native.py</code> adds opt-in end-to-end fetch, parse, baseline,
+channel-post and repeat-fetch checks. With <code>RSS_PUBLIC_FEED_URL</code> set, it uses the
+normal production transport and requires direct public DNS/network access.
+For deterministic offline integration, build a <strong>separate test-only</strong> module
+with <code>JS_ASYNC_HTTP_TEST_LOOPBACK</code> defined and run it with <code>RSS_TEST_LOOPBACK=1</code>.
+That build permits only literal HTTP <code>127.0.0.1</code> fixture destinations. The harness
+maps its one synthetic feed URL to an ephemeral local HTTP server; the production
+RSS script is otherwise unchanged. Never define this macro in shipped builds.
+Normal <code>tests/js_async_http.sh</code> separately checks production private-IP rejection
+and an explicitly compiled fixture transport.
+A fixture pass establishes local HTTP-to-IRC integration, not live public-network
+connectivity. The fixture also restarts the actual daemon using the same database,
+verifies persisted deduplication and exercises an exclusive database lock during
+unsubscribe. <code>node tests/test_rss_sqlite.cjs</code> separately exercises real SQLite
+transactions and file-backed fresh-realm restart (requires Node 24). The portable
+scheduler/replay suites use an explicit SQL contract mock, not a native database.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://r33drichards.github.io/docker/how-to/replay/">
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Replay and assert heap state - InspIRCd JavaScript module</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">InspIRCd JavaScript module</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Tutorials</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
+</li>
+                                    
+<li>
+    <a href="../../tutorials/command-and-timer/" class="dropdown-item">Register a command and timer</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">How-to guides</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../configure/" class="dropdown-item">Build and configure</a>
+</li>
+                                    
+<li>
+    <a href="../reload/" class="dropdown-item">Reload and recover</a>
+</li>
+                                    
+<li>
+    <a href="../rss/" class="dropdown-item">Subscribe channels to RSS</a>
+</li>
+                                    
+<li>
+    <a href="../wasm/" class="dropdown-item">Use WebAssembly</a>
+</li>
+                                    
+<li>
+    <a href="../test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../native-host-api/" class="dropdown-item">Native host APIs</a>
+</li>
+                                    
+<li>
+    <a href="../fetch-and-webhooks/" class="dropdown-item">Fetch and authenticated webhooks</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Replay and assert heap state</a>
+</li>
+                                    
+<li>
+    <a href="../agent-onboarding/" class="dropdown-item">Agent onboarding and MOTD</a>
+</li>
+                                    
+<li>
+    <a href="../documentation/" class="dropdown-item">Maintain and publish docs</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../reference/configuration/" class="dropdown-item">Configuration</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/commands/" class="dropdown-item">Command hooks</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/hooks/" class="dropdown-item">Core Module hooks</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/events/" class="dropdown-item">Separate event-provider hooks</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/api/" class="dropdown-item">Native API and authority</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/sqlite/" class="dropdown-item">SQLite databases</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/callable-api/" class="dropdown-item">Callable method signatures</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/features/" class="dropdown-item">Feature and branch matrix</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/limits/" class="dropdown-item">Execution and failure limits</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../explanation/trust/" class="dropdown-item">Trust and containment</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/host-lifecycle/" class="dropdown-item">Host authority and lifecycle</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../fetch-and-webhooks/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../agent-onboarding/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/r33drichards/docker/edit/master/site-docs/how-to/replay.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#replay-events-and-assert-javascript-state" class="nav-link">Replay events and assert JavaScript state</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#run-the-deterministic-suites" class="nav-link">Run the deterministic suites</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#test-the-actual-daemon-heap" class="nav-link">Test the actual daemon heap</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#test-applications-without-overstating-coverage" class="nav-link">Test applications without overstating coverage</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="replay-events-and-assert-javascript-state">Replay events and assert JavaScript state</h1>
+<p>Replay evaluates assertions inside the same JavaScript realm as the script. It can
+inspect lexical Maps, closures and object identity without flattening them to JSON.
+Use deterministic scenarios for ordering, then native integration for bridge behavior.</p>
+<h2 id="run-the-deterministic-suites">Run the deterministic suites</h2>
+<pre><code class="language-sh">node tests/replay/run.cjs
+sh tests/js_replay.sh
+</code></pre>
+<p>The first uses Node's V8 realm. The second embeds the production <code>js_runtime::Runtime</code>
+with matching V8 headers/libraries. Both still use a modeled host. Native transport,
+permissions and lifetime correctness require the real-daemon tests below.</p>
+<p>A trusted scenario can create state, replay events and assert the resulting heap:</p>
+<pre><code class="language-javascript">replay.configure({users: [{id: '001AAA', local: true, isOper: true}], channels: ['#feed']});
+const counts = new Map();
+ircd.on('postCommand', event =&gt; {
+  counts.set(event.command, (counts.get(event.command) || 0) + 1);
+});
+replay.event('postCommand', {userId: '001AAA', command: 'PING', params: []});
+replay.assert(&quot;counts instanceof Map &amp;&amp; counts.get('PING') === 1&quot;);
+</code></pre>
+<p><code>replay.advance(seconds)</code> controls time, runs due managed timers and emits
+<code>backgroundTimer</code>. <code>replay.pending()</code> exposes request tokens; <code>replay.complete(token,
+response)</code> controls their completion order. Inspect <code>replay.effects</code> and <code>replay.trace</code>
+for ordering. Assertions must evaluate to exactly <code>true</code>.</p>
+<p>Include failure cases: callback exceptions, later vetoes, cancelled or reordered
+completions, stale targets, repeated events and restart reconstruction. Failed callbacks
+discard modeled effects but retain JavaScript heap mutations. The model is deliberately
+not a proof that native code has identical rollback or permission behavior.</p>
+<h2 id="test-the-actual-daemon-heap">Test the actual daemon heap</h2>
+<p><code>tests/native_host_api.py</code> uses <code>tests/replay/native.py</code> to drive real IRC events and
+assert predeclared Map/closure expressions in the actual loaded script. Incoming IRC
+text selects an assertion by index; it is never evaluated as arbitrary JavaScript.
+There is no production debug/eval endpoint.</p>
+<pre><code class="language-sh">INSPIRCD_NATIVE=/path/to/disposable/installation sh tests/javascript.sh
+</code></pre>
+<p>This requires the matched daemon/module/probe build. Never run it against a live
+server: the host suite intentionally tests rehash, self-unload and shutdown.</p>
+<h2 id="test-applications-without-overstating-coverage">Test applications without overstating coverage</h2>
+<p>RSS replay and SQLite restart tests live in the <a href="../../reference/features/">separate RSS stack</a>.
+Run that checkout's documented commands; these files need not exist in this branch.
+A SQL-contract mock is a deterministic model, not evidence that native database commits
+survive a process restart. Real SQLite tests must cover commit/rollback, locks, reload
+and restart. A local HTTP fixture proves the tested pipeline, not live public DNS/TLS
+connectivity. A checkpoint placeholder is not a heap-snapshot implementation.</p>
+<p>See <a href="../test/">test setup</a> and the checked-in
+<a href="https://github.com/r33drichards/docker/blob/feat/native-api-surface/tests/replay/README.md">replay contract</a>.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

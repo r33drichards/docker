@@ -44,6 +44,10 @@
 <li>
     <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
 </li>
+                                    
+<li>
+    <a href="../../tutorials/command-and-timer/" class="dropdown-item">Register a command and timer</a>
+</li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
@@ -59,11 +63,31 @@
 </li>
                                     
 <li>
+    <a href="../../how-to/rss/" class="dropdown-item">Subscribe channels to RSS</a>
+</li>
+                                    
+<li>
     <a href="../../how-to/wasm/" class="dropdown-item">Use WebAssembly</a>
 </li>
                                     
 <li>
     <a href="../../how-to/test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/native-host-api/" class="dropdown-item">Native host APIs</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/fetch-and-webhooks/" class="dropdown-item">Fetch and authenticated webhooks</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/replay/" class="dropdown-item">Replay and assert heap state</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/agent-onboarding/" class="dropdown-item">Agent onboarding and MOTD</a>
 </li>
                                     
 <li>
@@ -100,6 +124,14 @@
 </li>
                                     
 <li>
+    <a href="../callable-api/" class="dropdown-item">Callable method signatures</a>
+</li>
+                                    
+<li>
+    <a href="../features/" class="dropdown-item">Feature and branch matrix</a>
+</li>
+                                    
+<li>
     <a href="../limits/" class="dropdown-item">Execution and failure limits</a>
 </li>
                                 </ul>
@@ -114,6 +146,10 @@
                                     
 <li>
     <a href="../../explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/host-lifecycle/" class="dropdown-item">Host authority and lifecycle</a>
 </li>
                                 </ul>
                             </li>
@@ -171,8 +207,9 @@
 </code></pre>
 <p>The primary image uses Alpine 3.22, InspIRCd v4.12.1 by default, and matching
 <code>nodejs-dev</code>/<code>nodejs-libs</code> 22.23.2-r0. Only V8 APIs are used; no Node environment,
-<code>process</code>, <code>require</code>, filesystem API, general networking API (<code>fetch</code>), or WASI is
-installed in scripts. The explicit queued webhook API below is opt-in.
+<code>process</code>, <code>require</code>, general filesystem API, browser Fetch/Promise runtime, or WASI
+is installed in scripts. The bounded admin-only fetch job and queued webhook APIs
+are opt-in; see <a href="../../how-to/native-host-api/">native host API</a>.
 The root <code>Dockerfile</code> includes the compiled module and its runtime library, but
 leaves it unloaded until explicitly configured. No scripts are installed or enabled
 by default. <code>Dockerfile.javascript</code> has been retired; downstream Railway projects

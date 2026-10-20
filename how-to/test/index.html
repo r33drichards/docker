@@ -44,6 +44,10 @@
 <li>
     <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
 </li>
+                                    
+<li>
+    <a href="../../tutorials/command-and-timer/" class="dropdown-item">Register a command and timer</a>
+</li>
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
@@ -59,11 +63,31 @@
 </li>
                                     
 <li>
+    <a href="../rss/" class="dropdown-item">Subscribe channels to RSS</a>
+</li>
+                                    
+<li>
     <a href="../wasm/" class="dropdown-item">Use WebAssembly</a>
 </li>
                                     
 <li>
     <a href="./" class="dropdown-item active" aria-current="page">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../native-host-api/" class="dropdown-item">Native host APIs</a>
+</li>
+                                    
+<li>
+    <a href="../fetch-and-webhooks/" class="dropdown-item">Fetch and authenticated webhooks</a>
+</li>
+                                    
+<li>
+    <a href="../replay/" class="dropdown-item">Replay and assert heap state</a>
+</li>
+                                    
+<li>
+    <a href="../agent-onboarding/" class="dropdown-item">Agent onboarding and MOTD</a>
 </li>
                                     
 <li>
@@ -100,6 +124,14 @@
 </li>
                                     
 <li>
+    <a href="../../reference/callable-api/" class="dropdown-item">Callable method signatures</a>
+</li>
+                                    
+<li>
+    <a href="../../reference/features/" class="dropdown-item">Feature and branch matrix</a>
+</li>
+                                    
+<li>
     <a href="../../reference/limits/" class="dropdown-item">Execution and failure limits</a>
 </li>
                                 </ul>
@@ -114,6 +146,10 @@
                                     
 <li>
     <a href="../../explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/host-lifecycle/" class="dropdown-item">Host authority and lifecycle</a>
 </li>
                                 </ul>
                             </li>
@@ -131,7 +167,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" href="../documentation/" class="nav-link">
+                                <a rel="next" href="../native-host-api/" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -187,7 +223,7 @@ and the test-only <code>m_js_hook_probe.so</code>. The primary Dockerfile suppor
 <p>The probe directly invokes all 75 adapters, checks owned snapshots and decision
 matrices, then exercises selected real lifecycle/message events. This is not
 natural-trigger E2E coverage for every hook. Consult the repository's
-<a href="https://github.com/r33drichards/docker/blob/feat/local-echo-command/docs/CI.md">CI coverage</a>
+<a href="https://github.com/r33drichards/docker/blob/master/docs/CI.md">CI coverage</a>
 for quick checks, sanitizers, Valgrind, fuzzing and label-triggered heavy image runs.</p></div>
             </div>
         </div>
