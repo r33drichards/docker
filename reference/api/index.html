@@ -235,6 +235,47 @@ may set <code>loopbackhttp="yes"</code> to allow HTTP at literal <code>127.0.0.1
 hostnames and non-loopback HTTP remain rejected. HTTPS still verifies peer and
 hostname with the system CA trust store. Redirects, environment proxies and
 application retries are disabled; no cookie jar or caller-supplied auth is used.</p>
+<h4 id="endpoint-specific-authentication-headers">Endpoint-specific authentication headers</h4>
+<p>An administrator can attach headers to one named destination, with values read
+from local secret files when configuration is loaded:</p>
+<pre><code class="language-xml">&lt;javascriptwebhook name=&quot;nocodb&quot; url=&quot;https://nocodb.example.invalid/api/v2/tables/TABLE_ID/records&quot;&gt;
+&lt;javascriptwebhookheader endpoint=&quot;nocodb&quot; name=&quot;xc-token&quot; valuefile=&quot;/run/secrets/nocodb-token&quot;&gt;
+</code></pre>
+<p>For Railway environments without secret-file mounts, the image provides a
+separately opt-in <a href="https://github.com/r33drichards/docker/blob/master/docs/nocodb-token-provisioning.md">token-file startup helper</a>
+using <code>/inspircd/.secrets/nocodb-token</code>. It does not enable forwarding by itself.</p>
+<p>The example is disabled unless explicitly configured. Use the API route and
+column names required by your NocoDB installation; the join example's nested
+payload is not automatically a NocoDB row. An administrator-authored script can
+post a matching row object with <code>ircd.postWebhook('nocodb', JSON.stringify(row))</code>.
+For bearer authentication, configure <code>name="Authorization"</code> and put the complete
+<code>Bearer ...</code> value in its file. Never place credentials in scripts or URLs.</p>
+<p>Files must be absolute paths, regular files owned by the daemon's effective UID,
+with exactly mode <code>0400</code> or <code>0600</code>. All path components must be real directories
+or files, without symlinks, <code>.</code> or <code>..</code>; mount secrets accordingly. Parent
+directories must be owned by root or the daemon and not group/world-writable.
+A root-owned sticky shared ancestor (such as <code>/tmp</code>) is accepted only when
+immediately followed by a daemon-owned <code>0700</code> directory. Values are read verbatim:
+1–1024 bytes, no NUL, CR, LF, tab, other ASCII control bytes or DEL. In particular,
+do not end a token file with a newline. No trimming or interpolation occurs.
+Missing, unreadable, changed-during-read, unsafe or invalid files reject the whole
+candidate configuration, retaining the last-good generation on rehash.</p>
+<p>The directive is repeatable: maximum 8 headers per endpoint, 64-byte HTTP token
+names, and 8192 aggregate header bytes including names, values and <code>:</code> / CRLF.
+Names are case-insensitive; duplicates and unknown endpoints are errors.
+Transport/control fields cannot be overridden: Host, Content-Type/Length/Encoding,
+Transfer-Encoding, Accept-Encoding, Expect, Connection, Keep-Alive, TE, Trailer,
+Upgrade, HTTP2-Settings, Cookie, Set-Cookie, proxy-* and method-override variants.
+Headers belong only to their configured endpoint. Redirects remain disabled.</p>
+<p>Scripts cannot set/read headers or open the files. Secret values and file paths
+are omitted from loader diagnostics, logs, counters and the JavaScript API.
+Immutable header storage is shared by the owning generation and its requests;
+editing a file has no effect until a successful rehash. Rotation retires old
+queued work and cancels old in-flight work under the same rules below; already
+transmitted requests cannot be recalled. Secrets remain in process/libcurl memory
+while owned; this does not guarantee zeroization or protection against process
+memory access. This change supplies authentication only, with no new event hooks,
+durable delivery, automatic retries or default credentials.</p>
 <p>The payload must be a UTF-8 JSON <strong>object string</strong>, at most 16 KiB. Invalid arity,
 types, JSON, destinations, excessive per-event effects, initialization calls and
 user-authority calls are script errors under the existing failure policy.
