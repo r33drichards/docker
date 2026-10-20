@@ -16,6 +16,7 @@
 #include <string>
 #include <thread>
 #include <type_traits>
+#include <utility>
 
 namespace js_runtime
 {
@@ -152,6 +153,30 @@ private:
 	}
 
 public:
+	// Only fixed categories may reach server logs. Never echo source names,
+	// exception values, command parameters, URLs, or host-error text.
+	static const char* FailureCategory(const std::string& error)
+	{
+		const std::pair<const char*, const char*> categories[] = {
+			{"JavaScript execution timed out", "timeout"},
+			{"JavaScript exception", "exception"},
+			{"JavaScript host operation threw a C++ exception", "host-exception"},
+			{"JavaScript host operation failed", "host-failure"},
+			{"JavaScript runtime operation failed", "runtime-failure"},
+			{"JavaScript runtime is disabled until reload", "disabled"},
+			{"Reentrant JavaScript runtime use is not supported", "reentrant"},
+			{"JavaScript runtime used from a non-owning thread", "wrong-thread"},
+			{"JavaScript runtime already initialized", "already-initialized"},
+		};
+		for (const auto& category : categories)
+		{
+			const std::string prefix(category.first);
+			if (error == prefix || error.compare(0, prefix.size() + 2, prefix + " (") == 0)
+				return category.second;
+		}
+		return "unknown";
+	}
+
 	explicit Runtime(unsigned int timeout_ms, std::size_t heap_limit_mb = 32)
 		: timeout(timeout_ms)
 	{

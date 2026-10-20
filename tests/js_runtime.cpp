@@ -332,6 +332,10 @@ int main()
 {
 	try
 	{
+		Check(std::string(js_runtime::Runtime::FailureCategory("JavaScript execution timed out (private/source.js)")) == "timeout", "Categorize timeout without source path");
+		Check(std::string(js_runtime::Runtime::FailureCategory("JavaScript exception (https://private.example/?secret=token)")) == "exception", "Categorize exception without source URL");
+		Check(std::string(js_runtime::Runtime::FailureCategory("password=secret")) == "unknown", "Do not echo arbitrary errors");
+		Check(std::string(js_runtime::Runtime::FailureCategory("JavaScript exception: password=secret")) == "unknown", "Reject ambiguous category prefixes");
 		TestInitializationAndIsolation();
 		TestErrorHandling();
 		TestSynchronousOnly();

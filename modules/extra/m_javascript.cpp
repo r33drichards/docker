@@ -204,6 +204,7 @@ class Script
 {
 public:
 	js_runtime::Runtime runtime;
+	std::size_t diagnostic_id = 0;
 	std::map<std::string, std::vector<v8::Global<v8::Function>>> callbacks;
 	bool dispatching = false;
 	std::vector<Effect> effects;
@@ -816,7 +817,8 @@ class ModuleJavaScript final : public Module
 				effects.clear();
 				if (!ok && washealthy)
 					ServerInstance->Logs.Normal(
-						MODNAME, "JavaScript callback failed; script disabled until successful rehash");
+						MODNAME, "JavaScript callback failed; script={} stage={} category={}; script disabled until successful rehash",
+						script->diagnostic_id, pre ? "preCommand" : "postCommand", js_runtime::Runtime::FailureCategory(error));
 				return ok;
 			}
 			effects.insert(effects.end(), script->effects.begin(), script->effects.end());
@@ -948,7 +950,8 @@ class ModuleJavaScript final : public Module
 				script->effects.clear();
 				if (!success && washealthy)
 					ServerInstance->Logs.Normal(
-						MODNAME, "JavaScript hook failed; script disabled until successful rehash");
+						MODNAME, "JavaScript hook failed; script={} stage={} category={}; script disabled until successful rehash",
+						script->diagnostic_id, stage, js_runtime::Runtime::FailureCategory(error));
 				return success ? result : hook.decision && hook.failclosed ? MOD_RES_DENY : MOD_RES_PASSTHRU;
 			}
 			effects.insert(effects.end(), script->effects.begin(), script->effects.end());
@@ -1092,9 +1095,11 @@ public:
 			{
 				auto script = std::make_unique<Script>(timeout, source.authority, candidate->wasm, delivery,
 					candidate->generation, database_root, source.databases);
+				script->diagnostic_id = candidate->scripts.size() + 1;
 				std::string error;
 				if (!script->Load(source, error))
-					throw std::runtime_error("JavaScript initialization failed (active scripts retained)");
+					throw std::runtime_error("JavaScript initialization failed; script=" + std::to_string(script->diagnostic_id) +
+						" stage=initialization category=" + js_runtime::Runtime::FailureCategory(error) + " (active scripts retained)");
 				candidate->scripts.push_back(std::move(script));
 			}
 			ValidateCommands(*candidate);
