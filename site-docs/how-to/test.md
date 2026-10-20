@@ -30,5 +30,5 @@ INSPIRCD_NATIVE=/path/to/installation sh tests/javascript.sh
 The probe directly invokes all 75 adapters, checks owned snapshots and decision
 matrices, then exercises selected real lifecycle/message events. This is not
 natural-trigger E2E coverage for every hook. Consult the repository's
-[CI coverage](https://github.com/r33drichards/docker/blob/feat/local-echo-command/docs/CI.md)
+[CI coverage](https://github.com/r33drichards/docker/blob/master/docs/CI.md)
 for quick checks, sanitizers, Valgrind, fuzzing and label-triggered heavy image runs.

@@ -63,8 +63,8 @@ check_python()
 }
 
 check_python \
-    tools/generate_js_bindings.py tools/generate_module_hooks.py \
-    tests/test_generate_module_hooks.py tests/test_generate_js_bindings.py tests/test_authorize_heavy.py \
+    tools/generate_js_bindings.py tools/generate_module_hooks.py tools/generate_docs_reference.py \
+    tests/test_docs_contract.py tests/test_generate_module_hooks.py tests/test_generate_js_bindings.py tests/test_authorize_heavy.py \
     tests/replay/*.py tests/native_host_api.py tests/javascript_native.py tests/wchat_nocodb_native.py tests/precommand_client.py tests/test_precommand_client.py \
     tests/precommand_log.py tests/primary_image.py tests/test_js_fetch_headers.py tests/fetch_headers_native.py tests/test_js_webhooks.py tests/test_materialize_nocodb_token.py tests/test_nocodb_config.py \
     tests/ci/*.py tests/fuzz/*.py
