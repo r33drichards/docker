@@ -30,7 +30,7 @@ script requires this grant and fails loading rather than silently falling back
 to volatile storage. Schema writes occur only in active callbacks, never during
 startup. Deploying or provisioning storage is a separate operator action.
 
-## Add or remove a feed
+## Add, list or remove feeds
 
 As any registered IRC user, enter:
 
@@ -49,6 +49,24 @@ channels. Feed URLs must be public HTTP(S) URLs without embedded credentials or 
 on the scheme's default port (80 for HTTP, 443 for HTTPS). Article links are only
 displayed, not fetched, and may include fragments or other valid ports.
 The transport rejects prohibited network destinations and unsafe feed data.
+
+To list subscriptions, including an explicit empty result:
+
+```text
+/quote RSS #news list
+```
+
+Lists are paginated in groups of ten. Follow the returned `/quote RSS #news list:2`
+command for the next page. Feed URLs are bounded to fit IRC notices. WeeChat users
+should use `/quote RSS ...` for this server command.
+
+Each RSS request returns a notice with success, failure, or usage. Disabled,
+missing, or failing handlers return a native unavailable notice instead of silence.
+If an outcome is uncertain, inspect the list before retrying. Server logs record
+fixed `RSS command outcome=success|failure` codes, never feed URLs or exception
+contents. Script handlers must return `{rssOutcome: 'success'}` or
+`{rssOutcome: 'failure'}` and queue a notice to the requester; the supplied script
+does this for every supported operation.
 
 To remove every feed subscription for a channel:
 

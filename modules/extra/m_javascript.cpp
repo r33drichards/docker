@@ -616,24 +616,32 @@ public:
 	}
 };
 
-// Core command registration preserves operator access and flood accounting.
+// Core command registration preserves registration and flood accounting.
 // The configured RSS script handles successful commands via postCommand.
 class CommandRss final : public Command
 {
+	std::function<void(User*, const char*)> failure;
+
 public:
-	explicit CommandRss(Module* module)
-		: Command(module, "RSS", 2, 2)
+	CommandRss(Module* module, std::function<void(User*, const char*)> report)
+		: Command(module, "RSS", 0, 15)
+		, failure(std::move(report))
 	{
 		access_needed = CmdAccess::NORMAL;
-		syntax = {"<channel> <feed-url|off>"};
+		syntax = {"<channel> <feed-url|off|list>"};
 	}
 	CmdResult Handle(User* user, const Params& parameters) override
 	{
 		if (!IS_LOCAL(user))
 			return CmdResult::FAILURE;
+		if (parameters.size() != 2)
+		{
+			failure(user, "RSS usage: /RSS <channel> <feed-url|off|list>");
+			return CmdResult::FAILURE;
+		}
 		if (!ServerInstance->Channels.IsChannel(parameters[0]) || !ServerInstance->Channels.Find(parameters[0]))
 		{
-			user->WriteNotice("RSS requires an existing channel");
+			failure(user, "RSS requires an existing channel");
 			return CmdResult::FAILURE;
 		}
 		return CmdResult::SUCCESS;
@@ -652,6 +660,14 @@ class ModuleJavaScript final : public Module
 	std::vector<std::unique_ptr<JavaScriptCommand>> registeredcommands;
 #include "js_host_dispatch.inc"
 
+	void RssFailure(User* user, const char* message)
+	{
+		// Native operational errors must remain visible even when script hooks
+		// are poisoned. Never echo command parameters or exception contents.
+		FlagGuard internal(state->internal);
+		user->WriteNotice(message);
+		ServerInstance->Logs.Normal(MODNAME, "RSS command outcome=failure");
+	}
 	static bool Snapshot(v8::Local<v8::Context> context, v8::Local<v8::Object>& event, const std::string& command,
 		const std::vector<std::string>& parameters, const std::string& actor, const char* result, bool loop,
 		bool validated)
@@ -772,7 +788,8 @@ class ModuleJavaScript final : public Module
 		return true;
 	}
 	bool Invoke(bool pre, std::string& command, std::vector<std::string>& params, const std::string& actor,
-		const char* result, bool loop, bool& denied, std::vector<Effect>& effects, bool validated)
+		const char* result, bool loop, bool& denied, std::vector<Effect>& effects, bool validated,
+		std::string* rssoutcome = nullptr)
 	{
 		if (!active)
 			return true;
@@ -800,6 +817,20 @@ class ModuleJavaScript final : public Module
 						if (!callback.Get(isolate)->Call(context, v8::Undefined(isolate), 1, &arg).ToLocal(&returned) ||
 							!js_runtime::Runtime::RequireSynchronous(isolate, returned))
 							return false;
+						if (rssoutcome && returned->IsObject())
+						{
+							v8::Local<v8::Value> value;
+							if (!returned.As<v8::Object>()->Get(context, Key(isolate, "rssOutcome")).ToLocal(&value))
+								return false;
+							if (!value->IsUndefined())
+							{
+								std::string outcome;
+								if (!Text(isolate, value, outcome) || (outcome != "success" && outcome != "failure") ||
+									!rssoutcome->empty())
+									return false;
+								*rssoutcome = outcome;
+							}
+						}
 						if (pre && !RewriteValue(context, returned, command, params, denied, validated))
 							return false;
 						if (denied)
@@ -971,7 +1002,7 @@ class ModuleJavaScript final : public Module
 public:
 	ModuleJavaScript()
 		: Module(VF_NONE, "Runs trusted local JavaScript and Wasm Module hooks with explicit authority.")
-		, rsscommand(this)
+		, rsscommand(this, [this](User* user, const char* message) { RssFailure(user, message); })
 		, events(this, [this](const auto* stage, const auto& actor, const auto& build)
 			  { return DispatchHook(stage, actor, build); })
 	{
@@ -1137,7 +1168,12 @@ public:
 		std::vector<Effect> effects;
 		bool denied = false;
 		if (!Invoke(true, replacement, params, user->uuid, nullptr, false, denied, effects, validated) || denied)
+		{
+			if (command == "RSS")
+				RssFailure(user,
+					"RSS unavailable: command rejected by script policy or an unhealthy handler. No change confirmed.");
 			return MOD_RES_DENY;
+		}
 		if (replacement != command || params != static_cast<const std::vector<std::string>&>(parameters))
 		{
 			// Core caches known handlers before this hook. Redispatch to resolve the
@@ -1184,8 +1220,29 @@ public:
 		const char* name = result == CmdResult::SUCCESS ? "SUCCESS"
 			: result == CmdResult::FAILURE				? "FAILURE"
 														: "INVALID";
-		if (Invoke(false, command, params, user->uuid, name, loop, denied, effects, true))
+		std::string rssoutcome;
+		const bool rss = command == "RSS" && result == CmdResult::SUCCESS;
+		const bool ok =
+			Invoke(false, command, params, user->uuid, name, loop, denied, effects, true, rss ? &rssoutcome : nullptr);
+		const bool rssreply = std::any_of(effects.begin(), effects.end(),
+			[&](const Effect& effect)
+			{
+				return effect.target == user->uuid && !effect.rename && !effect.privmsg && !effect.text.empty() &&
+					effect.operation.empty();
+			});
+		if (rss && (!ok || rssoutcome.empty() || !rssreply))
+		{
+			RssFailure(user,
+				"RSS unavailable: handler failed or did not confirm an outcome. Check /RSS <channel> list before "
+				"retrying.");
+			return;
+		}
+		if (ok)
+		{
 			Schedule(effects);
+			if (rss)
+				ServerInstance->Logs.Normal(MODNAME, "RSS command outcome={}", rssoutcome);
+		}
 	}
 };
 MODULE_INIT(ModuleJavaScript)

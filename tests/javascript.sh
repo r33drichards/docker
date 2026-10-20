@@ -7,6 +7,7 @@ fi
 python3 "$(dirname "$0")/javascript_native.py"
 
 python3 "$(dirname "$0")/native_host_api.py"
+python3 "$(dirname "$0")/rss_outcomes_native.py"
 
 if [ "${INSPIRCD_HTTP_TEST_LOOPBACK:-}" = "1" ]; then
     python3 "$(dirname "$0")/fetch_headers_native.py"
