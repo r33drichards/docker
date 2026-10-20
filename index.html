@@ -88,6 +88,10 @@
 </li>
                                     
 <li>
+    <a href="reference/events/" class="dropdown-item">Separate event-provider hooks</a>
+</li>
+                                    
+<li>
     <a href="reference/api/" class="dropdown-item">Native API and authority</a>
 </li>
                                     
@@ -128,7 +132,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a href="https://github.com/r33drichards/docker/edit/feat/local-echo-command/site-docs/index.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                                <a href="https://github.com/r33drichards/docker/edit/master/site-docs/index.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
                             </li>
                     </ul>
                 </div>
@@ -160,7 +164,8 @@
 <h1 id="inspircd-javascript-module">InspIRCd JavaScript module</h1>
 <p>Embed trusted administrator-authored JavaScript and synchronous WebAssembly in
 InspIRCd <strong>4.12.1</strong>. The optional module exposes all *<em>75 core Module On</em> hooks**,
-command rewriting, and six audited native utilities. It is <strong>not a hostile-code sandbox</strong>.
+<strong>22 separate event-provider callbacks</strong>, both command-validation phases,
+five explicit mutation-patch adapters, and six audited native utilities. It is <strong>not a hostile-code sandbox</strong>.
 The ordinary image is unchanged and the module is not loaded by default.</p>
 <p>Choose the documentation that fits your task:</p>
 <table>
@@ -181,7 +186,7 @@ The ordinary image is unchanged and the module is not loaded by default.</p>
 </tr>
 <tr>
 <td>Look up exact behavior</td>
-<td><a href="reference/configuration/">Configuration</a>, <a href="reference/commands/">command events</a>, <a href="reference/hooks/">all hooks</a>, <a href="reference/api/">API</a>, <a href="reference/limits/">limits</a></td>
+<td><a href="reference/configuration/">Configuration</a>, <a href="reference/commands/">command events</a>, <a href="reference/hooks/">core hooks and patches</a>, <a href="reference/events/">event-provider hooks</a>, <a href="reference/api/">API</a>, <a href="reference/limits/">limits</a></td>
 </tr>
 <tr>
 <td>Understand the design</td>
@@ -191,8 +196,9 @@ The ordinary image is unchanged and the module is not loaded by default.</p>
 </table>
 <p>This site follows <a href="https://diataxis.fr/start-here/">Diátaxis</a>: lessons teach skills,
 how-to guides solve tasks, reference specifies behavior, and explanation supplies context.
-It describes the PR branch implementation, not a deployment or claim that every release
-contains it. See <a href="https://github.com/r33drichards/docker/pull/3">PR #3</a>.</p></div>
+It describes this source checkout, not a deployment or claim that every published
+release contains these features. Event subscriptions are not full native API parity;
+see the event-provider reference for observation-only and unavailable operations.</p></div>
             </div>
         </div>
 
@@ -274,5 +280,5 @@ contains it. See <a href="https://github.com/r33drichards/docker/pull/3">PR #3</
 
 <!--
 MkDocs version : 1.6.1
-Build Date UTC : 2026-10-20 01:16:41.802109+00:00
+Build Date UTC : 2026-10-20 04:41:26.447465+00:00
 -->

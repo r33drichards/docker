@@ -88,6 +88,10 @@
 </li>
                                     
 <li>
+    <a href="../../reference/events/" class="dropdown-item">Separate event-provider hooks</a>
+</li>
+                                    
+<li>
     <a href="../../reference/api/" class="dropdown-item">Native API and authority</a>
 </li>
                                     
@@ -128,7 +132,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a href="https://github.com/r33drichards/docker/edit/feat/local-echo-command/site-docs/explanation/architecture.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                                <a href="https://github.com/r33drichards/docker/edit/master/site-docs/explanation/architecture.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
                             </li>
                     </ul>
                 </div>
@@ -162,12 +166,16 @@
 into owned, bounded snapshots so a retained JavaScript event does not become a
 dangling native pointer. Text carries both a decoded view and exact bytes; truncation
 metadata tells the caller when a bounded snapshot is incomplete. Editing a snapshot
-changes the copy, not the IRC object. Command rewriting is a separately validated API.</p>
+changes the copy, not the IRC object. Command rewriting is a separately validated API.
+Selected hooks also accept explicit bounded patches: these update staged copies
+and commit only after all invoked callbacks succeed without denying the event.
+A later native module can still reject the operation; patches are not a transaction
+across the whole server.</p>
 <p>Native module order still applies. A prior module's decision may prevent another
 observer from seeing an event, and per-target/core-generated command callbacks may
 appear more than once. Therefore the hook stream is neither an exactly-once audit
 log nor proof that another client received a message.</p>
-<p>Direct synchronous mutations could recurse into the same hooks with partially
+<p>Calling arbitrary native operations synchronously could recurse into the same hooks with partially
 processed native state. Notices and renames instead queue explicit effects to a
 safe main-loop point, re-resolve actors/targets, and suppress JS feedback while the
 effect runs. This avoids unbounded recursion but also means queuing an effect is
@@ -179,7 +187,8 @@ from partial initialization failure, but is not an atomic snapshot of the filesy
 Success resets JavaScript state. The V8 platform remains process-lifetime and
 NODELETE retains necessary module code; replacing native binaries needs a restart.</p>
 <p><a href="../../reference/api/">API reference</a> specifies authority/effect limits;
-<a href="../../reference/hooks/">hook reference</a> lists native result semantics and exceptions.</p></div>
+<a href="../../reference/hooks/">hook reference</a> lists patches, native result semantics and exceptions;
+<a href="../../reference/events/">event-provider reference</a> lists the separately subscribed event families.</p></div>
             </div>
         </div>
 

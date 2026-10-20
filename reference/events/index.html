@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://r33drichards.github.io/docker/reference/events/">
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>Separate event-provider hooks - InspIRCd JavaScript module</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">InspIRCd JavaScript module</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Tutorials</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">How-to guides</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../how-to/configure/" class="dropdown-item">Build and configure</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/reload/" class="dropdown-item">Reload and recover</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/wasm/" class="dropdown-item">Use WebAssembly</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/documentation/" class="dropdown-item">Maintain and publish docs</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../configuration/" class="dropdown-item">Configuration</a>
+</li>
+                                    
+<li>
+    <a href="../commands/" class="dropdown-item">Command hooks</a>
+</li>
+                                    
+<li>
+    <a href="../hooks/" class="dropdown-item">Core Module hooks</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Separate event-provider hooks</a>
+</li>
+                                    
+<li>
+    <a href="../api/" class="dropdown-item">Native API and authority</a>
+</li>
+                                    
+<li>
+    <a href="../limits/" class="dropdown-item">Execution and failure limits</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../explanation/trust/" class="dropdown-item">Trust and containment</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../hooks/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../api/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/r33drichards/docker/edit/master/site-docs/reference/events.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#separate-event-provider-hooks" class="nav-link">Separate event-provider hooks</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="3"><a href="#event-names-and-fields" class="nav-link">Event names and fields</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="3"><a href="#native-decisions" class="nav-link">Native decisions</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="3"><a href="#example-refuse-one-away-message-and-count-logins" class="nav-link">Example: refuse one away message and count logins</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#complete-typescript-event-declarations" class="nav-link">Complete TypeScript event declarations</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<!-- Generated by tools/generate_docs_reference.py; edit JAVASCRIPT.md or the binding sources. -->
+<h1 id="separate-event-provider-hooks">Separate event-provider hooks</h1>
+<p>These events supplement the generated core <code>Module</code> hooks. They register against
+InspIRCd 4.12.1 event providers and become active when the provider is loaded;
+loading JavaScript does not load services, CAP, HTTP, or spanning-tree for you.
+Listeners survive provider unload/reload. Callbacks are synchronous and must not
+return a Promise, including from an <code>async</code> function.</p>
+<p>All payloads are detached, bounded copies. Assigning to them <strong>does not modify
+native state</strong>. Text uses <code>HookText</code> (<code>text</code>, <code>bytes</code>, <code>byteLength</code>, <code>truncated</code>),
+not a plain string. <code>text</code> may be null for invalid UTF-8. Each event also includes
+<code>stage</code> and <code>userId</code> (null when there is no acting user). No socket, response
+context, native object, or native pointer is exposed.</p>
+<h3 id="event-names-and-fields">Event names and fields</h3>
+<table>
+<thead>
+<tr>
+<th>Events</th>
+<th>Additional payload fields</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>accountChange</code></td>
+<td><code>user</code>, <code>account</code>, <code>loggedIn</code>; empty account means logout</td>
+</tr>
+<tr>
+<td><code>userPreAway</code></td>
+<td><code>user</code>, <code>message</code></td>
+</tr>
+<tr>
+<td><code>userPreBack</code></td>
+<td><code>user</code></td>
+</tr>
+<tr>
+<td><code>userAway</code>, <code>userBack</code></td>
+<td><code>user</code>, <code>previouslyAway</code>, <code>previousMessage</code>, <code>previousTime</code>, <code>away</code>, <code>message</code>, <code>time</code>; times are Unix seconds</td>
+</tr>
+<tr>
+<td><code>whois</code></td>
+<td><code>source</code>, <code>target</code></td>
+</tr>
+<tr>
+<td><code>whoisLine</code></td>
+<td><code>source</code>, <code>target</code>, <code>numeric</code></td>
+</tr>
+<tr>
+<td><code>whoLine</code></td>
+<td><code>source</code>, <code>user</code>, <code>membership</code>, <code>numeric</code>, and WHO request fields below</td>
+</tr>
+<tr>
+<td><code>whoMatch</code></td>
+<td><code>source</code>, <code>user</code>, and WHO request fields</td>
+</tr>
+<tr>
+<td><code>whoVisible</code></td>
+<td><code>source</code>, <code>membership</code>, and WHO request fields</td>
+</tr>
+<tr>
+<td><code>namesListItem</code></td>
+<td><code>issuer</code>, <code>membership</code>, <code>prefixes</code>, <code>nick</code></td>
+</tr>
+<tr>
+<td><code>stats</code></td>
+<td><code>source</code>, <code>symbol</code>; response rows are deliberately omitted</td>
+</tr>
+<tr>
+<td><code>capAddDel</code></td>
+<td><code>name</code>, <code>adding</code></td>
+</tr>
+<tr>
+<td><code>capValueChange</code></td>
+<td><code>name</code>; values may be user-specific and are omitted</td>
+</tr>
+<tr>
+<td><code>serverLink</code>, <code>serverBurst</code></td>
+<td>server fields below</td>
+</tr>
+<tr>
+<td><code>serverSplit</code></td>
+<td>server fields and <code>error</code></td>
+</tr>
+<tr>
+<td><code>syncUser</code></td>
+<td>server fields and <code>user</code></td>
+</tr>
+<tr>
+<td><code>syncChannel</code></td>
+<td>server fields and <code>channel</code></td>
+</tr>
+<tr>
+<td><code>syncNetwork</code></td>
+<td>server fields</td>
+</tr>
+<tr>
+<td><code>httpACLCheck</code>, <code>httpRequest</code></td>
+<td><code>method</code>, <code>path</code>, <code>address</code> only</td>
+</tr>
+</tbody>
+</table>
+<p>WHO request fields: <code>matchText</code>, <code>matchChannel</code>, <code>fuzzyMatch</code>, <code>whox</code>, <code>queryType</code>.
+Server fields: <code>serverId</code>, <code>serverName</code>, <code>serverDescription</code>. Server names and
+identifiers are text snapshots, unlike the plain-string user snapshot <code>id</code>.</p>
+<h3 id="native-decisions">Native decisions</h3>
+<ul>
+<li><code>userPreAway</code>, <code>userPreBack</code>, <code>whoLine</code>, <code>whoMatch</code>, <code>whoVisible</code> accept
+  <code>{action: 'pass'}</code>, <code>{action: 'deny'}</code>, or <code>{action: 'allow'}</code>. <code>allow</code> requires
+  an administrator-authority script because it can bypass later native policy.</li>
+<li><code>namesListItem</code>, <code>whoisLine</code>, <code>stats</code> accept only pass or deny. For STATS, deny
+  means "handled" and suppresses subsequent native handling; this bridge does
+  not provide a response-row builder.</li>
+<li>Other events are observers. Return values do not claim native ownership or
+  bypass permissions. In particular HTTP events always return native passthrough.
+  A native HTTP deny would imply that the module already answered the socket;
+  this bridge cannot do so. HTTP bodies, headers (including Authorization and
+  cookies), query parameters, and fragments are never copied.</li>
+<li>Decision-hook failures fail closed; observer failures do not stop the native
+  operation. Existing script quarantine and authority rules still apply.</li>
+<li>CAP events concern <strong>server capability registration/value changes</strong>, not an
+  individual client's CAP REQ state. Use validated command hooks to observe
+  client commands; do not infer successful CAP negotiation from the request.</li>
+</ul>
+<p>Account events require a provider such as <code>services_account</code>; away, WHO, WHOIS,
+NAMES and STATS use their core providers; CAP uses <code>cap</code>; server events use
+<code>spanningtree</code>; HTTP uses <code>httpd</code>. A subscription without its provider is inert,
+not an error.</p>
+<h3 id="example-refuse-one-away-message-and-count-logins">Example: refuse one away message and count logins</h3>
+<pre><code class="language-js">// Load as a trusted script. No network calls or asynchronous callbacks.
+let logins = 0;
+const exactText = value =&gt; value &amp;&amp; !value.truncated &amp;&amp;
+  typeof value.text === 'string' ? value.text : null;
+
+ircd.on('userPreAway', event =&gt; {
+  if (exactText(event.message) === 'reserved test message')
+    return {action: 'deny'};
+});
+
+ircd.on('accountChange', event =&gt; {
+  if (event.loggedIn) ++logins;
+});
+
+ircd.on('serverSplit', event =&gt; {
+  // Safe to retain: these objects contain copies, not live native handles.
+  const name = exactText(event.serverName);
+  if (name !== null) globalThis.lastObservedSplit = {name, error: event.error};
+});
+</code></pre>
+<p>The counter and last split live only for this script generation; a successful
+rehash replaces them. Retained snapshots do not authorize any later action.</p>
+<h2 id="complete-typescript-event-declarations">Complete TypeScript event declarations</h2>
+<pre><code class="language-typescript">/** Optional-provider event snapshots. Referenced by js_api.d.ts. */
+interface HookAwayChange {
+  user: HookUser | null; previouslyAway: boolean; previousMessage: HookText;
+  previousTime: number; away: boolean; message: HookText; time: number;
+}
+interface HookWhoRequest {
+  source: HookUser | null; matchText: HookText; matchChannel: HookChannel | null;
+  fuzzyMatch: boolean; whox: boolean; queryType: HookText;
+}
+interface HookServerEvent {serverId: HookText; serverName: HookText; serverDescription: HookText}
+interface HookHttpEvent {method: HookText; path: HookText; address: HookText}
+interface ModuleHookEvents {
+  accountChange: {user: HookUser | null; account: HookText; loggedIn: boolean};
+  userPreAway: {user: HookUser | null; message: HookText};
+  userPreBack: {user: HookUser | null};
+  userAway: HookAwayChange;
+  userBack: HookAwayChange;
+  capAddDel: {name: HookText; adding: boolean};
+  capValueChange: {name: HookText};
+  namesListItem: {issuer: HookUser | null; membership: HookMembership | null; prefixes: HookText; nick: HookText};
+  stats: {source: HookUser | null; symbol: HookText};
+  whois: {source: HookUser | null; target: HookUser | null};
+  whoisLine: {source: HookUser | null; target: HookUser | null; numeric: HookNumeric};
+  whoLine: HookWhoRequest &amp; {user: HookUser | null; membership: HookMembership | null; numeric: HookNumeric};
+  whoMatch: HookWhoRequest &amp; {user: HookUser | null};
+  whoVisible: HookWhoRequest &amp; {membership: HookMembership | null};
+  serverLink: HookServerEvent;
+  serverBurst: HookServerEvent;
+  serverSplit: HookServerEvent &amp; {error: boolean};
+  syncUser: HookServerEvent &amp; {user: HookUser | null};
+  syncChannel: HookServerEvent &amp; {channel: HookChannel | null};
+  syncNetwork: HookServerEvent;
+  httpACLCheck: HookHttpEvent;
+  httpRequest: HookHttpEvent;
+}
+
+</code></pre></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

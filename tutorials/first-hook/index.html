@@ -88,6 +88,10 @@
 </li>
                                     
 <li>
+    <a href="../../reference/events/" class="dropdown-item">Separate event-provider hooks</a>
+</li>
+                                    
+<li>
     <a href="../../reference/api/" class="dropdown-item">Native API and authority</a>
 </li>
                                     
@@ -128,7 +132,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a href="https://github.com/r33drichards/docker/edit/feat/local-echo-command/site-docs/tutorials/first-hook.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                                <a href="https://github.com/r33drichards/docker/edit/master/site-docs/tutorials/first-hook.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
                             </li>
                     </ul>
                 </div>
@@ -184,7 +188,7 @@ client that supports raw commands. Do not use a production server. Port 16667
 must be free; allow time and disk space for a native V8/InspIRCd build.</p>
 <h2 id="1-get-the-lesson-files-and-build">1. Get the lesson files and build</h2>
 <p>Run from a fresh checkout (skip cloning if already in this repository):</p>
-<pre><code class="language-sh">git clone --branch feat/local-echo-command https://github.com/r33drichards/docker.git
+<pre><code class="language-sh">git clone --branch master https://github.com/r33drichards/docker.git
 cd docker
 docker build -t inspircd:local .
 </code></pre>
@@ -214,7 +218,22 @@ An ordinary <code>/quote PING :unchanged</code> still receives a PONG containing
 <p>Expect the ordinary VERSION reply and a server NOTICE containing
 <code>VERSION handler returned SUCCESS</code>. These are separate observations: a native
 handler result does not prove delivery to another client.
-Open <code>examples/javascript/tutorial/hooks.js</code> to match each result to its callback.</p>
+The lesson script is complete below. The validated phase also runs for the
+rewritten PING, so the guard keeps rewriting in the pre-validation phase:</p>
+<pre><code class="language-js">// Trusted administrator-authored tutorial code; local disposable server only.
+ircd.on('preCommand', event =&gt; {
+  if (event.validated) return; // Rewrites run only before native validation.
+  if (event.command === 'PING' &amp;&amp; event.params[0] === 'lesson')
+    return { action: 'pass', command: 'PING', params: ['hello-from-javascript'] };
+});
+ircd.on('postCommand', event =&gt; {
+  if (event.command === 'VERSION')
+    ircd.notice(event.userId, 'VERSION handler returned ' + event.result);
+});
+</code></pre>
+<p>The script is loaded by <code>&lt;javascript file="/lab/hooks.js"&gt;</code> in the disposable
+lesson configuration. To use a different file, change that configured path;
+JavaScript does not read or discover scripts on its own.</p>
 <h2 id="5-clean-up">5. Clean up</h2>
 <pre><code class="language-sh">docker rm -f js-lesson
 </code></pre>
