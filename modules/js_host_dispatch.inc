@@ -2,7 +2,7 @@
 bool InvokeHost(Script& script, v8::Global<v8::Function>& callback, const std::string& actor,
 	const std::vector<std::string>& params)
 {
-	if (!script.runtime.IsHealthy() || state->running || state->internal)
+	if (!state->alive || !script.runtime.IsHealthy() || state->running || state->internal)
 		return false;
 	FlagGuard running(state->running);
 	FlagGuard dispatching(script.dispatching);
@@ -34,7 +34,7 @@ bool InvokeHost(Script& script, v8::Global<v8::Function>& callback, const std::s
 }
 void TickTimers()
 {
-	if (!active || state->running || state->internal)
+	if (!state->alive || !active || state->running || state->internal)
 		return;
 	for (auto& script : active->scripts)
 	{

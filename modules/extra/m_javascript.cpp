@@ -798,7 +798,7 @@ class ModuleJavaScript final : public Module
 	ModResult DispatchHook(
 		const char* stage, const std::string& actor, const SnapshotBuilder& build, const MutationHandler& mutate = {})
 	{
-		if (!active || state->internal || state->running)
+		if (!state->alive || !active || state->internal || state->running)
 			return MOD_RES_PASSTHRU;
 		if (std::string(stage) == "backgroundTimer")
 			TickTimers();
@@ -951,7 +951,7 @@ public:
 	ModResult OnPreCommand(
 		std::string& command, CommandBase::Params& parameters, LocalUser* user, bool validated) override
 	{
-		if (state->internal || state->running)
+		if (!state->alive || state->internal || state->running)
 			return MOD_RES_PASSTHRU;
 		if (dispatchdepth >= 8)
 			return MOD_RES_DENY;
@@ -1000,7 +1000,7 @@ public:
 	void OnPostCommand(
 		Command* handler, const CommandBase::Params& parameters, LocalUser* user, CmdResult result, bool loop) override
 	{
-		if (state->internal || state->running)
+		if (!state->alive || state->internal || state->running)
 			return;
 		std::string command = handler->name;
 		std::vector<std::string> params = parameters;
