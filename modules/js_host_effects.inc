@@ -55,7 +55,8 @@ void ApplyHostEffect(const Effect& effect, DispatchState& state)
 			factory->Generate(ServerInstance->Time(), duration, ServerInstance->Config->ServerName, p[3], p[1]));
 		if (line && ServerInstance->XLines->AddLine(line.get(), server))
 		{
-			line.release();
+			// AddLine accepted ownership; releasing the guard must not delete it.
+			(void)line.release();
 			ServerInstance->XLines->ApplyLines();
 		}
 		return;
