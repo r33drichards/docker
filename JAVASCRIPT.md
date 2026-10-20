@@ -235,7 +235,7 @@ from local secret files when configuration is loaded:
 ~~~
 
 For Railway environments without secret-file mounts, the image provides a
-separately opt-in [token-file startup helper](docs/nocodb-token-provisioning.md)
+separately opt-in [token-file startup helper](https://github.com/r33drichards/docker/blob/master/docs/nocodb-token-provisioning.md)
 using `/inspircd/.secrets/nocodb-token`. It does not enable forwarding by itself.
 
 The example is disabled unless explicitly configured. Use the API route and
