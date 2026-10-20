@@ -239,7 +239,7 @@ function rssRetry(sub, now) {
 ircd.on('postCommand', event => {
   if (event.command !== 'RSS' || !event.validated || event.result !== 'SUCCESS') return;
   const user = ircd.userById(event.userId);
-  if (!user || !user.isOper || event.params.length !== 2) return;
+  if (!user || event.params.length !== 2) return;
   const [channel, feed] = event.params;
   if (typeof channel !== 'string' || !ircd.isChannel(channel)) return;
   try { rssInitializeStorage(); } catch (_) { ircd.notice(event.userId, 'RSS storage unavailable; no change made.'); return; }

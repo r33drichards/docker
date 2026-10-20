@@ -131,8 +131,6 @@ def exercise(url, fixture_port=None):
                 client = Client("127.0.0.1", port, "rssfetcher")
                 client.send("JOIN #rss-fetch-test")
                 client.barrier("rss-fetch-joined")
-                client.send("OPER rss-test synthetic-rss-test-only")
-                client.until(lambda line: " 381 rssfetcher " in line)
                 client.send("RSS #rss-fetch-test " + url)
                 subscribed = client.until(lambda line: "RSS subscribed." in line)
                 assert not any(" PRIVMSG #rss-fetch-test :[RSS] " in line for line in subscribed)
@@ -198,8 +196,6 @@ def exercise(url, fixture_port=None):
                     client = Client("127.0.0.1", port, "rssfetcher")
                     client.send("JOIN #rss-fetch-test")
                     client.barrier("rss-restarted-joined")
-                    client.send("OPER rss-test synthetic-rss-test-only")
-                    client.until(lambda line: " 381 rssfetcher " in line)
                     assert phase("rss-test-baseline") == [], "Restored baseline must not repost"
                     client.send("PING :rss-test-repeat")
                     assert phase("rss-test-repeat-done") == [], "Restart must retain dedup IDs"
@@ -211,7 +207,7 @@ def exercise(url, fixture_port=None):
                     )
                     assert check.execute("SELECT COUNT(*) FROM rss_seen").fetchone()[0] == 0
                 print(
-                    f"PASS: {'loopback fixture' if fixture_port else 'public feed ' + parts.hostname}, native HTTP + JavaScript XML parser, operator /RSS, "
+                    f"PASS: {'loopback fixture' if fixture_port else 'public feed ' + parts.hostname}, native HTTP + JavaScript XML parser, nonoperator /RSS, "
                     f"baseline, {len(first)} real channel PRIVMSG posts, busy rollback and restart deduplication"
                 )
             except Exception:

@@ -623,7 +623,7 @@ public:
 	explicit CommandRss(Module* module)
 		: Command(module, "RSS", 2, 2)
 	{
-		access_needed = CmdAccess::OPERATOR;
+		access_needed = CmdAccess::NORMAL;
 		syntax = {"<channel> <feed-url|off>"};
 	}
 	CmdResult Handle(User* user, const Params& parameters) override

@@ -4,11 +4,11 @@ replay.configure({users: [{id: 'oper', local: true, isOper: true}, {id: 'user', 
 const replayFeed = ids => '<rss version="2.0"><channel>' + ids.map(id =>
   '<item><guid>' + id + '</guid><title>Title ' + id + '</title><link>https://example.org/' + id + '</link></item>'
 ).join('') + '</channel></rss>';
-const replaySubscribe = (channel = '#feed', feed = 'https://example.org/feed', userId = 'oper') =>
+const replaySubscribe = (channel = '#feed', feed = 'https://example.org/feed', userId = 'user') =>
   replay.event('postCommand', {command: 'RSS', validated: true, result: 'SUCCESS', userId, params: [channel, feed]});
 const replaySub = () => rssSubscriptions.get('#feed\nhttps://example.org/feed');
 const replayPosts = () => replay.effects.filter(effect => effect.kind === 'privmsg');
-replaySubscribe('#feed', 'https://example.org/feed', 'user');
+replaySubscribe('#feed', 'https://example.org/feed', 'missing');
 replay.assert('rssSubscriptions.size === 0');
 replaySubscribe(); replaySubscribe('#FEED');
 replay.assert('rssSubscriptions instanceof Map && rssSubscriptions.size === 1');

@@ -90,10 +90,40 @@ ircd.on('backgroundTimer', () => {
         for command, suffix in (("NOTICE", "rss-timer-notice"), ("PRIVMSG", "rss-timer-privmsg")):
             assert len(_messages(delivered, command, channel, suffix)) == 1, delivered
 
-    # Native /RSS access checks reject nonoperators before successful command hooks.
+    # Registered nonoperators can reach successful RSS hooks without gaining
+    # broader administrative host API authority.
+    reload("""
+ircd.on('postCommand', e => {
+  if (e.command === 'RSS' && e.validated && e.result === 'SUCCESS')
+    ircd.notice(e.userId, 'rss-registered-user-success');
+});
+""")
     caller.send("RSS #rss-messaging https://example.org/feed")
-    result = caller.barrier("rss-operator-check")
-    assert any(f" 481 {caller.nick} " in line for line in result), result
+    result = caller.until(lambda line: line.endswith(":rss-registered-user-success"))
+    assert not any(f" 481 {caller.nick} " in line for line in result), result
+    caller.send("RSS #rss-messaging off")
+    caller.until(lambda line: line.endswith(":rss-registered-user-success"))
+
+    other.send("JOIN #rss-other-only")
+    other.barrier("rss-other-only-ready")
+    caller.send("RSS #rss-other-only https://example.org/feed")
+    caller.until(lambda line: line.endswith(":rss-registered-user-success"))
+    caller.send("RSS #rss-other-only off")
+    caller.until(lambda line: line.endswith(":rss-registered-user-success"))
+    other.send("PART #rss-other-only")
+    other.barrier("rss-other-only-cleanup")
+
+    # NORMAL commands remain registration-gated by the core command parser.
+    import socket
+
+    with socket.create_connection(caller.sock.getpeername(), timeout=5) as unregistered:
+        unregistered.sendall(b"RSS #rss-messaging https://example.org/feed\r\n")
+        received = b""
+        while b" 451 " not in received:
+            chunk = unregistered.recv(4096)
+            assert chunk, received
+            received += chunk
+        assert b"rss-registered-user-success" not in received, received
 
     # Both APIs preserve user authority: own UUID works, other UUID/channel fails.
     reload(
@@ -224,7 +254,7 @@ ircd.on('preCommand', e => {
     other.barrier("rss-messaging-other-cleanup")
     print(
         "PASS: native local user/channel NOTICE and PRIVMSG, server origin, no duplicates, "
-        "background timers, user authority, nonoperator RSS denial, veto rollback and disappearing targets"
+        "background timers, user authority, registered-user RSS access, veto rollback and disappearing targets"
     )
 
 
