@@ -581,3 +581,40 @@ ircd.on('serverSplit', event => {
 
 The counter and last split live only for this script generation; a successful
 rehash replaces them. Retained snapshots do not authorize any later action.
+
+### URL-scoped fetch headers
+
+Host configuration can inject headers into `ircd.fetch` without exposing a
+credential getter or accepting JavaScript-supplied headers:
+
+```xml
+<javascriptfetchheader script="scripts/trusted.js" url="https://api.example.invalid/v1/events?scope=irc" name="Authorization" valuefile="/run/secrets/api-header">
+```
+
+`script` resolves relative to the configuration directory (or may be absolute)
+and must identify a loaded admin-authority source after canonicalization. Rules
+match that source and the complete parsed URL, not a substring or prefix.
+Scheme/host case and an explicit default port are normalized. Path and query
+bytes, case, and ordering must match exactly, including a trailing empty `?`.
+Userinfo, fragments, backslashes, and literal `.`/`..` path segments are rejected.
+Only HTTPS URLs accepted by the ordinary fetch policy may have rules; injection
+does not relax its public-address, standard-port, no-proxy or no-redirect policy.
+
+There are at most 32 distinct source/URL rules and eight headers per rule, using
+the same header-name, secret-file ownership/mode, value and byte limits as
+`javascriptwebhookheader`. Config loading is atomic. Duplicate headers or
+conflicts with legacy endpoint headers reject the candidate configuration.
+Header values stay in native state and are not exposed by an API or logged.
+However, fetch returns the remote response: configure only trusted endpoints
+that will not reflect credentials. Host injection cannot prevent a recipient
+from returning or encoding a received secret.
+
+`postWebhook` remains a compatibility adapter over the same asynchronous HTTP
+implementation. Named endpoint configuration, JSON POSTs, private/explicit
+loopback endpoint authority, one-worker ordering, 64-job bound, timeouts,
+response-discarding and counters remain supported. Legacy endpoint credentials
+do not automatically become fetch rules. URL rules also apply to a matching
+named webhook from the specified script. Generic fetch still has its own
+per-script two-worker/16-job limit and does not inherit legacy destination
+exceptions. Disabling a poisoned script retires its queued/in-flight HTTP jobs;
+rehash/unload do the same. Already transmitted requests cannot be recalled.

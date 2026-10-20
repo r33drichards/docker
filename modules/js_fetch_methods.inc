@@ -53,7 +53,9 @@ static void HttpRequest(const v8::FunctionCallbackInfo<v8::Value>& args)
 	}
 	if (!self->http)
 		self->http = std::make_shared<js_async_http::Dispatcher>();
-	auto id = self->http->Stage(self->httpgeneration, method, url, body);
+	js_async_http::Policy policy;
+	policy.headers = self->generation->ForUrl(self->sourcepath, url);
+	auto id = self->http->Stage(self->httpgeneration, method, url, body, std::move(policy));
 	if (id.empty())
 	{
 		Error(args.GetIsolate(), "Invalid HTTP request or queue full");

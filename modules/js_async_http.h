@@ -11,6 +11,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -102,6 +103,37 @@ inline bool ValidUrl(const std::string& url)
 		return PublicAddress(reinterpret_cast<sockaddr*>(&v6));
 	return true;
 }
+struct Policy
+{
+	std::map<std::string, std::string> headers;
+	std::string contentType;
+	bool configuredEndpoint = false, discard = false;
+	long connectTimeout = 3000, timeout = 8000;
+	std::size_t maxResponse = MaxBody, maxTotal = 0;
+	std::function<void(bool)> completion;
+};
+inline bool ConfiguredUrl(const std::string& url)
+{
+	std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> p(curl_url(), curl_url_cleanup);
+	if (url.empty() || url.size() > 2048 || url.find('\0') != std::string::npos)
+		return false;
+	if (!p || curl_url_set(p.get(), CURLUPART_URL, url.c_str(), 0) != CURLUE_OK)
+		return false;
+	auto part = [&](CURLUPart which)
+	{
+		char* raw = nullptr;
+		if (curl_url_get(p.get(), which, &raw, 0) != CURLUE_OK)
+			return std::string();
+		std::string out(raw);
+		curl_free(raw);
+		return out;
+	};
+	return (part(CURLUPART_SCHEME) == "https" ||
+			   (part(CURLUPART_SCHEME) == "http" &&
+				   (part(CURLUPART_HOST) == "127.0.0.1" || part(CURLUPART_HOST) == "[::1]"))) &&
+		part(CURLUPART_USER).empty() && part(CURLUPART_PASSWORD).empty() && part(CURLUPART_FRAGMENT).empty() &&
+		url.find_first_of("\r\n\t ") == std::string::npos;
+}
 class Dispatcher
 {
 	using Clock = std::chrono::steady_clock;
@@ -111,6 +143,7 @@ class Dispatcher
 		std::shared_ptr<Generation> generation;
 		std::atomic<bool> cancelled{false};
 		bool committed = false, ready = false;
+		Policy policy;
 		Result result;
 		Clock::time_point created = Clock::now(), completed;
 	};
@@ -122,6 +155,7 @@ class Dispatcher
 	std::atomic<bool> stopping{false};
 	std::string prefix;
 	unsigned long long sequence = 0;
+	const std::size_t maxJobs, workerCount;
 	struct Transfer
 	{
 		Dispatcher& owner;
@@ -136,7 +170,8 @@ class Dispatcher
 		if ((size && count > MaxBody / size) || t.Cancelled())
 			return 0;
 		const auto total = size * count;
-		if (total > MaxBody - t.body.size())
+		if (total > t.job.policy.maxResponse - t.body.size() ||
+			(t.job.policy.maxTotal && t.headers + t.body.size() + total > t.job.policy.maxTotal))
 			return 0;
 		try
 		{
@@ -154,7 +189,8 @@ class Dispatcher
 		if ((size && count > 65536 / size) || t.Cancelled())
 			return 0;
 		const auto total = size * count;
-		if (total > 65536 - t.headers)
+		if (total > 65536 - t.headers ||
+			(t.job.policy.maxTotal && t.headers + t.body.size() + total > t.job.policy.maxTotal))
 			return 0;
 		t.headers += total;
 		return total;
@@ -166,8 +202,13 @@ class Dispatcher
 	static curl_socket_t Open(void* user, curlsocktype purpose, curl_sockaddr* address)
 	{
 		const auto& t = *static_cast<Transfer*>(user);
-		const bool fixture = FixtureUrl(t.job.url) && address->family == AF_INET &&
-			ntohl(reinterpret_cast<const sockaddr_in*>(&address->addr)->sin_addr.s_addr) == 0x7f000001;
+		const bool local =
+			(address->family == AF_INET &&
+				ntohl(reinterpret_cast<const sockaddr_in*>(&address->addr)->sin_addr.s_addr) == 0x7f000001) ||
+			(address->family == AF_INET6 &&
+				IN6_IS_ADDR_LOOPBACK(&reinterpret_cast<const sockaddr_in6*>(&address->addr)->sin6_addr));
+		const bool fixture =
+			(FixtureUrl(t.job.url) && local) || (t.job.policy.configuredEndpoint && ConfiguredUrl(t.job.url));
 		if (t.Cancelled() || purpose != CURLSOCKTYPE_IPCXN || (!PublicAddress(&address->addr) && !fixture))
 			return CURL_SOCKET_BAD;
 		return ::socket(address->family, address->socktype, address->protocol);
@@ -180,17 +221,36 @@ class Dispatcher
 		if (!curl)
 			return result;
 		Transfer t{*this, job, {}, 0};
+		curl_slist* rawheaders = nullptr;
+		auto addheader = [&](const std::string& line)
+		{
+			auto* next = curl_slist_append(rawheaders, line.c_str());
+			if (!next)
+				return false;
+			rawheaders = next;
+			return true;
+		};
+		bool headersok = addheader("Expect:");
+		if (!job.policy.contentType.empty())
+			headersok = headersok && addheader("Content-Type: " + job.policy.contentType);
+		for (const auto& header : job.policy.headers)
+			headersok = headersok && addheader(header.first + ": " + header.second);
+		std::unique_ptr<curl_slist, decltype(&curl_slist_free_all)> headers(rawheaders, curl_slist_free_all);
+		if (!headersok)
+			return result;
 		auto set = [&](CURLoption option, auto value)
 		{ return curl_easy_setopt(curl.get(), option, value) == CURLE_OK; };
 		if (!set(CURLOPT_URL, job.url.c_str()) || !set(CURLOPT_PROTOCOLS_STR, "http,https") ||
 			!set(CURLOPT_FOLLOWLOCATION, 0L) || !set(CURLOPT_PROXY, "") || !set(CURLOPT_NETRC, CURL_NETRC_IGNORED) ||
 			!set(CURLOPT_SSL_VERIFYPEER, 1L) || !set(CURLOPT_SSL_VERIFYHOST, 2L) || !set(CURLOPT_NOSIGNAL, 1L) ||
-			!set(CURLOPT_CONNECTTIMEOUT_MS, 3000L) || !set(CURLOPT_TIMEOUT_MS, 8000L) ||
+			!set(CURLOPT_CONNECTTIMEOUT_MS, job.policy.connectTimeout) ||
+			!set(CURLOPT_TIMEOUT_MS, job.policy.timeout) || !set(CURLOPT_HTTPHEADER, headers.get()) ||
 			!set(CURLOPT_USERAGENT, "InspIRCd-JavaScript/1.0") || !set(CURLOPT_WRITEFUNCTION, &Write) ||
 			!set(CURLOPT_WRITEDATA, &t) || !set(CURLOPT_HEADERFUNCTION, &Header) || !set(CURLOPT_HEADERDATA, &t) ||
 			!set(CURLOPT_OPENSOCKETFUNCTION, &Open) || !set(CURLOPT_OPENSOCKETDATA, &t) ||
 			!set(CURLOPT_XFERINFOFUNCTION, &Progress) || !set(CURLOPT_XFERINFODATA, &t) ||
-			!set(CURLOPT_NOPROGRESS, 0L) || !set(CURLOPT_MAXFILESIZE_LARGE, static_cast<curl_off_t>(MaxBody)))
+			!set(CURLOPT_NOPROGRESS, 0L) ||
+			!set(CURLOPT_MAXFILESIZE_LARGE, static_cast<curl_off_t>(job.policy.maxResponse)))
 			return result;
 		if (job.method == "POST" &&
 			(!set(CURLOPT_POST, 1L) || !set(CURLOPT_POSTFIELDS, job.body.data()) ||
@@ -252,7 +312,13 @@ class Dispatcher
 				job->result = std::move(result);
 				job->ready = true;
 				job->completed = Clock::now();
+				if (job->policy.completion)
+					job->policy.completion(job->result.ok && job->result.status >= 200 && job->result.status < 300);
+				if (job->policy.discard)
+					entries.erase(job->id);
 			}
+			else
+				entries.erase(job->id);
 		}
 	}
 
@@ -264,22 +330,25 @@ class Dispatcher
 	}
 
 public:
-	Dispatcher()
+	explicit Dispatcher(std::size_t limit = MaxJobs, std::size_t count = 2)
 		: prefix(NewPrefix())
+		, maxJobs(limit)
+		, workerCount(count)
 	{
 	}
 	~Dispatcher() { Stop(); }
 	Dispatcher(const Dispatcher&) = delete;
 	Dispatcher& operator=(const Dispatcher&) = delete;
 	std::string Stage(const std::shared_ptr<Generation>& generation, const std::string& method, const std::string& url,
-		const std::string& body = {})
+		const std::string& body = {}, Policy policy = {})
 	{
-		if (!generation || !generation->active || (method != "GET" && method != "POST") || !ValidUrl(url) ||
-			body.size() > MaxRequestBody || (method == "GET" && !body.empty()))
+		if (!generation || !generation->active || (method != "GET" && method != "POST") ||
+			(!ValidUrl(url) && !(policy.configuredEndpoint && ConfiguredUrl(url))) || body.size() > MaxRequestBody ||
+			(method == "GET" && !body.empty()))
 			return {};
 		std::lock_guard<std::mutex> lock(mutex);
 		Expire();
-		if (stopping || entries.size() >= MaxJobs)
+		if (stopping || entries.size() >= maxJobs)
 			return {};
 		auto job = std::make_shared<Job>();
 		job->id = prefix + std::to_string(++sequence);
@@ -287,6 +356,7 @@ public:
 		job->method = method;
 		job->url = url;
 		job->body = body;
+		job->policy = std::move(policy);
 		entries.emplace(job->id, job);
 		return job->id;
 	}
@@ -303,8 +373,8 @@ public:
 			if (!version || version->version_num < 0x075500 || !(version->features & CURL_VERSION_ASYNCHDNS) ||
 				!(version->features & CURL_VERSION_SSL) || !(version->features & CURL_VERSION_THREADSAFE))
 				return false;
-			workers.emplace_back([this] { Run(); });
-			workers.emplace_back([this] { Run(); });
+			for (std::size_t i = 0; i < workerCount; ++i)
+				workers.emplace_back([this] { Run(); });
 		}
 		queue.push_back(found->second);
 		found->second->committed = true;
