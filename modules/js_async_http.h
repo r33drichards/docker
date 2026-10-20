@@ -1,0 +1,357 @@
+/* SPDX-License-Identifier: MIT */
+#pragma once
+
+// Owned asynchronous HTTP jobs. No worker enters V8 or accesses IRC objects.
+#include <curl/curl.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <deque>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
+
+namespace js_async_http
+{
+constexpr std::size_t MaxJobs = 16, MaxBody = 512 * 1024, MaxRequestBody = 64 * 1024;
+struct Generation
+{
+	std::atomic<bool> active{true};
+};
+struct Result
+{
+	bool ok = false;
+	long status = 0;
+	std::string body, error;
+};
+inline bool PublicAddress(const sockaddr* address)
+{
+	if (address->sa_family == AF_INET)
+	{
+		const auto ip = ntohl(reinterpret_cast<const sockaddr_in*>(address)->sin_addr.s_addr);
+		const auto a = ip >> 24, b = (ip >> 16) & 255;
+		return a != 0 && a != 10 && a != 127 && a < 224 && !(a == 100 && b >= 64 && b <= 127) &&
+			!(a == 169 && b == 254) && !(a == 172 && b >= 16 && b <= 31) &&
+			!(a == 192 && (b == 168 || b == 0 || b == 2 || b == 88)) &&
+			!(a == 198 && (b == 18 || b == 19 || b == 51)) && !(a == 203 && b == 0);
+	}
+	if (address->sa_family == AF_INET6)
+	{
+		const auto* b = reinterpret_cast<const sockaddr_in6*>(address)->sin6_addr.s6_addr;
+		return (b[0] & 0xe0) == 0x20 && !(b[0] == 0x20 && b[1] == 0x01 && b[2] <= 1) &&
+			!(b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x0d && b[3] == 0xb8) && !(b[0] == 0x20 && b[1] == 0x02) &&
+			!(b[0] == 0x3f && (b[1] & 0xf0) == 0xf0);
+	}
+	return false;
+}
+inline bool FixtureUrl(const std::string& url)
+{
+#ifdef JS_ASYNC_HTTP_TEST_LOOPBACK
+	return url.compare(0, 17, "http://127.0.0.1:") == 0;
+#else
+	(void)url;
+	return false;
+#endif
+}
+inline bool ValidUrl(const std::string& url)
+{
+	static const bool initialized = curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK;
+	if (!initialized || url.empty() || url.size() > 2048 || url.find_first_of("\r\n\t ") != std::string::npos ||
+		url.find('\0') != std::string::npos)
+		return false;
+	std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> parsed(curl_url(), curl_url_cleanup);
+	if (!parsed || curl_url_set(parsed.get(), CURLUPART_URL, url.c_str(), 0) != CURLUE_OK)
+		return false;
+	auto part = [&](CURLUPart which)
+	{
+		char* raw = nullptr;
+		if (curl_url_get(parsed.get(), which, &raw, 0) != CURLUE_OK)
+			return std::string();
+		std::string value(raw);
+		curl_free(raw);
+		return value;
+	};
+	const auto scheme = part(CURLUPART_SCHEME), host = part(CURLUPART_HOST), port = part(CURLUPART_PORT);
+	if ((scheme != "http" && scheme != "https") || host.empty() || !part(CURLUPART_USER).empty() ||
+		!part(CURLUPART_PASSWORD).empty() || !part(CURLUPART_FRAGMENT).empty() ||
+		(!FixtureUrl(url) && !port.empty() && port != (scheme == "https" ? "443" : "80")))
+		return false;
+	// Reject literal private addresses before enqueue; DNS destinations are also
+	// validated at socket creation, avoiding resolve/connect TOCTOU rebinding.
+	sockaddr_in v4{};
+	v4.sin_family = AF_INET;
+	if (inet_pton(AF_INET, host.c_str(), &v4.sin_addr) == 1)
+		return PublicAddress(reinterpret_cast<sockaddr*>(&v4)) || FixtureUrl(url);
+	const auto ipv6 =
+		host.size() > 2 && host.front() == '[' && host.back() == ']' ? host.substr(1, host.size() - 2) : host;
+	sockaddr_in6 v6{};
+	v6.sin6_family = AF_INET6;
+	if (inet_pton(AF_INET6, ipv6.c_str(), &v6.sin6_addr) == 1)
+		return PublicAddress(reinterpret_cast<sockaddr*>(&v6));
+	return true;
+}
+class Dispatcher
+{
+	using Clock = std::chrono::steady_clock;
+	struct Job
+	{
+		std::string id, method, url, body;
+		std::shared_ptr<Generation> generation;
+		std::atomic<bool> cancelled{false};
+		bool committed = false, ready = false;
+		Result result;
+		Clock::time_point created = Clock::now(), completed;
+	};
+	std::mutex mutex;
+	std::condition_variable wake;
+	std::map<std::string, std::shared_ptr<Job>> entries;
+	std::deque<std::shared_ptr<Job>> queue;
+	std::vector<std::thread> workers;
+	std::atomic<bool> stopping{false};
+	std::string prefix;
+	unsigned long long sequence = 0;
+	struct Transfer
+	{
+		Dispatcher& owner;
+		Job& job;
+		std::string body;
+		std::size_t headers = 0;
+		bool Cancelled() const { return owner.stopping || job.cancelled || !job.generation->active; }
+	};
+	static std::size_t Write(char* data, std::size_t size, std::size_t count, void* user)
+	{
+		auto& t = *static_cast<Transfer*>(user);
+		if ((size && count > MaxBody / size) || t.Cancelled())
+			return 0;
+		const auto total = size * count;
+		if (total > MaxBody - t.body.size())
+			return 0;
+		try
+		{
+			t.body.append(data, total);
+		}
+		catch (...)
+		{
+			return 0;
+		}
+		return total;
+	}
+	static std::size_t Header(char*, std::size_t size, std::size_t count, void* user)
+	{
+		auto& t = *static_cast<Transfer*>(user);
+		if ((size && count > 65536 / size) || t.Cancelled())
+			return 0;
+		const auto total = size * count;
+		if (total > 65536 - t.headers)
+			return 0;
+		t.headers += total;
+		return total;
+	}
+	static int Progress(void* user, curl_off_t, curl_off_t, curl_off_t, curl_off_t)
+	{
+		return static_cast<Transfer*>(user)->Cancelled() ? 1 : 0;
+	}
+	static curl_socket_t Open(void* user, curlsocktype purpose, curl_sockaddr* address)
+	{
+		const auto& t = *static_cast<Transfer*>(user);
+		const bool fixture = FixtureUrl(t.job.url) && address->family == AF_INET &&
+			ntohl(reinterpret_cast<const sockaddr_in*>(&address->addr)->sin_addr.s_addr) == 0x7f000001;
+		if (t.Cancelled() || purpose != CURLSOCKTYPE_IPCXN || (!PublicAddress(&address->addr) && !fixture))
+			return CURL_SOCKET_BAD;
+		return ::socket(address->family, address->socktype, address->protocol);
+	}
+	Result Fetch(Job& job)
+	{
+		Result result;
+		result.error = "HTTP transport failed";
+		std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> curl(curl_easy_init(), curl_easy_cleanup);
+		if (!curl)
+			return result;
+		Transfer t{*this, job, {}, 0};
+		auto set = [&](CURLoption option, auto value)
+		{ return curl_easy_setopt(curl.get(), option, value) == CURLE_OK; };
+		if (!set(CURLOPT_URL, job.url.c_str()) || !set(CURLOPT_PROTOCOLS_STR, "http,https") ||
+			!set(CURLOPT_FOLLOWLOCATION, 0L) || !set(CURLOPT_PROXY, "") || !set(CURLOPT_NETRC, CURL_NETRC_IGNORED) ||
+			!set(CURLOPT_SSL_VERIFYPEER, 1L) || !set(CURLOPT_SSL_VERIFYHOST, 2L) || !set(CURLOPT_NOSIGNAL, 1L) ||
+			!set(CURLOPT_CONNECTTIMEOUT_MS, 3000L) || !set(CURLOPT_TIMEOUT_MS, 8000L) ||
+			!set(CURLOPT_USERAGENT, "InspIRCd-JavaScript/1.0") || !set(CURLOPT_WRITEFUNCTION, &Write) ||
+			!set(CURLOPT_WRITEDATA, &t) || !set(CURLOPT_HEADERFUNCTION, &Header) || !set(CURLOPT_HEADERDATA, &t) ||
+			!set(CURLOPT_OPENSOCKETFUNCTION, &Open) || !set(CURLOPT_OPENSOCKETDATA, &t) ||
+			!set(CURLOPT_XFERINFOFUNCTION, &Progress) || !set(CURLOPT_XFERINFODATA, &t) ||
+			!set(CURLOPT_NOPROGRESS, 0L) || !set(CURLOPT_MAXFILESIZE_LARGE, static_cast<curl_off_t>(MaxBody)))
+			return result;
+		if (job.method == "POST" &&
+			(!set(CURLOPT_POST, 1L) || !set(CURLOPT_POSTFIELDS, job.body.data()) ||
+				!set(CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(job.body.size()))))
+			return result;
+		if (t.Cancelled() || curl_easy_perform(curl.get()) != CURLE_OK)
+			return result;
+		if (curl_easy_getinfo(curl.get(), CURLINFO_RESPONSE_CODE, &result.status) != CURLE_OK)
+			return result;
+		result.ok = true; // HTTP 4xx/5xx are completed HTTP responses, not transport errors.
+		result.body = std::move(t.body);
+		result.error.clear();
+		return result;
+	}
+	void Expire()
+	{
+		const auto now = Clock::now();
+		for (auto it = entries.begin(); it != entries.end();)
+		{
+			auto& job = *it->second;
+			if (!job.generation->active || job.cancelled ||
+				(job.ready && now - job.completed > std::chrono::seconds(60)) ||
+				(!job.committed && now - job.created > std::chrono::seconds(60)))
+			{
+				job.cancelled = true;
+				it = entries.erase(it);
+			}
+			else
+				++it;
+		}
+		queue.erase(std::remove_if(queue.begin(), queue.end(), [](const auto& job) { return job->cancelled.load(); }),
+			queue.end());
+	}
+	void Run() noexcept
+	{
+		for (;;)
+		{
+			std::shared_ptr<Job> job;
+			{
+				std::unique_lock<std::mutex> lock(mutex);
+				wake.wait(lock, [&] { return stopping || !queue.empty(); });
+				if (stopping)
+					return;
+				job = std::move(queue.front());
+				queue.pop_front();
+			}
+			Result result;
+			try
+			{
+				result = Fetch(*job);
+			}
+			catch (...)
+			{
+				result.error = "HTTP transport failed";
+			}
+			std::lock_guard<std::mutex> lock(mutex);
+			if (!job->cancelled && job->generation->active)
+			{
+				job->result = std::move(result);
+				job->ready = true;
+				job->completed = Clock::now();
+			}
+		}
+	}
+
+	static std::string NewPrefix()
+	{
+		static std::atomic<unsigned long long> instances{0};
+		return std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + "-" +
+			std::to_string(++instances) + "-";
+	}
+
+public:
+	Dispatcher()
+		: prefix(NewPrefix())
+	{
+	}
+	~Dispatcher() { Stop(); }
+	Dispatcher(const Dispatcher&) = delete;
+	Dispatcher& operator=(const Dispatcher&) = delete;
+	std::string Stage(const std::shared_ptr<Generation>& generation, const std::string& method, const std::string& url,
+		const std::string& body = {})
+	{
+		if (!generation || !generation->active || (method != "GET" && method != "POST") || !ValidUrl(url) ||
+			body.size() > MaxRequestBody || (method == "GET" && !body.empty()))
+			return {};
+		std::lock_guard<std::mutex> lock(mutex);
+		Expire();
+		if (stopping || entries.size() >= MaxJobs)
+			return {};
+		auto job = std::make_shared<Job>();
+		job->id = prefix + std::to_string(++sequence);
+		job->generation = generation;
+		job->method = method;
+		job->url = url;
+		job->body = body;
+		entries.emplace(job->id, job);
+		return job->id;
+	}
+	bool Commit(const std::string& id)
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		Expire();
+		auto found = entries.find(id);
+		if (stopping || found == entries.end() || found->second->committed)
+			return false;
+		if (workers.empty())
+		{
+			const auto* version = curl_version_info(CURLVERSION_NOW);
+			if (!version || version->version_num < 0x075500 || !(version->features & CURL_VERSION_ASYNCHDNS) ||
+				!(version->features & CURL_VERSION_SSL) || !(version->features & CURL_VERSION_THREADSAFE))
+				return false;
+			workers.emplace_back([this] { Run(); });
+			workers.emplace_back([this] { Run(); });
+		}
+		queue.push_back(found->second);
+		found->second->committed = true;
+		wake.notify_one();
+		return true;
+	}
+	bool Take(const std::shared_ptr<Generation>& generation, const std::string& id, Result& result)
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		Expire();
+		auto found = entries.find(id);
+		if (!generation || !generation->active || found == entries.end() || found->second->generation != generation)
+		{
+			result = {};
+			result.error = "expired or unknown HTTP request";
+			return true;
+		}
+		if (!found->second->ready)
+			return false;
+		result = std::move(found->second->result);
+		entries.erase(found);
+		return true;
+	}
+	bool Cancel(const std::shared_ptr<Generation>& generation, const std::string& id)
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		auto found = entries.find(id);
+		if (found == entries.end() || found->second->generation != generation)
+			return false;
+		found->second->cancelled = true;
+		entries.erase(found);
+		Expire();
+		return true;
+	}
+	void Invalidate(const std::shared_ptr<Generation>& generation)
+	{
+		if (!generation)
+			return;
+		generation->active = false;
+		std::lock_guard<std::mutex> lock(mutex);
+		Expire();
+	}
+	void Stop()
+	{
+		stopping = true;
+		wake.notify_all();
+		for (auto& worker : workers)
+			if (worker.joinable())
+				worker.join();
+		workers.clear();
+		std::lock_guard<std::mutex> lock(mutex);
+		queue.clear();
+		entries.clear();
+	}
+};
+} // namespace js_async_http

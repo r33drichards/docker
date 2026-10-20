@@ -5,6 +5,7 @@
 #include "inspircd.h"
 #include "js_runtime.h"
 #include "js_webhooks.h"
+#include "js_async_http.h"
 #include "js_wire_validation.h"
 #include "js_script_loader.h"
 #include "js_native_utilities.h"
@@ -19,12 +20,21 @@
 namespace
 {
 using Authority = js_scripts::Authority;
+struct HttpTicket
+{
+	std::shared_ptr<js_async_http::Dispatcher> transport;
+	std::shared_ptr<js_async_http::Generation> generation;
+	std::string id;
+	bool committed = false;
+	~HttpTicket() { if (!committed) transport->Cancel(generation, id); }
+};
 struct Effect
 {
 	std::string actor, target, text;
 	Authority authority;
 	bool rename;
 	std::shared_ptr<js_webhooks::Request> webhook = nullptr;
+	std::shared_ptr<HttpTicket> http;
 };
 struct DispatchState
 {
@@ -177,6 +187,9 @@ public:
 	Authority authority;
 	std::string actor;
 	bool loading = true;
+	std::shared_ptr<js_async_http::Dispatcher> http;
+	std::shared_ptr<js_async_http::Generation> httpgeneration = std::make_shared<js_async_http::Generation>();
+	~Script() { httpgeneration->active = false; if (http) http->Invalidate(httpgeneration); }
 	js_webhooks::Dispatcher& delivery;
 	std::shared_ptr<js_webhooks::Generation> generation;
 	const std::vector<js_scripts::WasmAsset>& wasm;
@@ -347,6 +360,7 @@ public:
 	}
 	static void Notice(const v8::FunctionCallbackInfo<v8::Value>& args) { EffectCall(args, false); }
 	static void Rename(const v8::FunctionCallbackInfo<v8::Value>& args) { EffectCall(args, true); }
+	#include "js_fetch_methods.inc"
 	static void UserById(const v8::FunctionCallbackInfo<v8::Value>& args)
 	{
 		std::string uuid;
@@ -386,6 +400,7 @@ public:
 				api->Set(Key(isolate, "notice"), v8::FunctionTemplate::New(isolate, Safe<Notice>, data));
 				api->Set(Key(isolate, "rename"), v8::FunctionTemplate::New(isolate, Safe<Rename>, data));
 				api->Set(Key(isolate, "userById"), v8::FunctionTemplate::New(isolate, Safe<UserById>, data));
+				RegisterFetch(isolate, api, data);
 				v8::Local<v8::Object> instance;
 				return api->NewInstance(context).ToLocal(&instance) &&
 					Put(context, context->Global(), "ircd", instance);
@@ -630,7 +645,11 @@ class ModuleJavaScript final : public Module
 	{
 		for (auto& effect : effects)
 		{
-			if (effect.webhook)
+			if (effect.http)
+			{
+				effect.http->committed = effect.http->transport->Commit(effect.http->id);
+			}
+			else if (effect.webhook)
 				delivery.Commit(std::move(effect.webhook));
 			else
 				ServerInstance->AtomicActions.AddAction(new DeferredEffect(state, std::move(effect)));

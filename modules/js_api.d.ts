@@ -1,3 +1,4 @@
+/// <reference path="js_fetch.d.ts" />
 /// <reference path="js_events.d.ts" />
 /// <reference path="js_hooks.d.ts" />
 /// <reference path="js_generated/inspircd.d.ts" />
