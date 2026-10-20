@@ -17,8 +17,9 @@ docker build -t inspircd:local .
 
 The primary image uses Alpine 3.22, InspIRCd v4.12.1 by default, and matching
 `nodejs-dev`/`nodejs-libs` 22.23.2-r0. Only V8 APIs are used; no Node environment,
-`process`, `require`, filesystem API, general networking API (`fetch`), or WASI is
-installed in scripts. The explicit queued webhook API below is opt-in.
+`process`, `require`, general filesystem API, browser Fetch/Promise runtime, or WASI
+is installed in scripts. The bounded admin-only fetch job and queued webhook APIs
+are opt-in; see [native host API](site-docs/how-to/native-host-api.md).
 The root `Dockerfile` includes the compiled module and its runtime library, but
 leaves it unloaded until explicitly configured. No scripts are installed or enabled
 by default. `Dockerfile.javascript` has been retired; downstream Railway projects
@@ -170,8 +171,10 @@ python3 tools/generate_js_bindings.py
 python3 tools/generate_js_bindings.py --check
 ```
 
-Six audited utility wrappers are implemented: `match`, `matchCIDR`, `isNick`,
-`isChannel`, `stripColor`, and `time`. Inputs have strict arity/types, copied
+Nineteen audited utility wrappers are implemented, covering validation, glob/CIDR
+matching, color processing, random values, time and timing-safe comparison. Their
+exact signatures and conversion limits are generated from the binding manifest
+in [the callable reference](site-docs/reference/callable-api.md). Inputs have strict arity/types, copied
 ownership, and explicit conversions. NUL is rejected for native glob/CIDR
 functions with NUL-terminated internals. The manifest tracks reviewed declarations,
 manual-wrapper candidates, exclusions, and pending mutations. It is a systematic
@@ -179,7 +182,10 @@ allowlist and coverage inventory, **not an automatic binding of every function i
 inspircd.h or the whole SDK**. New bindings require explicit conversion, lifetime,
 effect, and authorization policy plus an implementation and tests.
 
-Additional explicit host methods:
+The [callable reference](site-docs/reference/callable-api.md) derives every signature
+from the checked-in declarations, including native query/command/channel/admin/timer
+and fetch APIs. See [authority and lifecycle](site-docs/explanation/host-lifecycle.md)
+for initialization, deferred commit and unload rules. Core compatibility methods:
 
 - `userById(uuid)` returns an owned `{ id, nick }` snapshot or null.
 - `notice(targetUuid, text)` queues a server notice (maximum 400 UTF-8 bytes).
