@@ -333,6 +333,13 @@ public:
 		, id(std::move(token))
 	{
 	}
+	void Commit()
+	{
+		if (!generation->alive)
+			return;
+		reservation->committed = true;
+		committed = transport->Commit(id);
+	}
 	~Request()
 	{
 		if (!committed)
@@ -414,7 +421,7 @@ public:
 			waiting.push_back(std::move(request));
 		}
 		else
-			request->committed = transport->Commit(request->id);
+			request->Commit();
 	}
 	const Counters& Stats() const { return *counts; }
 	void Stop()

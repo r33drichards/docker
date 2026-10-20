@@ -50,6 +50,16 @@ ircd.registerCommand('FETCHOVERRIDE', 0, 0, false, e => {
 });
 """
 
+WEBHOOK_ORDER = r"""
+ircd.registerCommand('WEBHOOKCONTROL', 0, 0, false, () => {
+  ircd.postWebhook('unload', '{"marker":"webhook-control"}');
+});
+ircd.registerCommand('WEBHOOKUNLOAD', 0, 0, false, () => {
+  ircd.unloadModule('m_javascript.so');
+  ircd.postWebhook('unload', '{"marker":"must-not-send-after-unload"}');
+});
+"""
+
 
 def main():
     if os.environ.get("INSPIRCD_HTTP_TEST_LOOPBACK") != "1":
@@ -194,6 +204,35 @@ def main():
                 print(
                     "PASS: immutable secret snapshot, duplicate/authority rollback, rotation and rule removal"
                 )
+
+                # Named webhooks must use the same ordered effect queue as fetch:
+                # a prior self-unload invalidates later staged network effects.
+                first.write_text(WEBHOOK_ORDER)
+                reload(
+                    f'<javascriptwebhook name="unload" url="{receiver.url}/webhook-unload" '
+                    'loopbackhttp="yes">\n'
+                    f'<javascriptwebhookheader endpoint="unload" name="xc-token" valuefile="{secret}">\n'
+                )
+                before = len(receiver.posts)
+                caller.send("WEBHOOKCONTROL")
+                caller.barrier("webhook-control-committed")
+                posts = receiver.wait(before + 1, timeout=10)
+                route, body, headers = posts[-1]
+                headers = {key.lower(): value for key, value in headers.items()}
+                assert len(posts) == before + 1 and route == "/webhook-unload", posts
+                assert json.loads(body) == {"marker": "webhook-control"}, body
+                assert headers.get("xc-token") == "synthetic-rotated-token", headers
+                assert headers.get("content-type") == "application/json", headers
+                caller.send("WEBHOOKUNLOAD")
+                caller.barrier("webhook-self-unloaded")
+                caller.send("WEBHOOKCONTROL")
+                lines = caller.barrier("webhook-command-removed")
+                assert any(" 421 " in line and "WEBHOOKCONTROL" in line for line in lines), lines
+                with receiver.condition:
+                    assert not receiver.condition.wait_for(
+                        lambda: len(receiver.posts) > before + 1, timeout=2
+                    ), receiver.posts
+                print("PASS: named webhook positive control and self-unload suppresses later POST")
             except BaseException:
                 print(logfile.read_text())
                 raise

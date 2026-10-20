@@ -197,9 +197,11 @@ Queued operations re-resolve the original actor and target UUIDs and skip users
 who disconnected. Only local targets are changed in this initial API.
 
 At most 16 effects can be queued per file/event. All effects for the event are
-discarded on pre denial/error. Accepted IRC effects run at the main-loop safe point,
-after the current parser stack unwinds; accepted webhooks enter the owned worker
-queue instead, after the complete JavaScript callback batch accepts the event. They may still be skipped/rejected by
+discarded on pre denial/error. Accepted IRC effects and HTTP commitments share
+the ordered main-loop safe-point queue after the current parser stack unwinds.
+A self-unload earlier in that queue prevents later fetch/webhook jobs from
+starting. Webhook and fetch workers still perform the I/O outside the IRC loop.
+Effects may still be skipped/rejected by
 native checks; queuing is not a success receipt or an atomic transaction, and a
 later core command rejection does not retract accepted queued effects. Native
 effects and commands they synchronously trigger do not invoke JS hooks, avoiding

@@ -480,6 +480,11 @@ public:
 		auto owner = state.lock();
 		if (!owner || !owner->alive)
 			return;
+		if (effect.webhook)
+		{
+			effect.webhook->Commit();
+			return;
+		}
 		if (effect.http)
 		{
 			// Preserve callback effect ordering: accepted self-unload earlier in
@@ -738,8 +743,6 @@ class ModuleJavaScript final : public Module
 		{
 			if (effect.local)
 				effect.local->committed = true;
-			else if (effect.webhook)
-				delivery.Commit(std::move(effect.webhook));
 			else
 				ServerInstance->AtomicActions.AddAction(new DeferredEffect(state, std::move(effect)));
 		}
@@ -963,8 +966,8 @@ public:
 					if (js_webhooks::ExactUrl(endpoint.url) == key.second)
 					{
 						std::size_t bytes = 0;
-						for (const auto* headers : {endpoint.headers.get(), rule.headers.get()})
-							for (const auto& [name, value] : *headers)
+						for (const auto* group : {endpoint.headers.get(), rule.headers.get()})
+							for (const auto& [name, value] : *group)
 								bytes += name.size() + value.size() + 4;
 						if (bytes > js_webhooks::MaxHeaderBytes ||
 							endpoint.headers->size() + rule.headers->size() > js_webhooks::MaxHeaders)
