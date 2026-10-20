@@ -59,6 +59,7 @@ jobs:
           docker build --build-arg VERSION="${INSP_VERSION}" --target builder -t inspircd:test-builder .
           docker build --build-arg VERSION="${INSP_VERSION}" -t inspircd:testing .
           export SQLITE_TEST_IMAGE=inspircd:test-builder
+          export HTTP_TEST_IMAGE=inspircd:test-builder
 
           echo "* * * Image built, running tests... * * *"
           ./run_tests.sh

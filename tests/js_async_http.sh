@@ -1,6 +1,13 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
+# The legacy image job does not provision a host curl SDK. Use the matched
+# Alpine builder there; dedicated native CI still compiles directly.
+if [ -n "${HTTP_TEST_IMAGE:-}" ]; then
+    exec docker run --rm --user inspircd --entrypoint sh \
+        -v "$PWD:/repo:ro" "$HTTP_TEST_IMAGE" \
+        -ec 'cd /repo && sh tests/js_async_http.sh'
+fi
 build="$(mktemp -d)"
 trap 'rm -rf "$build"' EXIT
 # pkg-config emits compiler arguments, intentionally split into separate words.
