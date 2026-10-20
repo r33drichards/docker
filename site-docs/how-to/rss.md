@@ -32,13 +32,16 @@ startup. Deploying or provisioning storage is a separate operator action.
 
 ## Add or remove a feed
 
-As an IRC operator, enter:
+As any registered IRC user, enter:
 
 ```text
 /rss #news https://example.org/feed.xml
 ```
 
-The native command validates operator privileges and the channel. The script
+The native command accepts registered local users and validates the channel. Any
+registered user can add or remove feeds for any existing channel; channel
+membership or channel-operator status is not required. This grants only the RSS
+command, not operator status or access to administrator host APIs. The script
 validates the feed URL and subscribes that channel and feed pair. Repeating the same pair is idempotent;
 different feeds can post to the same channel and the same feed can serve several
 channels. Channel spelling is compared using RFC1459 case folding. Use existing
@@ -103,7 +106,7 @@ From the repository root:
 node tests/test_rss.cjs
 ```
 
-These deterministic tests mock the native API. They verify operator/stage guards,
+These deterministic tests mock the native API. They verify registered-user/stage guards,
 Map state, initial baselines, duplicate prevention, channel isolation, bounded
 work, UTF-8 output, backoff, abandoned jobs and unsubscribe behavior. Generic HTTP
 transport and full daemon/SQLite restart tests are separate checks; this test

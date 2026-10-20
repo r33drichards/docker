@@ -637,7 +637,7 @@ rehash replaces them. Retained snapshots do not authorize any later action.
 
 ## RSS feed subscriptions
 
-The opt-in [RSS script](examples/rss.js) implements `/RSS <channel> <feed-url>` and `/RSS <channel> off`. The native command is operator-only. It uses `backgroundTimer`, Map-based state, bounded asynchronous `fetch`/`takeFetchResult`, and admin-authorized `privmsg` channel targets. No feed subscriptions are installed by default. See [RSS setup and limits](site-docs/how-to/rss.md).
+The opt-in [RSS script](examples/rss.js) implements `/RSS <channel> <feed-url>` and `/RSS <channel> off`. The native command is available to every registered local user, including adding or removing feeds for any existing channel. It does not grant operator status or other administrator APIs. It uses `backgroundTimer`, Map-based state, bounded asynchronous `fetch`/`takeFetchResult`, and admin-authorized `privmsg` channel targets. No feed subscriptions are installed by default. See [RSS setup and limits](site-docs/how-to/rss.md).
 ## Explicit durable SQLite data
 
 See [SQLite API and operations](docs/SQLITE.md) for opt-in per-script database grants,

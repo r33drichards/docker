@@ -7,7 +7,7 @@ const {createRssSqliteMock} = require('./rss_sqlite_mock.js');
 const source = fs.readFileSync(path.join(__dirname, '../examples/rss.js'), 'utf8');
 function harness(existingDatabase) {
   const handlers = new Map(), notices = [], jobs = [], results = new Map(), cancelled = [];
-  let operator = true, accepting = true;
+  let operator = false, present = true, accepting = true;
   const database = createRssSqliteMock(existingDatabase && existingDatabase.state);
   let storageFailure = false;
   const storage = {
@@ -17,7 +17,7 @@ function harness(existingDatabase) {
   const context = vm.createContext({ircd: {
     sqlite: {open() { return storage; }},
     on(name, fn) { handlers.set(name, fn); },
-    userById() { return {isOper: operator}; },
+    userById() { return present ? {isOper: operator} : null; },
     isChannel(name) { return /^#[^ ,:\x00-\x1f]+$/.test(name); },
     notice(target, text) { assert.ok(Buffer.byteLength(text) <= 400); notices.push({target, text}); },
     privmsg(target, text) { assert.ok(Buffer.byteLength(text) <= 400); notices.push({target, text}); },
@@ -28,7 +28,7 @@ function harness(existingDatabase) {
   vm.runInContext(source, context, {timeout: 100});
   return {notices, jobs, results, context, handlers, cancelled, database,
     failStorage(value) { storageFailure = value; },
-    oper(value) { operator = value; }, accepting(value) { accepting = value; },
+    oper(value) { operator = value; }, present(value) { present = value; }, accepting(value) { accepting = value; },
     tick(now) { handlers.get('backgroundTimer')({curtime: now}); },
     command(channel = '#rss', feed = 'https://example.com/rss', extra = {}) {
       handlers.get('postCommand')({command: 'RSS', validated: true, result: 'SUCCESS', userId: '001AAAAAA', params: [channel, feed], ...extra});
@@ -45,7 +45,7 @@ function harness(existingDatabase) {
 const item = (id, title = id) => ({id, title, url: 'https://example.com/' + encodeURIComponent(id)});
 {
   const h = harness();
-  h.oper(false); h.command(); h.oper(true);
+  h.present(false); h.command(); h.present(true);
   h.command('#rss', 'https://example.com/rss', {validated: false});
   h.command('#rss', 'https://example.com/rss', {result: 'FAILURE'});
   h.command('#rss', 'file:///etc/passwd'); h.command('#rss', 'https://user:pass@example.com/rss');
@@ -240,4 +240,4 @@ const item = (id, title = id) => ({id, title, url: 'https://example.com/' + enco
   assert.equal(restarted.posts().length, 1);
   assert.match(restarted.posts()[0].text, /genuinely-new/);
 }
-console.log('PASS: RSS authorization, Map state, deduplication, baseline, multi-channel isolation, bounded scheduling/output, UTF-8 sanitation, backoff, stale jobs and removal');
+console.log('PASS: RSS registered-user/stage guards, Map state, deduplication, baseline, multi-channel isolation, bounded scheduling/output, UTF-8 sanitation, backoff, stale jobs and removal');
