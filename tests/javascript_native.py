@@ -739,11 +739,17 @@ def main():
                 caller.send("PING :timeout")
                 assert_silent(caller)
                 assert server.poll() is None
-                assert "script=1 stage=preCommand category=timeout" in (path / "server.log").read_text()
+                assert (
+                    "script=1 stage=preCommand category=timeout"
+                    in (path / "server.log").read_text()
+                )
                 reload("ircd.on('postCommand', e => { throw Error('post failed'); });")
                 caller.barrier("post-error-cannot-undo")
                 caller.barrier("post-only-does-not-lock-pre")
-                assert "script=1 stage=postCommand category=exception" in (path / "server.log").read_text()
+                assert (
+                    "script=1 stage=postCommand category=exception"
+                    in (path / "server.log").read_text()
+                )
                 script.write_text(GOOD)
                 config.write_text(
                     base.replace('<module name="javascript">', "")
