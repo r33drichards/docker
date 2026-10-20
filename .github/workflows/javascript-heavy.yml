@@ -118,7 +118,7 @@ jobs:
           docker run --rm --user inspircd --entrypoint sh -e INSPIRCD_NOCODB_TOKEN=fake-ci-token -e INSPIRCD_NOCODB_WCHAT=yes javascript-testing -ec '. /materialize-nocodb-token.sh; test "$(id -u)" = 10000; test "$(stat -c %u:%a /inspircd/.secrets)" = 10000:700; test "$(stat -c %u:%a /inspircd/.secrets/nocodb-token)" = 10000:600; test "$(cat /inspircd/.secrets/nocodb-token)" = fake-ci-token; test "${INSPIRCD_NOCODB_TOKEN+x}" != x; ! env | grep -q fake-ci-token; sh /conf/nocodb.sh | grep -q javascriptwebhookheader'
       - name: Test actual daemon, authority, errors, Wasm, and module reload
         run: |
-          docker run --rm --user root --entrypoint sh -v "$PWD:/repo:ro" javascript-testing -c 'apk add --no-cache python3 && su inspircd -s /bin/sh -c "INSPIRCD_NATIVE=/inspircd python3 /repo/tests/javascript_native.py"' 2>&1 | tee artifacts/daemon.log
+          docker run --rm --user root --entrypoint sh -v "$PWD:/repo:ro" javascript-testing -c 'apk add --no-cache python3 && su inspircd -s /bin/sh -c "INSPIRCD_NATIVE=/inspircd python3 /repo/tests/javascript_native.py && INSPIRCD_NATIVE=/inspircd python3 /repo/tests/javascript_sqlite_native.py"' 2>&1 | tee artifacts/daemon.log
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

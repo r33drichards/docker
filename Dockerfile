@@ -17,7 +17,7 @@ ARG TEST_HOOK_PROBE=0
 COPY modules/ /src/modules/
 COPY tests/fixtures/ /tmp/js-hook-fixtures/
 
-RUN apk add --no-cache gcc g++ make git pkgconfig perl binutils curl-dev \
+RUN apk add --no-cache gcc g++ make git pkgconfig perl binutils curl-dev sqlite-dev \
        perl-net-ssleay perl-crypt-ssleay perl-lwp-protocol-https \
        perl-libwww wget gnutls-dev "nodejs-dev=${NODEJS_VERSION}" $BUILD_DEPENDENCIES
 
@@ -41,6 +41,7 @@ RUN echo $CONFIGUREARGS | xargs --no-run-if-empty ./configure
 RUN make -j`getconf _NPROCESSORS_ONLN` install && \
     test -s /inspircd/modules/m_javascript.so && \
     readelf -d /inspircd/modules/m_javascript.so | grep -q 'libnode.so.127' && \
+    readelf -d /inspircd/modules/m_javascript.so | grep -q 'libsqlite3.so.0' && \
     readelf -d /inspircd/modules/m_javascript.so | grep -q NODELETE
 
 ## Wipe out vanilla config; entrypoint.sh will handle repopulating it at runtime
@@ -52,7 +53,7 @@ FROM alpine:3.22
 ARG NODEJS_VERSION
 ARG RUN_DEPENDENCIES=
 
-RUN apk add --no-cache libgcc libstdc++ gnutls gnutls-utils libcurl ca-certificates "nodejs-libs=${NODEJS_VERSION}" $RUN_DEPENDENCIES && \
+RUN apk add --no-cache libgcc libstdc++ gnutls gnutls-utils libcurl sqlite-libs ca-certificates "nodejs-libs=${NODEJS_VERSION}" $RUN_DEPENDENCIES && \
     addgroup -g 10000 -S inspircd && \
     adduser -u 10000 -h /inspircd/ -D -S -G inspircd inspircd
 

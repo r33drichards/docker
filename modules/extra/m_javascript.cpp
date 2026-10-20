@@ -1,9 +1,12 @@
 /* SPDX-License-Identifier: MIT */
-/// $CompilerFlags: -isystem /usr/include/node -pthread find_compiler_flags("libcurl")
-/// $LinkerFlags: -lnode -pthread -Wl,-z,nodelete find_linker_flags("libcurl")
+/// $CompilerFlags: -isystem /usr/include/node -pthread find_compiler_flags("libcurl") find_compiler_flags("sqlite3")
+/// $LinkerFlags: -lnode -pthread -Wl,-z,nodelete find_linker_flags("libcurl") find_linker_flags("sqlite3")
 
 #include "inspircd.h"
 #include "js_runtime.h"
+#include "js_sqlite.h"
+#include <cmath>
+#include <sstream>
 #include "js_webhooks.h"
 #include "js_wire_validation.h"
 #include "js_script_loader.h"
@@ -180,14 +183,30 @@ public:
 	js_webhooks::Dispatcher& delivery;
 	std::shared_ptr<js_webhooks::Generation> generation;
 	const std::vector<js_scripts::WasmAsset>& wasm;
+	std::shared_ptr<js_sqlite::Root> database_root;
+	std::set<std::string> databases;
+	struct Database
+	{
+		Script* owner;
+		js_sqlite::Connection connection;
+		Database(Script* script, const std::string& name)
+			: owner(script)
+			, connection(script->database_root, name)
+		{
+		}
+	};
+	std::vector<std::unique_ptr<Database>> database_handles;
 
 	Script(unsigned int timeout, Authority auth, const std::vector<js_scripts::WasmAsset>& assets,
-		js_webhooks::Dispatcher& transport, std::shared_ptr<js_webhooks::Generation> owner)
+		js_webhooks::Dispatcher& transport, std::shared_ptr<js_webhooks::Generation> owner,
+		std::shared_ptr<js_sqlite::Root> root, const std::set<std::string>& grants)
 		: runtime(timeout)
 		, authority(auth)
 		, delivery(transport)
 		, generation(std::move(owner))
 		, wasm(assets)
+		, database_root(std::move(root))
+		, databases(grants)
 	{
 	}
 
@@ -370,6 +389,9 @@ public:
 			return;
 		args.GetReturnValue().Set(object);
 	}
+
+#include "js_sqlite_bridge.h"
+
 	bool Load(const js_scripts::Source& source, std::string& error)
 	{
 		bool result = runtime.Initialize(
@@ -386,6 +408,9 @@ public:
 				api->Set(Key(isolate, "notice"), v8::FunctionTemplate::New(isolate, Safe<Notice>, data));
 				api->Set(Key(isolate, "rename"), v8::FunctionTemplate::New(isolate, Safe<Rename>, data));
 				api->Set(Key(isolate, "userById"), v8::FunctionTemplate::New(isolate, Safe<UserById>, data));
+				auto sqlite = v8::ObjectTemplate::New(isolate);
+				sqlite->Set(Key(isolate, "open"), v8::FunctionTemplate::New(isolate, Safe<DatabaseOpen>, data));
+				api->Set(Key(isolate, "sqlite"), sqlite);
 				v8::Local<v8::Object> instance;
 				return api->NewInstance(context).ToLocal(&instance) &&
 					Put(context, context->Global(), "ircd", instance);
@@ -794,9 +819,18 @@ public:
 				auto permission = tag->getString("authority", "user");
 				if (file.empty() == directory.empty() || (permission != "user" && permission != "admin"))
 					throw std::runtime_error("javascript requires exactly one file/directory and user/admin authority");
+				std::set<std::string> grants;
+				std::istringstream names(tag->getString("databases"));
+				std::string name;
+				while (names >> name)
+				{
+					if (!js_webhooks::ValidName(name) || grants.size() >= 16 || !grants.insert(name).second)
+						throw std::runtime_error("Invalid, duplicate or excessive SQLite database grant");
+				}
 				sources.push_back(
 					{file.empty() ? js_scripts::SourceSpec::Kind::Directory : js_scripts::SourceSpec::Kind::File,
-						file.empty() ? directory : file, permission == "admin" ? Authority::Admin : Authority::User});
+						file.empty() ? directory : file, permission == "admin" ? Authority::Admin : Authority::User,
+						grants});
 			}
 			for (const auto& [_, tag] : ServerInstance->Config->ConfTags("javascriptwasm"))
 				assets.push_back({tag->getString("name"), tag->getString("file")});
@@ -818,13 +852,25 @@ public:
 					throw std::runtime_error("Unknown webhook header endpoint");
 				js_webhooks::AddHeader(found->second, tag->getString("name"), tag->getString("valuefile"));
 			}
+			std::shared_ptr<js_sqlite::Root> database_root;
+			const auto root = ServerInstance->Config->ConfValue("javascriptsettings")->getString("sqlitedirectory");
+			if (!root.empty())
+			{
+				const std::filesystem::path path(root);
+				database_root = std::make_shared<js_sqlite::Root>(
+					(path.is_absolute() ? path : std::filesystem::path(ServerInstance->Config->Paths.Config) / path)
+						.string());
+			}
+			for (const auto& source : sources)
+				if (!source.databases.empty() && !database_root)
+					throw std::runtime_error("SQLite database grants require sqlitedirectory");
 			auto candidate = std::make_unique<ScriptSet>();
 			candidate->generation = std::make_shared<js_webhooks::Generation>(std::move(endpoints));
 			candidate->wasm = js_scripts::LoadWasmAssets(assets, ServerInstance->Config->Paths.Config);
 			for (const auto& source : js_scripts::LoadSources(sources, ServerInstance->Config->Paths.Config))
 			{
-				auto script = std::make_unique<Script>(
-					timeout, source.authority, candidate->wasm, delivery, candidate->generation);
+				auto script = std::make_unique<Script>(timeout, source.authority, candidate->wasm, delivery,
+					candidate->generation, database_root, source.databases);
 				std::string error;
 				if (!script->Load(source, error))
 					throw std::runtime_error("JavaScript initialization failed (active scripts retained)");

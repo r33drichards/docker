@@ -37,6 +37,7 @@ struct SourceSpec
 	Kind kind;
 	std::filesystem::path path;
 	Authority authority = Authority::User;
+	std::set<std::string> databases = {};
 };
 
 struct Limits
@@ -51,6 +52,7 @@ struct Source
 	std::filesystem::path canonical_path;
 	std::string content;
 	Authority authority = Authority::User;
+	std::set<std::string> databases = {};
 };
 
 struct WasmSpec
@@ -227,7 +229,7 @@ inline std::vector<Source> LoadSources(
 	std::vector<Source> candidate;
 	std::set<fs::path> seen;
 	std::size_t total = 0;
-	const auto append = [&](const fs::path& canonical_path, Authority authority)
+	const auto append = [&](const fs::path& canonical_path, Authority authority, const std::set<std::string>& databases)
 	{
 		if (!seen.insert(canonical_path).second)
 			throw LoadError("duplicate canonical path: " + detail::Label(canonical_path));
@@ -235,7 +237,7 @@ inline std::vector<Source> LoadSources(
 			throw LoadError("source count limit exceeded: " + detail::Label(canonical_path));
 		auto content = detail::Read(canonical_path, limits, total);
 		total += content.size();
-		candidate.push_back(Source{canonical_path, std::move(content), authority});
+		candidate.push_back(Source{canonical_path, std::move(content), authority, databases});
 	};
 
 	for (const auto& spec : specs)
@@ -248,7 +250,7 @@ inline std::vector<Source> LoadSources(
 		{
 			if (path.extension() != ".js")
 				throw LoadError("explicit file must have a .js extension: " + detail::Label(path));
-			append(detail::Canonical(path), spec.authority);
+			append(detail::Canonical(path), spec.authority, spec.databases);
 			continue;
 		}
 		if (spec.kind != SourceSpec::Kind::Directory)
@@ -290,7 +292,7 @@ inline std::vector<Source> LoadSources(
 					a.begin(), a.end(), b.begin(), b.end(), [](unsigned char x, unsigned char y) { return x < y; });
 			});
 		for (const auto& entry : entries)
-			append(entry, spec.authority); // Canonical parent + filename; never resolve entry links.
+			append(entry, spec.authority, spec.databases); // Canonical parent + filename; never resolve entry links.
 	}
 	return candidate;
 }

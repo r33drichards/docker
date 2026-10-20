@@ -23,3 +23,5 @@ MODULE=$(find build -path '*/modules/m_javascript.so' -type f -print -quit)
 test -n "$MODULE"
 readelf -d "$MODULE" | grep NODELETE
 readelf -d "$MODULE" | grep libnode
+
+readelf -d "$MODULE" | grep libsqlite3

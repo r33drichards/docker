@@ -28,6 +28,10 @@ def main():
         ),
     }
     outputs = {}
+    outputs["site-docs/reference/sqlite.md"] = (
+        "<!-- Generated from docs/SQLITE.md; edit that source. -->\n"
+        + (ROOT / "docs/SQLITE.md").read_text()
+    )
     for slug, (title, section) in mapping.items():
         body = sections[section].strip()
         if slug == "hooks":
@@ -51,6 +55,7 @@ def main():
             + body
             + "\n"
         )
+    outputs["site-docs/assets/js_sqlite.d.ts"] = (ROOT / "modules/js_sqlite.d.ts").read_text()
     outputs["site-docs/assets/js_api.d.ts"] = (ROOT / "modules/js_api.d.ts").read_text()
     outputs["site-docs/assets/js_events.d.ts"] = (ROOT / "modules/js_events.d.ts").read_text()
     outputs["site-docs/assets/js_hooks.d.ts"] = (ROOT / "modules/js_hooks.d.ts").read_text()
