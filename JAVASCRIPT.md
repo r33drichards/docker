@@ -63,10 +63,11 @@ filesystem-wide atomic snapshot. Successful reload resets all JavaScript state.
 
 ## Hooks and owned data
 
-See `examples/javascript/hooks.js` and `modules/js_api.d.ts`.
+Register handlers in an administrator-configured script:
 
 ```
 ircd.on('preCommand', event => {
+  if (event.validated) return; // Rewrite only before native validation.
   if (event.command === 'EXAMPLEPING')
     return { action: 'pass', command: 'PING', params: ['hello'] };
 });
@@ -78,10 +79,13 @@ ircd.on('postCommand', event => {
 
 Register at most 16 callbacks per stage per file during initialization. Callbacks
 run synchronously in registration order, then file order. Pre callbacks receive
-owned command/parameter snapshots at `validated=false`. Post callbacks receive
+owned command/parameter snapshots first at `validated=false`, then at
+`validated=true` immediately before execution if native validation succeeds.
+The validated phase supports observation and pass/deny, never command/parameter
+rewrites: native access and parameter checks have already completed. Post callbacks receive
 `result` (`SUCCESS`, `FAILURE`, `INVALID`) and `loop`, matching the native hook.
 `validated` is true for the post-handler snapshot. This does not prove delivery
-to another client. The earlier debug logger still observes validated pre events.
+to another client.
 
 Fields are `command`, `params`, `commandBytes`, `paramBytes`, `userId`, `stage`,
 `validated`, `result`, and `loop`. Valid UTF-8 text becomes JavaScript strings;
@@ -96,7 +100,21 @@ Pre return values:
 
 - `undefined` or `{ action: 'pass' }`: continue ordinary core processing.
 - `{ action: 'deny' }`: stop processing and discard this event's queued effects.
-- `{ action: 'pass', command: 'PING', params: ['text'] }`: request a rewrite.
+- `{ action: 'pass', command: 'PING', params: ['text'] }`: request a rewrite only at `validated=false`.
+
+A validated-stage veto can inspect the final command without bypassing native permissions:
+
+```js
+ircd.on("preCommand", event => {
+  if (event.validated && event.command === "VERSION")
+    return {action: "deny"};
+});
+```
+
+A callback receives both phases; guard `event.validated` when a queued notice or
+webhook should be emitted only once. Unknown or rejected commands may never reach
+the validated phase. Returning rewrite fields in that phase disables the script
+and denies the command, even when the proposed value matches the current value.
 
 Rewrite parameters may also be Uint8Array values. Rewrites require uppercase
 ASCII command tokens, at most 15 parameters, a conservative 510-byte line limit,
@@ -105,7 +123,8 @@ Unknown/server-only target handlers are rejected. Rewrites are redispatched unde
 the original client through the core parser, including operator/registration
 checks, rather than invoking a cached handler. Tags are retained internally.
 This incurs additional core flood accounting. The exact replacement skips a
-second JS pre pass; nested commands still pass through hooks, with rewrite depth
+second unvalidated JS pre pass, but its validated phase still runs; nested commands
+still pass through hooks, with rewrite depth
 bounded to eight. A later script sees earlier scripts' proposed changes.
 
 Other modules may veto before this hook, and unknown commands can reach native
@@ -344,9 +363,8 @@ see the Native API and authority section above.
 Implementation-table events plus direct `OnCleanup`. See
 [the per-hook inventory](bindings/module_hooks_coverage.md) and
 `modules/js_generated/module_hooks.d.ts` for exact names, arguments, native
-return semantics, and failure policy. Optional modules’ separate EventProvider
-APIs and native lifecycle methods (Init, ReadConfig, Prioritize, destruction)
-are not additional script events. Wasm can participate through these JS callbacks;
+return semantics, and failure policy. The separate event-provider interfaces documented below are also bridged. Native
+lifecycle methods (Init, ReadConfig, Prioritize, destruction) are not script events. Wasm can participate through these JS callbacks;
 there is no separate Wasm hook ABI.
 
 ```js
@@ -365,7 +383,8 @@ User-authority effects require a local actor; explicit admin authority permits
 local-target effects without an actor. The same queued-effect/reentrancy rules
 apply to all events.
 
-Void hooks observe only; return values are ignored except unsupported Promises.
+Void hooks observe only unless listed as mutable below; other return values are
+ignored except unsupported Promises.
 ModResult hooks accept undefined or `{action: "pass"}`, `{action: "deny"}`,
 and (only with admin authority and where inventoried) `{action: "allow"}`.
 Allow has the *native hook-specific meaning*, not a generic permit: consult the
@@ -375,8 +394,87 @@ an earlier decision can prevent later modules/callbacks from observing an event.
 Exceptions/timeouts/invalid decisions disable the script until successful rehash.
 Decision hooks fail closed, except kill, channelPreDelete and userPreQuit pass
 on failure so cleanup cannot be blocked by a disabled script. Observational
-failures do not undo native actions. No native mutation support is implied for
-mutable-reference arguments outside the existing command rewrite API.
+failures do not undo native actions. Only the explicit patches below write back
+to native state; other mutable-reference arguments remain snapshots.
+
+### Explicit native mutation patches
+
+Return `{action: "pass", patch: {...}}`, rather than editing a snapshot. A patch
+is staged and committed only when every invoked callback/file succeeds and none
+returns deny. Unknown fields, wrong types, invalid values, or unauthorized fields
+quarantine the script. Failed void-hook patches leave native state unchanged;
+failed decision-hook patches also deny the operation. Queued effects are discarded.
+Each callback still sees the original native snapshot; patches accumulate in a
+separate staged copy, not in the event object. User-authority patches require a
+local acting user. Administrator scripts remain trusted server policy code.
+
+```js
+ircd.on('userPreMessage', event => {
+  if (event.details.text.text === 'hello bot')
+    return {action: 'pass', patch: {text: 'Hello from JavaScript!'}};
+});
+ircd.on('userPart', event => {
+  if (event.partmessage.text === 'rewrite reason')
+    return {action: 'pass', patch: {partmessage: 'See you later'}};
+});
+ircd.on('buildNeighborList', event => {
+  // Restrict notifications to the listed, already-included channel memberships.
+  const channels = event.include.items
+    .filter(m => m && m.channel && m.channel.name.text === '#public')
+    .map(m => m.channel.name.text);
+  return {action: 'pass', patch: {includeChannels: channels}};
+});
+```
+
+Supported patch fields:
+
+- `userPreMessage`: `text`, `exemptions: [userUuid]`,
+  `tagsOut: [{name, value}]`, `echo`, `echoOriginal`, `updateIdle`.
+- `userPart`: `partmessage`, `exemptions: [userUuid]`.
+- `buildNeighborList`: `includeChannels: [channelName]`,
+  `exceptions: [{userId: userUuid, include: false}]`.
+- `userPreJoin`: administrator-only `privs`, a string of distinct registered
+  prefix-mode letters (for example `"ov"`, not display symbols `"@+"`).
+- `preChangeConnectClass`: administrator-only
+  `errnum: {code: 499, params: ["Connection unavailable"]}` or `errnum: null`.
+  This sets the error numeric for subsequent native handling; it does not itself
+  deny a connection. A deny decision discards staged patches.
+
+Strings reject NUL, CR, LF and unpaired UTF-16 surrogates. Message text is nonempty
+and at most 400 UTF-8 bytes; PART reasons may be empty and have the same limit.
+Arrays have at most 256 entries. User UUIDs must resolve to live registered users.
+User-authority `exemptions` add recipients to the existing exclusion set;
+administrator-authority `exemptions` replace that set. Neighbor channel lists
+only filter existing memberships, even for administrators. User scripts may
+only add `include: false` neighbor exceptions; administrators may use true for
+live local users. No native pointer or membership can be fabricated.
+
+Outgoing tag patches may only retain or remove existing tag names. User scripts
+cannot change their values; administrators may change values, preserving the
+original native provider and its delivery rules. Existing snapshot tag values
+are already IRCv3-escaped wire text. Returning an identical value preserves it;
+a changed administrative value is treated as decoded text and escaped once by
+the native tag encoder (including spaces, semicolons, and backslashes).
+Tag names are limited to 128
+bytes, values to 512, and combined escaped tag-wire bytes to 4096. New tag providers or
+arbitrary server tags cannot be created. Message flags are booleans. Privileges
+are at most 64 bytes. Connection error codes must be 400–599 with 1–14 parameters
+satisfying command-wire validation and its 510-byte aggregate bound.
+
+Message destination identity/type remains immutable. Changing it after native
+checks would bypass routing permissions. To reroute, rewrite `PRIVMSG` or
+`NOTICE` in an unvalidated `preCommand` callback so the core validates the new
+destination. For example:
+
+```js
+ircd.on('preCommand', event => {
+  if (!event.validated && event.command === 'PRIVMSG' &&
+      event.paramBytes.length === 2 && event.params[0] === '#old-room') {
+    return {action: 'pass', command: 'PRIVMSG',
+      params: ['#new-room', event.paramBytes[1]]};
+  }
+});
+```
 
 Inventory/ABI checks:
 
@@ -390,3 +488,96 @@ module (optional image build arg `TEST_HOOK_PROBE=1`). It invokes all adapters,
 checks snapshots after native stack destruction, exercises every ModResult
 pass/deny/admin-allow decision, and sends real lifecycle/message traffic.
 The normal primary image excludes this probe and remains unloaded by default.
+
+## Separate event-provider hooks (InspIRCd 4.12.1)
+
+These events supplement the generated core `Module` hooks. They register against
+InspIRCd 4.12.1 event providers and become active when the provider is loaded;
+loading JavaScript does not load services, CAP, HTTP, or spanning-tree for you.
+Listeners survive provider unload/reload. Callbacks are synchronous and must not
+return a Promise, including from an `async` function.
+
+All payloads are detached, bounded copies. Assigning to them **does not modify
+native state**. Text uses `HookText` (`text`, `bytes`, `byteLength`, `truncated`),
+not a plain string. `text` may be null for invalid UTF-8. Each event also includes
+`stage` and `userId` (null when there is no acting user). No socket, response
+context, native object, or native pointer is exposed.
+
+### Event names and fields
+
+| Events | Additional payload fields |
+| --- | --- |
+| `accountChange` | `user`, `account`, `loggedIn`; empty account means logout |
+| `userPreAway` | `user`, `message` |
+| `userPreBack` | `user` |
+| `userAway`, `userBack` | `user`, `previouslyAway`, `previousMessage`, `previousTime`, `away`, `message`, `time`; times are Unix seconds |
+| `whois` | `source`, `target` |
+| `whoisLine` | `source`, `target`, `numeric` |
+| `whoLine` | `source`, `user`, `membership`, `numeric`, and WHO request fields below |
+| `whoMatch` | `source`, `user`, and WHO request fields |
+| `whoVisible` | `source`, `membership`, and WHO request fields |
+| `namesListItem` | `issuer`, `membership`, `prefixes`, `nick` |
+| `stats` | `source`, `symbol`; response rows are deliberately omitted |
+| `capAddDel` | `name`, `adding` |
+| `capValueChange` | `name`; values may be user-specific and are omitted |
+| `serverLink`, `serverBurst` | server fields below |
+| `serverSplit` | server fields and `error` |
+| `syncUser` | server fields and `user` |
+| `syncChannel` | server fields and `channel` |
+| `syncNetwork` | server fields |
+| `httpACLCheck`, `httpRequest` | `method`, `path`, `address` only |
+
+WHO request fields: `matchText`, `matchChannel`, `fuzzyMatch`, `whox`, `queryType`.
+Server fields: `serverId`, `serverName`, `serverDescription`. Server names and
+identifiers are text snapshots, unlike the plain-string user snapshot `id`.
+
+### Native decisions
+
+- `userPreAway`, `userPreBack`, `whoLine`, `whoMatch`, `whoVisible` accept
+  `{action: 'pass'}`, `{action: 'deny'}`, or `{action: 'allow'}`. `allow` requires
+  an administrator-authority script because it can bypass later native policy.
+- `namesListItem`, `whoisLine`, `stats` accept only pass or deny. For STATS, deny
+  means "handled" and suppresses subsequent native handling; this bridge does
+  not provide a response-row builder.
+- Other events are observers. Return values do not claim native ownership or
+  bypass permissions. In particular HTTP events always return native passthrough.
+  A native HTTP deny would imply that the module already answered the socket;
+  this bridge cannot do so. HTTP bodies, headers (including Authorization and
+  cookies), query parameters, and fragments are never copied.
+- Decision-hook failures fail closed; observer failures do not stop the native
+  operation. Existing script quarantine and authority rules still apply.
+- CAP events concern **server capability registration/value changes**, not an
+  individual client's CAP REQ state. Use validated command hooks to observe
+  client commands; do not infer successful CAP negotiation from the request.
+
+Account events require a provider such as `services_account`; away, WHO, WHOIS,
+NAMES and STATS use their core providers; CAP uses `cap`; server events use
+`spanningtree`; HTTP uses `httpd`. A subscription without its provider is inert,
+not an error.
+
+### Example: refuse one away message and count logins
+
+```js
+// Load as a trusted script. No network calls or asynchronous callbacks.
+let logins = 0;
+const exactText = value => value && !value.truncated &&
+  typeof value.text === 'string' ? value.text : null;
+
+ircd.on('userPreAway', event => {
+  if (exactText(event.message) === 'reserved test message')
+    return {action: 'deny'};
+});
+
+ircd.on('accountChange', event => {
+  if (event.loggedIn) ++logins;
+});
+
+ircd.on('serverSplit', event => {
+  // Safe to retain: these objects contain copies, not live native handles.
+  const name = exactText(event.serverName);
+  if (name !== null) globalThis.lastObservedSplit = {name, error: event.error};
+});
+```
+
+The counter and last split live only for this script generation; a successful
+rehash replaces them. Retained snapshots do not authorize any later action.

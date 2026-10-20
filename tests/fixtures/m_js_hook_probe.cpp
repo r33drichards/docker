@@ -60,6 +60,11 @@ public:
 		User::NeighborExceptions exceptions{{user, true}};
 		MessageTarget message_target(channel, '@');
 		ProbeDetails details(text);
+		if (selected == "userPreMessage")
+		{
+			details.exemptions.insert(user);
+			details.tags_out.emplace("+probe", ClientProtocol::MessageTagData(nullptr, "original"));
+		}
 		auto* mode = ServerInstance->Modes.FindMode('i', MODETYPE_CHANNEL);
 		if (!mode)
 			return CmdResult::FAILURE;
@@ -84,6 +89,15 @@ public:
 		const auto klass = user->GetClass();
 		std::optional<Numeric::Numeric> errnum(numeric);
 #include "module_hook_calls.inc"
+		report.append("message-text:").append(details.text).append(" ");
+		report.append("message-exemptions:").append(ConvToStr(details.exemptions.size())).append(" ");
+		report.append("message-tag:")
+			.append(details.tags_out.empty() ? "none" : details.tags_out.begin()->second.value)
+			.append(" ");
+		report.append("join-privileges:").append(text).append(" ");
+		report.append("connect-numeric:").append(errnum ? ConvToStr(errnum->GetNumeric()) : "none").append(" ");
+		if (errnum && !errnum->GetParams().empty())
+			report.append("connect-reason:").append(errnum->GetParams().front()).append(" ");
 		return CmdResult::SUCCESS;
 	}
 };

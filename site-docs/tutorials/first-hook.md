@@ -11,7 +11,7 @@ Run from a fresh checkout (skip cloning if already in this repository):
 
 
 ~~~sh
-git clone --branch feat/local-echo-command https://github.com/r33drichards/docker.git
+git clone --branch master https://github.com/r33drichards/docker.git
 cd docker
 docker build -t inspircd:local .
 ~~~
@@ -56,7 +56,25 @@ An ordinary `/quote PING :unchanged` still receives a PONG containing `unchanged
 Expect the ordinary VERSION reply and a server NOTICE containing
 `VERSION handler returned SUCCESS`. These are separate observations: a native
 handler result does not prove delivery to another client.
-Open `examples/javascript/tutorial/hooks.js` to match each result to its callback.
+The lesson script is complete below. The validated phase also runs for the
+rewritten PING, so the guard keeps rewriting in the pre-validation phase:
+
+~~~js
+// Trusted administrator-authored tutorial code; local disposable server only.
+ircd.on('preCommand', event => {
+  if (event.validated) return; // Rewrites run only before native validation.
+  if (event.command === 'PING' && event.params[0] === 'lesson')
+    return { action: 'pass', command: 'PING', params: ['hello-from-javascript'] };
+});
+ircd.on('postCommand', event => {
+  if (event.command === 'VERSION')
+    ircd.notice(event.userId, 'VERSION handler returned ' + event.result);
+});
+~~~
+
+The script is loaded by `<javascript file="/lab/hooks.js">` in the disposable
+lesson configuration. To use a different file, change that configured path;
+JavaScript does not read or discover scripts on its own.
 
 ## 5. Clean up
 

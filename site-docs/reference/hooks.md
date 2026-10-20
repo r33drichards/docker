@@ -8,9 +8,8 @@ see the Native API and authority section above.
 Implementation-table events plus direct `OnCleanup`. See
 [the per-hook inventory](#hook-inventory) and
 `modules/js_generated/module_hooks.d.ts` for exact names, arguments, native
-return semantics, and failure policy. Optional modules’ separate EventProvider
-APIs and native lifecycle methods (Init, ReadConfig, Prioritize, destruction)
-are not additional script events. Wasm can participate through these JS callbacks;
+return semantics, and failure policy. The separate event-provider interfaces documented below are also bridged. Native
+lifecycle methods (Init, ReadConfig, Prioritize, destruction) are not script events. Wasm can participate through these JS callbacks;
 there is no separate Wasm hook ABI.
 
 ```js
@@ -29,7 +28,8 @@ User-authority effects require a local actor; explicit admin authority permits
 local-target effects without an actor. The same queued-effect/reentrancy rules
 apply to all events.
 
-Void hooks observe only; return values are ignored except unsupported Promises.
+Void hooks observe only unless listed as mutable below; other return values are
+ignored except unsupported Promises.
 ModResult hooks accept undefined or `{action: "pass"}`, `{action: "deny"}`,
 and (only with admin authority and where inventoried) `{action: "allow"}`.
 Allow has the *native hook-specific meaning*, not a generic permit: consult the
@@ -39,8 +39,87 @@ an earlier decision can prevent later modules/callbacks from observing an event.
 Exceptions/timeouts/invalid decisions disable the script until successful rehash.
 Decision hooks fail closed, except kill, channelPreDelete and userPreQuit pass
 on failure so cleanup cannot be blocked by a disabled script. Observational
-failures do not undo native actions. No native mutation support is implied for
-mutable-reference arguments outside the existing command rewrite API.
+failures do not undo native actions. Only the explicit patches below write back
+to native state; other mutable-reference arguments remain snapshots.
+
+### Explicit native mutation patches
+
+Return `{action: "pass", patch: {...}}`, rather than editing a snapshot. A patch
+is staged and committed only when every invoked callback/file succeeds and none
+returns deny. Unknown fields, wrong types, invalid values, or unauthorized fields
+quarantine the script. Failed void-hook patches leave native state unchanged;
+failed decision-hook patches also deny the operation. Queued effects are discarded.
+Each callback still sees the original native snapshot; patches accumulate in a
+separate staged copy, not in the event object. User-authority patches require a
+local acting user. Administrator scripts remain trusted server policy code.
+
+```js
+ircd.on('userPreMessage', event => {
+  if (event.details.text.text === 'hello bot')
+    return {action: 'pass', patch: {text: 'Hello from JavaScript!'}};
+});
+ircd.on('userPart', event => {
+  if (event.partmessage.text === 'rewrite reason')
+    return {action: 'pass', patch: {partmessage: 'See you later'}};
+});
+ircd.on('buildNeighborList', event => {
+  // Restrict notifications to the listed, already-included channel memberships.
+  const channels = event.include.items
+    .filter(m => m && m.channel && m.channel.name.text === '#public')
+    .map(m => m.channel.name.text);
+  return {action: 'pass', patch: {includeChannels: channels}};
+});
+```
+
+Supported patch fields:
+
+- `userPreMessage`: `text`, `exemptions: [userUuid]`,
+  `tagsOut: [{name, value}]`, `echo`, `echoOriginal`, `updateIdle`.
+- `userPart`: `partmessage`, `exemptions: [userUuid]`.
+- `buildNeighborList`: `includeChannels: [channelName]`,
+  `exceptions: [{userId: userUuid, include: false}]`.
+- `userPreJoin`: administrator-only `privs`, a string of distinct registered
+  prefix-mode letters (for example `"ov"`, not display symbols `"@+"`).
+- `preChangeConnectClass`: administrator-only
+  `errnum: {code: 499, params: ["Connection unavailable"]}` or `errnum: null`.
+  This sets the error numeric for subsequent native handling; it does not itself
+  deny a connection. A deny decision discards staged patches.
+
+Strings reject NUL, CR, LF and unpaired UTF-16 surrogates. Message text is nonempty
+and at most 400 UTF-8 bytes; PART reasons may be empty and have the same limit.
+Arrays have at most 256 entries. User UUIDs must resolve to live registered users.
+User-authority `exemptions` add recipients to the existing exclusion set;
+administrator-authority `exemptions` replace that set. Neighbor channel lists
+only filter existing memberships, even for administrators. User scripts may
+only add `include: false` neighbor exceptions; administrators may use true for
+live local users. No native pointer or membership can be fabricated.
+
+Outgoing tag patches may only retain or remove existing tag names. User scripts
+cannot change their values; administrators may change values, preserving the
+original native provider and its delivery rules. Existing snapshot tag values
+are already IRCv3-escaped wire text. Returning an identical value preserves it;
+a changed administrative value is treated as decoded text and escaped once by
+the native tag encoder (including spaces, semicolons, and backslashes).
+Tag names are limited to 128
+bytes, values to 512, and combined escaped tag-wire bytes to 4096. New tag providers or
+arbitrary server tags cannot be created. Message flags are booleans. Privileges
+are at most 64 bytes. Connection error codes must be 400–599 with 1–14 parameters
+satisfying command-wire validation and its 510-byte aggregate bound.
+
+Message destination identity/type remains immutable. Changing it after native
+checks would bypass routing permissions. To reroute, rewrite `PRIVMSG` or
+`NOTICE` in an unvalidated `preCommand` callback so the core validates the new
+destination. For example:
+
+```js
+ircd.on('preCommand', event => {
+  if (!event.validated && event.command === 'PRIVMSG' &&
+      event.paramBytes.length === 2 && event.params[0] === '#old-room') {
+    return {action: 'pass', command: 'PRIVMSG',
+      params: ['#new-room', event.paramBytes[1]]};
+  }
+});
+```
 
 Inventory/ABI checks:
 
@@ -57,7 +136,7 @@ The normal primary image excludes this probe and remains unloaded by default.
 
 ## Hook inventory
 
-All 74 Implementation events plus the direct OnCleanup callback. Native references are owned read-only snapshots; only command rewrites and explicit queued effects mutate native state.
+All 74 Implementation events plus the direct OnCleanup callback. Native references are owned read-only snapshots; only command rewrites, five bounded explicit patch adapters, and explicit queued effects mutate native state.
 
 | Native hook | JS stage | Result | Callback failure |
 |---|---|---|---|
@@ -172,12 +251,15 @@ interface HookWireMessage {
   tags: HookList<{name: HookText; value: HookText}>;
 }
 type HookDecision = {action: 'pass' | 'deny' | 'allow'};
+type ModuleHookResult<K extends keyof ModuleHookEvents> = HookDecision |
+  (K extends keyof ModuleHookPatches ? {action: 'pass'; patch: ModuleHookPatches[K]} : never);
 type ModuleHookEvent<K extends keyof ModuleHookEvents> = ModuleHookEvents[K] & {stage: K; userId: string | null};
 interface IrcdApi {
   /** Native result semantics apply. allow requires authority=admin, never accepts socket ownership.
-   * Void hooks ignore synchronous return values. All snapshots are detached copies, not native handles.
+   * Explicit patches are available only on ModuleHookPatches stages. Void patches require action=pass.
+   * Patches commit atomically on successful dispatch; snapshots remain detached copies, not native handles.
    */
-  on<K extends keyof ModuleHookEvents>(stage: K, callback: (event: ModuleHookEvent<K>) => HookDecision | void): void;
+  on<K extends keyof ModuleHookEvents>(stage: K, callback: (event: ModuleHookEvent<K>) => ModuleHookResult<K> | void): void;
 }
 // Generated by tools/generate_module_hooks.py; do not edit.
 interface ModuleHookEvents {
@@ -254,6 +336,13 @@ interface ModuleHookEvents {
   preChangeConnectClass: {user: HookUser | null; klass: {name: HookText} | null; errnum: HookNumeric | null};
   changeConnectClass: {user: HookUser | null; klass: {name: HookText} | null; force: boolean};
   postChangeConnectClass: {user: HookUser | null; force: boolean};
+}
+interface ModuleHookPatches {
+  userPreMessage: {text?: string; exemptions?: string[]; tagsOut?: {name: string; value: string}[]; echo?: boolean; echoOriginal?: boolean; updateIdle?: boolean};
+  userPart: {partmessage?: string; exemptions?: string[]};
+  buildNeighborList: {includeChannels?: string[]; exceptions?: {userId: string; include: boolean}[]};
+  userPreJoin: {privs?: string};
+  preChangeConnectClass: {errnum?: {code: number; params: string[]} | null};
 }
 
 ~~~

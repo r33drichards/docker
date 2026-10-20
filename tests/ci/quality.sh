@@ -49,7 +49,8 @@ check_cpp \
     modules/extra/m_javascript.cpp modules/js_native_utilities.h \
     modules/js_webhooks.h tests/js_webhooks.cpp tests/js_webhook_headers.inc \
     modules/js_runtime.h modules/js_script_loader.h modules/js_wire_validation.h modules/js_hook_snapshot.h \
-    tests/fixtures/m_js_hook_probe.cpp \
+    modules/js_hook_mutations.h modules/js_event_listeners.h modules/js_event_specs.h \
+    tests/fixtures/m_js_hook_probe.cpp tests/fixtures/m_js_event_probe.cpp \
     tests/precommand_struct.cpp tests/js_runtime.cpp tests/js_script_loader.cpp \
     tests/js_runtime_lifecycle.cpp tests/js_runtime_lifecycle_host.cpp \
     tests/fuzz/*.cpp tests/fuzz/*.h

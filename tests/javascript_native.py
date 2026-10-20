@@ -28,6 +28,7 @@ if (!ircd.match('hello', 'h*') || !ircd.matchCIDR('192.0.2.4', '192.0.2.0/24') |
 const wasm = new WebAssembly.Instance(new WebAssembly.Module(ircd.wasm('answer')), {});
 const users = new Map();
 ircd.on('preCommand', e => {
+  if (e.validated) return;
   const user = ircd.userById(e.userId);
   if (user) users.set(user.nick, e.userId);
   if (e.command === 'PING' && e.params[0] === 'rewrite')
@@ -173,6 +174,283 @@ ircd.on('userPart', e => { if (e.memb.channel.name.text === '#jslive') ircd.noti
     reload(GOOD)
     print(
         "PASS: all 75 native Module adapters, every ModResult pass/deny/admin-allow, hook failures, and real lifecycle policy"
+    )
+
+
+def exercise_validated_commands(caller, reload):
+    reload(r"""
+ircd.on('preCommand', e => {
+  if (e.command === 'XVALIDATED' && !e.validated)
+    return {action:'pass', command:'PING', params:['validated-deny']};
+  if (e.command === 'PING' && e.params[0] === 'validated-deny' && e.validated)
+    return {action:'deny'};
+  if (e.command === 'PING' && e.params[0] === 'phase-probe')
+    ircd.notice(e.userId, 'phase:' + String(e.validated));
+});
+""")
+    caller.send("PING :phase-probe")
+    lines = caller.barrier("phases-finished")
+    assert sum(line.endswith(":phase:false") for line in lines) == 1, lines
+    assert sum(line.endswith(":phase:true") for line in lines) == 1, lines
+    caller.send("PING :validated-deny")
+    caller.send("XVALIDATED")
+    lines = caller.barrier("validated-denials-finished")
+    assert not any(" PONG " in line and line.endswith("validated-deny") for line in lines), lines
+    # Rewriting after core validation must fail closed, rather than bypass the
+    # completed command permission/arity checks.
+    for result in (
+        "{action:'pass', command:'DIE', params:['synthetic']}",
+        "Object.assign(Object.create({command:'PING',params:['late']}),{action:'pass'})",
+        "new Proxy({action:'pass'}, {})",
+    ):
+        reload(
+            "ircd.on('preCommand', e => { if(e.validated && e.command === 'PING') return "
+            + result
+            + "; });"
+        )
+        caller.send("PING :invalid-validated-rewrite")
+        assert_silent(caller)
+    reload(GOOD)
+    caller.barrier("validated-rewrite-recovered")
+    print(
+        "PASS: both preCommand phases, validated deny, rewritten-command validation and late rewrite rejection"
+    )
+
+
+def exercise_native_mutations(caller, other, reload):
+    # Inspect actual native reference state after a direct hook call, including
+    # deny rollback (which ordinary delivery tests alone cannot establish).
+    for action, expected in [("pass", "probe-rewritten"), ("deny", "probe")]:
+        source = "ircd.on('userPreMessage', e => ({action:'pass',patch:{text:'probe-rewritten'}}));"
+        if action == "deny":
+            source += "ircd.on('userPreMessage', e => ({action:'deny'}));"
+        reload(source)
+        caller.send("JSHOOKPROBE userPreMessage")
+        caller.send("JSHOOKPROBE result")
+        lines = caller.until(lambda line: ":probe-result:" in line)
+        assert any("message-text:" + expected + " " in line for line in lines), lines
+    # User patches cannot restore native-exempt recipients; admin patches may.
+    for authority, count in [("user", 1), ("admin", 0)]:
+        reload(
+            "ircd.on('userPreMessage', e => ({action:'pass',patch:{exemptions:[]}}));", authority
+        )
+        caller.send("JSHOOKPROBE userPreMessage")
+        caller.send("JSHOOKPROBE result")
+        lines = caller.until(lambda line: ":probe-result:" in line)
+        assert any("message-exemptions:" + str(count) + " " in line for line in lines), lines
+    for authority, expected in [("user", "original"), ("admin", "changed")]:
+        reload(
+            "ircd.on('userPreMessage', e => ({action:'pass',patch:{tagsOut:[{name:'+probe',value:'changed'}]}}));",
+            authority,
+        )
+        caller.send("JSHOOKPROBE userPreMessage")
+        time.sleep(0.3)
+        reload("")  # Inspect after reloading a context poisoned by denied authority.
+        caller.send("JSHOOKPROBE result")
+        lines = caller.until(lambda line: ":probe-result:" in line)
+        assert any("message-tag:" + expected + " " in line for line in lines), lines
+    value = r"x;fake=y with\slash"
+    reload(
+        "ircd.on('userPreMessage', e => ({action:'pass',patch:{tagsOut:[{name:'+probe',value:"
+        + json.dumps(value)
+        + "}]}}));",
+        "admin",
+    )
+    caller.send("JSHOOKPROBE userPreMessage")
+    caller.send("JSHOOKPROBE result")
+    lines = caller.until(lambda line: ":probe-result:" in line)
+    assert any(r"message-tag:x\:fake=y\swith\\slash " in line for line in lines), lines
+    for authority, expected in [("user", "probe"), ("admin", "v")]:
+        reload("ircd.on('userPreJoin', e => ({action:'pass',patch:{privs:'v'}}));", authority)
+        caller.send("JSHOOKPROBE userPreJoin")
+        time.sleep(0.3)
+        reload("")
+        caller.send("JSHOOKPROBE result")
+        lines = caller.until(lambda line: ":probe-result:" in line)
+        assert any("join-privileges:" + expected + " " in line for line in lines), lines
+    for authority, patch, expected in (
+        ("admin", "{code:499,params:['custom-reason']}", "499"),
+        ("admin", "null", "none"),
+        ("user", "{code:499,params:['custom-reason']}", "999"),
+        ("admin", "{code:399,params:['bad']}", "999"),
+        ("admin", "{code:600,params:['bad']}", "999"),
+    ):
+        reload(
+            "ircd.on('preChangeConnectClass', e => ({action:'pass',patch:{errnum:"
+            + patch
+            + "}}));",
+            authority,
+        )
+        caller.send("JSHOOKPROBE preChangeConnectClass")
+        time.sleep(0.3)
+        reload("")
+        caller.send("JSHOOKPROBE result")
+        lines = caller.until(lambda line: ":probe-result:" in line)
+        assert any("connect-numeric:" + expected + " " in line for line in lines), lines
+        if expected == "499":
+            assert any("connect-reason:custom-reason " in line for line in lines), lines
+    reload(
+        "ircd.on('userPreMessage', e => ({action:'pass',patch:{text:'partial',echo:'invalid'}}));"
+    )
+    caller.send("JSHOOKPROBE userPreMessage")
+    caller.send("JSHOOKPROBE result")
+    lines = caller.until(lambda line: ":probe-result:" in line)
+    assert any("message-text:probe " in line for line in lines), lines
+    reload("")
+    caller.send("JOIN #patches")
+    caller.barrier("patch-caller-joined")
+    other.send("JOIN #patches")
+    other.barrier("patch-other-joined")
+    reload(r"""
+let otherId;
+ircd.on('preCommand', e => {
+  if (!e.validated && e.command === 'PING' && e.params[0] === 'remember-patch-other')
+    otherId = e.userId;
+});
+ircd.on('userPreMessage', e => {
+  if (e.details.text.text === 'hello bot') return {action:'pass',patch:{text:'Hello from JavaScript!'}};
+  if (e.details.text.text === 'rewrite-body') return {action:'pass',patch:{text:'rewritten: café two  spaces'}};
+  if (e.details.text.text === 'patch-excluded') return {action:'pass',patch:{exemptions:[otherId]}};
+  if (e.details.text.text === 'patch-denied') return {action:'pass',patch:{text:'must-not-deliver'}};
+});
+ircd.on('userPreMessage', e => { if (e.details.text.text === 'patch-denied') return {action:'deny'}; });
+ircd.on('buildNeighborList', e => {
+  if (e.source.id !== otherId) return {action:'pass',patch:{exceptions:[{userId:otherId,include:false}]}};
+});
+ircd.on('userPart', e => {
+  if (e.memb.channel.name.text === '#patches') return {action:'pass',patch:{partmessage:'patched departure'}};
+});
+""")
+    other.barrier("remember-patch-other")
+    caller.send("PRIVMSG #patches :hello bot")
+    other.until(
+        lambda line: " PRIVMSG #patches :" in line and line.endswith(":Hello from JavaScript!")
+    )
+    caller.send("PRIVMSG #patches :rewrite-body")
+    lines = other.until(lambda line: " PRIVMSG #patches :" in line)
+    assert lines[-1].endswith(":rewritten: café two  spaces"), lines
+    caller.send("PRIVMSG #patches :patch-excluded")
+    caller.send("PRIVMSG #patches :patch-denied")
+    caller.barrier("patch-deliveries-finished")
+    lines = other.barrier("patch-no-delivery")
+    assert not any(" PRIVMSG #patches :" in line for line in lines), lines
+    caller.send("NICK patchrenamed")
+    caller.until(lambda line: " NICK " in line and line.endswith(":patchrenamed"))
+    caller.nick = "patchrenamed"
+    lines = other.barrier("neighbor-excluded")
+    assert not any(" NICK " in line and line.endswith(":patchrenamed") for line in lines), lines
+    reload(r"""
+ircd.on('buildNeighborList', event => {
+  const channels = event.include.items
+    .filter(m => m && m.channel && m.channel.name.text === '#public')
+    .map(m => m.channel.name.text);
+  return {action:'pass',patch:{includeChannels:channels}};
+});
+ircd.on('userPart', e => ({action:'pass',patch:{partmessage:'patched departure'}}));
+""")
+    caller.send("NICK patchfiltered")
+    caller.until(lambda line: " NICK " in line and line.endswith(":patchfiltered"))
+    caller.nick = "patchfiltered"
+    lines = other.barrier("neighbor-channels-filtered")
+    assert not any(" NICK " in line and line.endswith(":patchfiltered") for line in lines), lines
+    caller.send("PART #patches :original departure")
+    lines = other.until(lambda line: " PART #patches " in line)
+    assert lines[-1].endswith(":patched departure"), lines
+    # Invalid wire data poisons the context and cannot partially publish a patch.
+    reload(r"""
+ircd.on('userPreMessage', e => ({action:'pass',patch:{text:'bad\rline'}}));
+""")
+    caller.send("PRIVMSG " + other.nick + " :invalid-patch")
+    time.sleep(0.3)
+    reload("")
+    lines = other.barrier("invalid-patch-not-delivered")
+    assert not any(" PRIVMSG " in line for line in lines), lines
+    reload(GOOD)
+    other.send("PART #patches")
+    other.barrier("patch-cleanup")
+    print(
+        "PASS: actual message rewrite, exemptions, deny discard, neighbor exclusions, PART reason and invalid patch rejection"
+    )
+
+
+def exercise_event_listeners(caller, other, reload):
+    reload(r"""
+const stages = ['accountChange','userPreAway','userPreBack','userAway','userBack',
+'capAddDel','capValueChange','namesListItem','stats','whois','whoisLine','whoLine',
+'whoMatch','whoVisible','serverLink','serverBurst','serverSplit','syncUser',
+'syncChannel','syncNetwork','httpACLCheck','httpRequest'];
+const snapshots = new Map();
+for (const stage of stages) ircd.on(stage, e => {
+  snapshots.set(stage, e);
+  if (e.stage !== stage) throw Error('event stage mismatch');
+  if (e.userId) ircd.notice(e.userId, 'event:' + stage);
+  if (stage === 'userPreAway' && e.message.text === 'blocked-away') return {action:'deny'};
+  if (stage === 'userAway' && (!e.away || e.message.text !== 'event-away')) throw Error('away state');
+  if (stage === 'userBack' && (e.away || !e.previouslyAway || e.previousMessage.text !== 'event-away')) throw Error('back state');
+  if (stage === 'whoisLine' && e.numeric.code === 312) return {action:'deny'};
+});
+ircd.on('postCommand', e => {
+  if (e.command !== 'JSEVENTPROBE') return;
+  for (const stage of ['accountChange','capAddDel','capValueChange','serverLink','serverBurst',
+      'serverSplit','syncUser','syncChannel','syncNetwork','httpACLCheck','httpRequest']) {
+    if (!snapshots.has(stage)) throw Error('missing event:' + stage);
+  }
+  if (snapshots.get('accountChange').loggedIn || snapshots.get('accountChange').account.text !== '') throw Error('account logout');
+  if (snapshots.get('capValueChange').name.text !== 'js-event-probe') throw Error('capability ownership');
+  if (snapshots.get('serverLink').serverName.text !== 'event-probe.example') throw Error('server ownership');
+  if (snapshots.get('serverSplit').serverId.text !== '999') throw Error('server ID');
+  const request = snapshots.get('httpRequest');
+  if (request.path.text !== '/js-event-probe' || request.method.text !== 'GET') throw Error('request ownership');
+  if ('headers' in request || 'body' in request || 'query' in request) throw Error('HTTP privacy');
+  ircd.notice(e.userId, 'event-probe:snapshots-retained');
+});
+""")
+    caller.send("JSEVENTPROBE")
+    caller.until(lambda line: line.endswith(":event-probe:snapshots-retained"))
+    caller.send("AWAY :blocked-away")
+    lines = caller.barrier("away-denied")
+    assert not any(" 306 " in line or line.endswith(":event:userAway") for line in lines), lines
+    caller.send("AWAY :event-away")
+    lines = caller.barrier("away-set")
+    assert any(line.endswith(":event:userPreAway") for line in lines), lines
+    assert any(line.endswith(":event:userAway") for line in lines), lines
+    assert any(" 306 " in line for line in lines), lines
+    caller.send("AWAY")
+    lines = caller.barrier("away-cleared")
+    assert any(line.endswith(":event:userPreBack") for line in lines), lines
+    assert any(line.endswith(":event:userBack") for line in lines), lines
+    assert any(" 305 " in line for line in lines), lines
+    caller.send("WHOIS " + caller.nick)
+    lines = caller.until(lambda line: " 318 " in line)
+    lines += caller.barrier("event-318-effects")
+    assert any(line.endswith(":event:whois") for line in lines), lines
+    assert any(line.endswith(":event:whoisLine") for line in lines), lines
+    assert any(" 311 " in line for line in lines), lines
+    assert not any(" 312 " in line for line in lines), lines
+    caller.send("JOIN #events")
+    caller.barrier("events-joined")
+    caller.send("NAMES #events")
+    lines = caller.until(lambda line: " 366 " in line)
+    lines += caller.barrier("event-366-effects")
+    assert any(line.endswith(":event:namesListItem") for line in lines), lines
+    caller.send("WHO #events")
+    lines = caller.until(lambda line: " 315 " in line)
+    lines += caller.barrier("event-315-effects")
+    assert any(line.endswith(":event:whoLine") for line in lines), lines
+    caller.send("WHO " + caller.nick)
+    lines = caller.until(lambda line: " 315 " in line)
+    lines += caller.barrier("event-315-effects")
+    assert any(line.endswith(":event:whoMatch") for line in lines), lines
+    assert any(line.endswith(":event:whoVisible") for line in lines), lines
+    caller.send("STATS u")
+    lines = caller.until(lambda line: " 219 " in line)
+    lines += caller.barrier("event-219-effects")
+    assert any(line.endswith(":event:stats") for line in lines), lines
+    reload(GOOD)
+    caller.send("PART #events")
+    caller.barrier("events-cleanup")
+    print(
+        "PASS: all 22 listener names registered; real AWAY/BACK, WHOIS filtering, NAMES, WHO and STATS events"
     )
 
 
@@ -325,6 +603,7 @@ def main():
 <alias text="TIME" replace="XLOOP">
 <module name="javascript">
 <module name="js_hook_probe">
+<module name="js_event_probe">
 <log method="stdout" type="m_javascript MODULE CONFIG" level="normal">
 <javascriptsettings timeoutms="200">
 <javascriptwasm name="answer" file="{ROOT / "examples/javascript/answer.wasm"}">
@@ -386,6 +665,8 @@ def main():
 
                 def reload(source, authority="user", webhook_config=""):
                     script.write_text(source)
+                    if os.environ.get("JS_NATIVE_TRACE"):
+                        print("RELOAD", authority, source[:250], flush=True)
                     config.write_text(
                         base
                         + webhook_config
@@ -406,7 +687,10 @@ def main():
                     else:
                         raise AssertionError("Rehash did not complete")
 
+                exercise_validated_commands(caller, reload)
                 exercise_module_hooks(caller, reload)
+                exercise_native_mutations(caller, other, reload)
+                exercise_event_listeners(caller, other, reload)
                 exercise_webhooks(caller, reload, receiver, path)
                 output = (path / "server.log").read_text()
                 for marker in ("synthetic-first-token", "synthetic-second-token", "webhook-secret"):

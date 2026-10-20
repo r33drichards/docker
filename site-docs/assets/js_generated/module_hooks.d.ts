@@ -74,3 +74,10 @@ interface ModuleHookEvents {
   changeConnectClass: {user: HookUser | null; klass: {name: HookText} | null; force: boolean};
   postChangeConnectClass: {user: HookUser | null; force: boolean};
 }
+interface ModuleHookPatches {
+  userPreMessage: {text?: string; exemptions?: string[]; tagsOut?: {name: string; value: string}[]; echo?: boolean; echoOriginal?: boolean; updateIdle?: boolean};
+  userPart: {partmessage?: string; exemptions?: string[]};
+  buildNeighborList: {includeChannels?: string[]; exceptions?: {userId: string; include: boolean}[]};
+  userPreJoin: {privs?: string};
+  preChangeConnectClass: {errnum?: {code: number; params: string[]} | null};
+}
