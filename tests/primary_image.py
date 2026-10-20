@@ -30,6 +30,45 @@ def check_irc(container):
             observer.close()
 
 
+def check_nocodb_activation(image):
+    # Exercise the shipped entrypoint/config/script path with a fake token.
+    # check_irc only uses #packaging, so no event targets the real NocoDB service.
+    container = docker(
+        "run",
+        "-d",
+        "-p",
+        "127.0.0.1::6667",
+        "-e",
+        "INSPIRCD_NOCODB_TOKEN=fake-primary-image-token",
+        "-e",
+        "INSPIRCD_NOCODB_WCHAT=yes",
+        image,
+    ).strip()
+    try:
+        check_irc(container)
+        maps = docker("exec", container, "cat", "/proc/1/maps")
+        assert "m_javascript.so" in maps
+        assert "m_precommand.so" not in maps
+        docker(
+            "exec",
+            container,
+            "sh",
+            "-ec",
+            'test "$(stat -c %u:%a /inspircd/.secrets)" = 10000:700; '
+            'test "$(stat -c %u:%a /inspircd/.secrets/nocodb-token)" = 10000:600; '
+            'test "$(cat /inspircd/.secrets/nocodb-token)" = fake-primary-image-token',
+        )
+        inherited = docker("exec", container, "cat", "/proc/1/environ")
+        assert "INSPIRCD_NOCODB_TOKEN=" not in inherited
+        assert "fake-primary-image-token" not in inherited
+        assert "fake-primary-image-token" not in docker("logs", container)
+        print(
+            "PASS: shipped NocoDB opt-in startup, secret permissions, environment removal, ordinary IRC"
+        )
+    finally:
+        docker("rm", "-f", container)
+
+
 def main():
     image = "inspircd:testing"
     volume = "primary-image-" + uuid.uuid4().hex
@@ -81,6 +120,7 @@ def main():
         assert "m_javascript.so" in maps, "Explicit configuration must load the packaged module"
         assert "libnode.so.127" in maps, "Loaded module must use the packaged V8 library"
         assert "m_precommand.so" not in maps
+        check_nocodb_activation(image)
         print("PASS: primary image, opt-in JavaScript, persistent config, and ordinary IRC")
     except Exception:
         if container is not None:

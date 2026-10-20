@@ -224,6 +224,56 @@ hostnames and non-loopback HTTP remain rejected. HTTPS still verifies peer and
 hostname with the system CA trust store. Redirects, environment proxies and
 application retries are disabled; no cookie jar or caller-supplied auth is used.
 
+#### Endpoint-specific authentication headers
+
+An administrator can attach headers to one named destination, with values read
+from local secret files when configuration is loaded:
+
+~~~xml
+<javascriptwebhook name="nocodb" url="https://nocodb.example.invalid/api/v2/tables/TABLE_ID/records">
+<javascriptwebhookheader endpoint="nocodb" name="xc-token" valuefile="/run/secrets/nocodb-token">
+~~~
+
+For Railway environments without secret-file mounts, the image provides a
+separately opt-in [token-file startup helper](https://github.com/r33drichards/docker/blob/master/docs/nocodb-token-provisioning.md)
+using `/inspircd/.secrets/nocodb-token`. It does not enable forwarding by itself.
+
+The example is disabled unless explicitly configured. Use the API route and
+column names required by your NocoDB installation; the join example's nested
+payload is not automatically a NocoDB row. An administrator-authored script can
+post a matching row object with `ircd.postWebhook('nocodb', JSON.stringify(row))`.
+For bearer authentication, configure `name="Authorization"` and put the complete
+`Bearer ...` value in its file. Never place credentials in scripts or URLs.
+
+Files must be absolute paths, regular files owned by the daemon's effective UID,
+with exactly mode `0400` or `0600`. All path components must be real directories
+or files, without symlinks, `.` or `..`; mount secrets accordingly. Parent
+directories must be owned by root or the daemon and not group/world-writable.
+A root-owned sticky shared ancestor (such as `/tmp`) is accepted only when
+immediately followed by a daemon-owned `0700` directory. Values are read verbatim:
+1–1024 bytes, no NUL, CR, LF, tab, other ASCII control bytes or DEL. In particular,
+do not end a token file with a newline. No trimming or interpolation occurs.
+Missing, unreadable, changed-during-read, unsafe or invalid files reject the whole
+candidate configuration, retaining the last-good generation on rehash.
+
+The directive is repeatable: maximum 8 headers per endpoint, 64-byte HTTP token
+names, and 8192 aggregate header bytes including names, values and `: ` / CRLF.
+Names are case-insensitive; duplicates and unknown endpoints are errors.
+Transport/control fields cannot be overridden: Host, Content-Type/Length/Encoding,
+Transfer-Encoding, Accept-Encoding, Expect, Connection, Keep-Alive, TE, Trailer,
+Upgrade, HTTP2-Settings, Cookie, Set-Cookie, proxy-* and method-override variants.
+Headers belong only to their configured endpoint. Redirects remain disabled.
+
+Scripts cannot set/read headers or open the files. Secret values and file paths
+are omitted from loader diagnostics, logs, counters and the JavaScript API.
+Immutable header storage is shared by the owning generation and its requests;
+editing a file has no effect until a successful rehash. Rotation retires old
+queued work and cancels old in-flight work under the same rules below; already
+transmitted requests cannot be recalled. Secrets remain in process/libcurl memory
+while owned; this does not guarantee zeroization or protection against process
+memory access. This change supplies authentication only, with no new event hooks,
+durable delivery, automatic retries or default credentials.
+
 The payload must be a UTF-8 JSON **object string**, at most 16 KiB. Invalid arity,
 types, JSON, destinations, excessive per-event effects, initialization calls and
 user-authority calls are script errors under the existing failure policy.

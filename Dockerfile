@@ -58,7 +58,9 @@ RUN apk add --no-cache libgcc libstdc++ gnutls gnutls-utils libcurl ca-certifica
 
 COPY --chown=inspircd:inspircd conf/ /conf/
 COPY --chown=inspircd:inspircd entrypoint.sh /entrypoint.sh
+COPY --chown=inspircd:inspircd tools/materialize-nocodb-token.sh /materialize-nocodb-token.sh
 COPY --from=builder --chown=inspircd:inspircd /inspircd/ /inspircd/
+COPY --chown=inspircd:inspircd examples/javascript/wchat-nocodb.js /inspircd/scripts/wchat-nocodb.js
 
 USER inspircd
 

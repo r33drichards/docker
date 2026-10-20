@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 using namespace js_webhooks;
+#include "js_webhook_headers.inc"
 
 static void Drain(Dispatcher& dispatcher)
 {
@@ -16,7 +17,8 @@ static void Drain(Dispatcher& dispatcher)
 
 int main(int argc, char** argv)
 {
-	assert(argc == 3);
+	assert(argc == 4);
+	HeaderTests(argv[3]);
 	const std::string base = argv[1];
 	assert(ValidName("joins_1-A") && !ValidName("") && !ValidName("bad name") && !ValidName(std::string(65, 'x')));
 	for (const auto& url : {"http://example.invalid/", "file:///tmp/test", "https://user:pass@example.invalid/",
@@ -75,6 +77,9 @@ int main(int argc, char** argv)
 	for (const std::string name : {"ok", "redirect", "failure", "large", "slow"})
 		endpoints.emplace(name, ValidateEndpoint(base + "/" + name, true));
 	endpoints.emplace("tls", ValidateEndpoint(argv[2]));
+	AddHeader(endpoints.at("ok"), "xc-token", std::string(argv[3]) + "/secret");
+	AddHeader(endpoints.at("redirect"), "Authorization", std::string(argv[3]) + "/secret");
+	AddHeader(endpoints.at("tls"), "Authorization", std::string(argv[3]) + "/secret");
 	generation = std::make_shared<Generation>(std::move(endpoints));
 	generation->alive = true;
 	Dispatcher transport;
