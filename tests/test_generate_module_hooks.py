@@ -82,6 +82,12 @@ class HookGenerationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "mutation"):
             generator.validate(self.data)
 
+    def test_native_test_fixtures_are_in_docker_context(self):
+        allowlist = (ROOT / ".dockerignore").read_text().splitlines()
+        for fixture in (ROOT / "tests/fixtures").glob("m_js_*_probe.cpp"):
+            self.assertIn("!" + str(fixture.relative_to(ROOT)), allowlist)
+        self.assertIn("!tests/fixtures/module_hook_calls.inc", allowlist)
+
     def test_socket_ownership_is_not_exposed(self):
         hook = next(h for h in self.hooks if h["native"] == "OnAcceptConnection")
         self.assertFalse(hook["allow"])
