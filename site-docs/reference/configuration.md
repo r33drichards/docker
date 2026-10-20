@@ -7,7 +7,8 @@ docker build -t inspircd:local .
 
 The primary image uses Alpine 3.22, InspIRCd v4.12.1 by default, and matching
 `nodejs-dev`/`nodejs-libs` 22.23.2-r0. Only V8 APIs are used; no Node environment,
-`process`, `require`, filesystem API, network API, or WASI is installed in scripts.
+`process`, `require`, filesystem API, general networking API (`fetch`), or WASI is
+installed in scripts. The explicit queued webhook API below is opt-in.
 The root `Dockerfile` includes the compiled module and its runtime library, but
 leaves it unloaded until explicitly configured. No scripts are installed or enabled
 by default. `Dockerfile.javascript` has been retired; downstream Railway projects

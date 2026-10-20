@@ -24,6 +24,8 @@ Additional explicit host methods:
 - `notice(targetUuid, text)` queues a server notice (maximum 400 UTF-8 bytes).
 - `rename(targetUuid, nick)` queues a validated nickname change.
 - `wasm(name)` returns a fresh Uint8Array of a configured asset's bytes.
+- `postWebhook(name, json)` stages a bounded JSON POST to an administrator-configured endpoint (admin callbacks only).
+- `webhookStats()` returns aggregate `{pending, sent, failed, discarded}` counters (admin scripts only).
 
 Default `authority="user"` restricts notice/rename targets to the triggering
 client. Rename runs ordinary NICK processing as that client, retaining native
@@ -34,12 +36,92 @@ Queued operations re-resolve the original actor and target UUIDs and skip users
 who disconnected. Only local targets are changed in this initial API.
 
 At most 16 effects can be queued per file/event. All effects for the event are
-discarded on pre denial/error. Accepted effects run at the main-loop safe point,
-after the current parser stack unwinds. They may still be skipped/rejected by
+discarded on pre denial/error. Accepted IRC effects run at the main-loop safe point,
+after the current parser stack unwinds; accepted webhooks enter the owned worker
+queue instead, after the complete JavaScript callback batch accepts the event. They may still be skipped/rejected by
 native checks; queuing is not a success receipt or an atomic transaction, and a
 later core command rejection does not retract accepted queued effects. Native
 effects and commands they synchronously trigger do not invoke JS hooks, avoiding
 unbounded feedback loops; ordinary core/native-module checks still apply.
+
+
+### Opt-in channel join webhooks
+
+Use **one** successful join observer, `postJoin`, not both `userJoin` and
+`postJoin`. Its arguments are `event.memb.user` and `event.memb.channel`
+(not `event.details.memb`); `user.id` is a plain UUID string, while nick/channel
+names use HookText snapshots. Copy `examples/javascript/join-webhook.js` into your
+config directory, edit its explicit channel allowlist, and load it **once**:
+
+~~~xml
+<module name="javascript">
+<javascriptwebhook name="joins" url="https://hooks.example.invalid/irc">
+<javascript file="scripts/join-webhook.js" authority="admin">
+~~~
+
+The URL is a placeholder: configure your own receiver and consented channels.
+No endpoint, script or network worker is enabled by default. The example selects
+local, non-quitting users to avoid reposting remote joins on every linked server,
+skips invalid/truncated text, and includes only an event name, user UUID/nick and
+channel. It does not export IP addresses, hosts, credentials or message bodies.
+Channel allowlist matching uses the server snapshot's exact canonical spelling.
+Each genuine later rejoin is a new event; this is not an exactly-once audit feed.
+The receiver must accept this JSON schema; services with a different schema need
+an administrator-authored payload adapter.
+
+Only trusted admin-authority callbacks may call `ircd.postWebhook('joins',
+JSON.stringify(object))`. Scripts choose a configured **name**, never a URL,
+headers, method, file or credentials. Names are unique, case-sensitive ASCII
+letters/digits/underscore/hyphen, 1–64 characters; at most 16 endpoints may be
+configured. URLs are at most 2048 bytes and require HTTPS, with no userinfo,
+fragment, spaces or control bytes. Credentials in a private URL must remain in
+private server configuration. Neither URLs nor request/response bodies are logged.
+For isolated tests or an explicitly trusted same-host relay only, an endpoint
+may set `loopbackhttp="yes"` to allow HTTP at literal `127.0.0.1` or `[::1]`;
+hostnames and non-loopback HTTP remain rejected. HTTPS still verifies peer and
+hostname with the system CA trust store. Redirects, environment proxies and
+application retries are disabled; no cookie jar or caller-supplied auth is used.
+
+The payload must be a UTF-8 JSON **object string**, at most 16 KiB. Invalid arity,
+types, JSON, destinations, excessive per-event effects, initialization calls and
+user-authority calls are script errors under the existing failure policy.
+`true` means **staged**, not sent: every request shares the event's 16-effect
+budget and is discarded with the entire batch on denial, exception, timeout or
+unsupported Promise return. A full queue returns `false` without blocking or
+retrying. As with other effects, a later native veto cannot undo an already
+accepted batch: use a successful observer such as `postJoin` for join receipts.
+
+One worker owns copied requests; it never enters V8 or accesses native IRC objects.
+A module-wide maximum of 64 reservations covers staged, queued **and in-flight**
+payloads across all scripts/generations. Transfers have 1-second connect and
+2-second total libcurl timeouts and discard at most 64 KiB of combined response
+headers/body. Curl must support thread-safe global initialization and asynchronous
+DNS; native build requires libcurl 7.85+ development headers, runtime library and
+CA certificates. Deadlines are not a hard real-time scheduling guarantee.
+
+A failed rehash retains the old generation and configured destinations, and
+candidate initialization cannot send. A successful rehash retires old queued jobs
+and requests cancellation of old in-flight transfers without retargeting them.
+Unload clears queued work, requests cancellation, and joins the owned worker.
+A request already transmitted cannot be recalled. There is no persistence or
+automatic retry: timeout/cancellation/crash outcomes can be ambiguous, and HTTP
+2xx means only that the receiver accepted the HTTP request, not that downstream
+actions completed. Consumers needing delivery/idempotency must implement their
+own stable event IDs, durable receiver and reconciliation.
+
+`webhookStats()` reports reservations still alive (`pending`), completed 2xx
+responses (`sent`), failed/ambiguous transfer attempts (`failed`), and queued
+jobs discarded before an attempt (`discarded`). Pre-batch aborts simply release
+their reservations. Counters reset on module unload, not rehash; no endpoint,
+credential, body or response is exposed.
+
+Local checks: `node tests/test_join_webhook.cjs` and
+`python3 tests/test_js_webhooks.py` (C++17 compiler, pkg-config/libcurl, OpenSSL
+CLI and Python required; no dependency-skip fallback). The latter creates only
+owned loopback HTTP/TLS fixtures and checks bounds, cancellation, no redirects,
+proxy suppression, untrusted certificate rejection and HTTP error/size/timeout
+handling. The native daemon suite additionally exercises real JOIN-to-POST,
+rejoin, authority, rollback and failed-rehash behavior.
 
 ## TypeScript assets
 

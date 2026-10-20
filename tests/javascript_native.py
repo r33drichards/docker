@@ -16,6 +16,7 @@ import tempfile
 import time
 
 from precommand_client import Client
+from test_js_webhooks import Receiver
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RUN = pathlib.Path(os.environ["INSPIRCD_NATIVE"]).resolve()
@@ -174,6 +175,101 @@ ircd.on('userPart', e => { if (e.memb.channel.name.text === '#jslive') ircd.noti
     )
 
 
+def exercise_webhooks(caller, reload, receiver):
+    endpoint = f'<javascriptwebhook name="joins" url="{receiver.url}/joins" loopbackhttp="yes">\n'
+    example = (ROOT / "examples/javascript/join-webhook.js").read_text()
+    reload(example, "admin", endpoint)
+    before = len(receiver.posts)
+    caller.send("JOIN #example")
+    caller.barrier("webhook-real-join")
+    posts = receiver.wait(before + 1)
+    route, body, content_type = posts[-1]
+    payload = json.loads(body)
+    assert route == "/joins" and content_type == "application/json"
+    assert payload == {
+        "event": "irc.channel.join",
+        "user": {"id": payload["user"]["id"], "nick": caller.nick},
+        "channel": "#example",
+    }
+    assert isinstance(payload["user"]["id"], str) and len(payload["user"]["id"]) == 9
+    caller.send("JOIN #private-webhook-test")
+    caller.barrier("webhook-private-filter")
+    caller.send("PART #example")
+    caller.send("JOIN #example")
+    caller.barrier("webhook-real-rejoin")
+    receiver.wait(before + 2)
+    time.sleep(0.2)
+    assert len(receiver.posts) == before + 2
+
+    # Initialization attempts fail before reservation or I/O. The entire failed
+    # candidate (including a changed target) must leave the last-good set alive.
+    changed_endpoint = endpoint.replace("/joins", "/wrong-target")
+    reload("ircd.postWebhook('joins', '{}');", "admin", changed_endpoint)
+    caller.send("PART #example")
+    caller.send("JOIN #example")
+    caller.barrier("webhook-failed-rehash-retains-target")
+    receiver.wait(before + 3)
+    assert receiver.posts[-1][0] == "/joins"
+
+    # Every failure is tested in a fresh isolate. Denied/error/Promise batches
+    # cannot release even their earlier staged requests to the worker.
+    for ending in (
+        "return {action:'deny'};",
+        "throw Error('synthetic');",
+        "return Promise.resolve();",
+        "while (true) {}",
+    ):
+        source = (
+            "ircd.on('preCommand', e => { if (e.command === 'XWEBTEST') { ircd.postWebhook('joins', '{}'); "
+            + ending
+            + " } });"
+        )
+        reload(source, "admin", endpoint)
+        count = len(receiver.posts)
+        caller.send("XWEBTEST")
+        if ending.startswith("return {action"):
+            caller.barrier("webhook-denied-batch")
+        else:
+            assert_silent(caller)
+        time.sleep(0.2)
+        assert len(receiver.posts) == count
+
+    for source in (
+        "ircd.on('preCommand', e => { if (e.command === 'XWEBTEST') ircd.postWebhook('joins', '{'); });",
+        "ircd.on('preCommand', e => { if (e.command === 'XWEBTEST') ircd.postWebhook('joins', '[]'); });",
+        "ircd.on('preCommand', e => { if (e.command === 'XWEBTEST') ircd.postWebhook('unconfigured', '{}'); });",
+        "ircd.on('preCommand', e => { if (e.command === 'XWEBTEST') ircd.postWebhook('joins', JSON.stringify({x:'x'.repeat(16384)})); });",
+    ):
+        reload(source, "admin", endpoint)
+        count = len(receiver.posts)
+        caller.send("XWEBTEST")
+        assert_silent(caller)
+        assert len(receiver.posts) == count
+
+    reload("ircd.on('postJoin', () => ircd.postWebhook('joins', '{}'));", "user", endpoint)
+    count = len(receiver.posts)
+    caller.send("JOIN #user-webhook-denied")
+    caller.barrier("webhook-user-authority")
+    time.sleep(0.2)
+    assert len(receiver.posts) == count
+    reload(
+        "ircd.on('preCommand', e => { if(e.command === 'XWEBSTATS') ircd.notice(e.userId, 'webhook-stats:' + JSON.stringify(ircd.webhookStats())); });",
+        "admin",
+        endpoint,
+    )
+    caller.send("XWEBSTATS")
+    lines = caller.until(lambda line: ":webhook-stats:" in line)
+    stats = json.loads(
+        next(line.split(":webhook-stats:", 1)[1] for line in lines if ":webhook-stats:" in line)
+    )
+    assert stats["pending"] == 0 and stats["sent"] >= 3
+    assert set(stats) == {"pending", "sent", "failed", "discarded"}
+    print(
+        "PASS: real JOIN-to-POST/rejoin, privacy filter, failed-rehash target, init/user authority, batch/JSON rejection and aggregate stats"
+    )
+    reload(GOOD)
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="irc-javascript-") as directory:
         path = pathlib.Path(directory)
@@ -198,6 +294,7 @@ def main():
 <javascriptsettings timeoutms="200">
 <javascriptwasm name="answer" file="{ROOT / "examples/javascript/answer.wasm"}">
 '''
+        receiver = Receiver()
         config = path / "inspircd.conf"
         config.write_text(base + f'<javascript file="{script}">\n')
         with (path / "server.log").open("w") as log:
@@ -252,10 +349,12 @@ def main():
                 caller.send("XNOTICE")
                 caller.until(lambda line: line.endswith(":owned: café two  spaces"))
 
-                def reload(source, authority="user"):
+                def reload(source, authority="user", webhook_config=""):
                     script.write_text(source)
                     config.write_text(
-                        base + f'<javascript file="{script}" authority="{authority}">\n'
+                        base
+                        + webhook_config
+                        + f'<javascript file="{script}" authority="{authority}">\n'
                     )
                     offset = (path / "server.log").stat().st_size
                     server.send_signal(signal.SIGHUP)
@@ -273,6 +372,7 @@ def main():
                         raise AssertionError("Rehash did not complete")
 
                 exercise_module_hooks(caller, reload)
+                exercise_webhooks(caller, reload, receiver)
 
                 reload('throw Error("candidate fails");')
                 caller.send("XWASM")  # Last-good context survived failed reload.
@@ -336,6 +436,7 @@ def main():
                     client.close()
                 server.terminate()
                 server.wait(timeout=15)
+                receiver.close()
 
 
 def until_raw(client, predicate):

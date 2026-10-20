@@ -53,13 +53,16 @@ jobs:
       - name: Install distro-matched V8 and native tools
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends g++-14 libc6-dbg libnode-dev valgrind pkg-config python3
+          apt-get install -y --no-install-recommends g++-14 libc6-dbg libnode-dev libcurl4-openssl-dev valgrind pkg-config python3 openssl nodejs
           mkdir -p artifacts/native
           dpkg-query -W > artifacts/native/packages.txt
           useradd --create-home --uid 1000 ci
           chown -R ci:ci "$GITHUB_WORKSPACE"
       - name: Required ASan, UBSan, leak and ownership checks
         run: |
+          runuser -u ci -- node tests/test_join_webhook.cjs
+          runuser -u ci -- python3 tests/test_js_webhooks.py
+          runuser -u ci -- env WEBHOOK_TEST_CXXFLAGS="-O1 -fsanitize=address,undefined -fno-sanitize-recover=all" python3 tests/test_js_webhooks.py
           runuser -u ci -- bash tests/ci/native.sh sanitizers
           runuser -u ci -- bash tests/ci/native.sh valgrind
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -113,7 +116,7 @@ jobs:
       - name: Install compile dependencies
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git g++-14 make perl pkg-config libnode-dev binutils python3
+          apt-get install -y --no-install-recommends ca-certificates git g++-14 make perl pkg-config libnode-dev libcurl4-openssl-dev binutils python3
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           repository: inspircd/inspircd
