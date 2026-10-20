@@ -32,11 +32,28 @@ startup. Deploying or provisioning storage is a separate operator action.
 
 ## Add or remove a feed
 
-As an IRC operator, enter:
+As an IRC operator, send the server command `RSS <channel> <feed-url>`.
+In WeeChat, use `/quote` so the client sends this custom command to the server:
 
 ```text
-/rss #news https://example.org/feed.xml
+/quote RSS #news https://example.org/feed.xml
 ```
+
+Clients that forward unknown commands directly may also accept
+`/rss #news https://example.org/feed.xml`. Run it from a buffer on the intended
+server. Operator status is required; channel operator (`@`) status alone is not
+enough, and the server's operator class must permit the `RSS` command. Use your
+existing operator access; do not paste operator credentials into chat.
+
+A `481` permission error means the connection lacks the required IRC-operator
+access; merely joining the channel or holding channel `@` does not satisfy it.
+An unknown-command error can mean the client did not forward the command (use
+`/quote` in WeeChat) or that the server lacks the command/module.
+
+A successful addition returns `RSS subscribed. The first successful fetch
+establishes a baseline; new entries will be posted.` This confirms storage of the
+subscription, not a successful fetch or delivered item. An existing pair returns
+`RSS subscription already exists.`
 
 The native command validates operator privileges and the channel. The script
 validates the feed URL and subscribes that channel and feed pair. Repeating the same pair is idempotent;
@@ -50,8 +67,15 @@ The transport rejects prohibited network destinations and unsafe feed data.
 To remove every feed subscription for a channel:
 
 ```text
-/rss #news off
+/quote RSS #news off
 ```
+
+`off` removes **all** feeds for that channel, not just one URL. There is currently
+no RSS list/status subcommand or individual-feed removal command. `/RSS #news list`
+is not a listing request; it is rejected as an invalid feed URL. Keep the URLs you
+subscribe, or ask the server operator to inspect stored subscriptions read-only.
+Do not remove/re-add feeds merely to check status: re-adding establishes a fresh
+baseline.
 
 Removing a subscription also discards its pending posts. Already queued native
 fetches may finish, but their results are no longer posted.
