@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://r33drichards.github.io/docker/reference/sqlite/">
+        <link rel="shortcut icon" href="../../img/favicon.ico">
+        <title>SQLite databases - InspIRCd JavaScript module</title>
+        <link href="../../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../../css/brands.min.css" rel="stylesheet">
+        <link href="../../css/solid.min.css" rel="stylesheet">
+        <link href="../../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../..">InspIRCd JavaScript module</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../.." class="nav-link">Home</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Tutorials</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../tutorials/first-hook/" class="dropdown-item">Your first command hook</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">How-to guides</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../how-to/configure/" class="dropdown-item">Build and configure</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/reload/" class="dropdown-item">Reload and recover</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/wasm/" class="dropdown-item">Use WebAssembly</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/test/" class="dropdown-item">Test changes</a>
+</li>
+                                    
+<li>
+    <a href="../../how-to/documentation/" class="dropdown-item">Maintain and publish docs</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Reference</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../configuration/" class="dropdown-item">Configuration</a>
+</li>
+                                    
+<li>
+    <a href="../commands/" class="dropdown-item">Command hooks</a>
+</li>
+                                    
+<li>
+    <a href="../hooks/" class="dropdown-item">Core Module hooks</a>
+</li>
+                                    
+<li>
+    <a href="../events/" class="dropdown-item">Separate event-provider hooks</a>
+</li>
+                                    
+<li>
+    <a href="../api/" class="dropdown-item">Native API and authority</a>
+</li>
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">SQLite databases</a>
+</li>
+                                    
+<li>
+    <a href="../limits/" class="dropdown-item">Execution and failure limits</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Explanation</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../../explanation/trust/" class="dropdown-item">Trust and containment</a>
+</li>
+                                    
+<li>
+    <a href="../../explanation/architecture/" class="dropdown-item">Snapshots, ordering and effects</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../api/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../limits/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="https://github.com/r33drichards/docker/edit/master/site-docs/reference/sqlite.md" class="nav-link"><i class="fa-brands fa-github"></i> Edit on GitHub</a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#script-sqlite-databases" class="nav-link">Script SQLite databases</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#configure" class="nav-link">Configure</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#api" class="nav-link">API</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#limits-and-operations" class="nav-link">Limits and operations</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#persistent-container-state" class="nav-link">Persistent container state</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="3"><a href="#first-import-maintenance-gate" class="nav-link">First-import maintenance gate</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<!-- Generated from docs/SQLITE.md; edit that source. -->
+<h1 id="script-sqlite-databases">Script SQLite databases</h1>
+<p>SQLite persists explicitly written data, not a JavaScript heap. Every rehash and
+restart creates fresh isolates; globals, closures, authentication and native
+capabilities are never restored. This is an opt-in API for trusted scripts, not
+an adversarial-code sandbox.</p>
+<h2 id="configure">Configure</h2>
+<p>Create a directory owned by the daemon user, mode 0700, on persistent storage.
+The directory must already exist; it is not automatically provisioned. Relative
+paths resolve under the configured config directory.</p>
+<pre><code class="language-xml">&lt;javascriptsettings timeoutms=&quot;25&quot; sqlitedirectory=&quot;/inspircd/data/script-databases&quot;&gt;
+&lt;javascript file=&quot;scripts/rss.js&quot; authority=&quot;user&quot; databases=&quot;rss&quot;&gt;
+</code></pre>
+<p>A grant <code>rss</code> permits only <code>rss.sqlite</code> inside that root. Grants are independent of
+user/admin IRC authority: admin scripts without a grant have no database access.
+Directory-loaded scripts inherit their tag's exact grant list. Revocation takes
+effect only after a successful rehash: update scripts that still open removed
+grants, and verify rehash success. A failed candidate retains old grants and
+connections along with the old script set. Sharing a name is
+explicit sharing of all tables/data in that database, not row-level isolation.
+Use separate database names for different trust domains. No arbitrary paths, URIs,
+SQL ATTACH/DETACH, extension loading, virtual tables or script PRAGMAs are exposed.</p>
+<p>The host checks private directory ownership, files, links, and SQLite sidecars;
+the directory and its ancestors must not be writable by untrusted users. Do not
+let another process running as the daemon user modify these paths concurrently.
+SQLite is not a defense against a hostile same-UID process or malicious native
+code. Use local storage with reliable filesystem locks, not a network filesystem.</p>
+<h2 id="api">API</h2>
+<pre><code class="language-js">const db = ircd.sqlite.open('rss');
+let initialized = false;
+ircd.on('preCommand', event =&gt; {
+  if (event.validated) return;
+  if (!initialized) {
+    db.exec('CREATE TABLE IF NOT EXISTS seen (url TEXT PRIMARY KEY, fetched INTEGER)');
+    initialized = true;
+  }
+  if (event.command !== 'VERSION') return;
+  db.transaction(() =&gt; {
+    db.exec('INSERT OR REPLACE INTO seen(url, fetched) VALUES (?, ?)',
+      ['https://example.com/feed', ircd.time()]);
+    const result = db.query('SELECT url, fetched FROM seen WHERE url = ?',
+      ['https://example.com/feed']);
+    // result.columns: ['url', 'fetched']; result.rows: [['https://...', 123]]
+  });
+});
+</code></pre>
+<ul>
+<li><code>open(name)</code> returns a handle. At most 16 handles may be created during one
+  script lifetime, including closed handles; retain and reuse them.</li>
+<li><code>query(sql, params = [])</code> accepts one read-only prepared statement and returns
+  <code>{columns, rows, changes, lastInsertRowid}</code>. Rows are arrays, preserving duplicate
+  column names. No live native statement, cursor or pointer escapes.</li>
+<li><code>exec(sql, params = [])</code> accepts one statement and returns the same shape with
+  empty rows. Use this for DDL and writes. Use separate calls for multiple SQL
+  statements; text after one statement is rejected.</li>
+<li>Parameters are positional arrays containing null, finite Number, signed 64-bit
+  BigInt, string, or Uint8Array. Objects, nested arrays, booleans, undefined and
+  unsafe integer Numbers are rejected, not coerced. Use <code>?</code> placeholders.</li>
+<li>Integer cells become Numbers when safe, otherwise BigInts; metadata <code>changes</code>
+  and <code>lastInsertRowid</code> are BigInts. Blobs are fresh Uint8Arrays. Text with invalid
+  UTF-8 is returned as null; use <code>CAST(column AS BLOB)</code> to retrieve arbitrary bytes.</li>
+<li><code>transaction(callback)</code> commits on synchronous success, returns the callback's
+  value, and rolls back on a throw, Promise result, or execution termination observed
+  before commit starts. Cancellation that arrives during COMMIT/fsync can be too
+  late: committed data is not undone even if the surrounding hook times out.
+  Nested transactions on the same handle and direct SQL transaction control are
+  rejected. There is no transaction spanning separate IRC callbacks/events.</li>
+<li><code>close()</code> releases a connection; closed handles cannot be reused. Closing from
+  inside a transaction is rejected. Script disposal closes all remaining handles.</li>
+</ul>
+<p>Initialization may open databases and read existing tables but cannot issue SQL
+writes or start transactions. Existing WAL-mode databases are rejected, not
+converted; this first interface uses rollback-journal mode. SQLite may still
+perform its normal crash-recovery I/O while opening an existing database.
+Initialize/migrate schemas from an active hook. Opening may
+create an empty database even if a later source fails initialization; this is not
+an atomic filesystem rehash. A failed rehash retains the old active script set.</p>
+<p>Database commits are immediate and independent of the IRC event's queued effects.
+A later hook exception, command veto or failure does not undo earlier commits.
+Use a database transaction for groups of SQL changes; do not claim a transaction
+atomically spans SQLite and IRC/webhook delivery. External API deduplication or
+an explicit outbox/retry design is still necessary for reliable feed processing.</p>
+<h2 id="limits-and-operations">Limits and operations</h2>
+<p>Operations are synchronous. Lock contention fails immediately (zero busy timeout),
+not by waiting on the IRC main loop. Defaults cap SQL at 64 KiB, parameters at 128 and 1 MiB total, columns at 128,
+result rows at 1,000 and bytes at 4 MiB, database size at 64 MiB and database
+count at 32 per root. SQLite VM work is capped at 100,000 steps and 25 ms
+per operation (checked every 100 VM steps). Statements are finalized after each
+call; there is no retained statement cache or cursor. These bounds do not bound
+filesystem I/O, fsync latency, native allocation or operating-system stalls. Keep
+queries small and indexed; benchmark on the deployment storage before enabling a
+busy feed. A background-worker API is a possible later addition, not provided by
+this synchronous interface. This is not a hard real-time or OOM-isolated service.</p>
+<p>SQLite 3.41 or newer is required. The Docker image links the distro SQLite library (<code>sqlite-dev</code> at build time,
+<code>sqlite-libs</code> at runtime). No Node filesystem or npm SQLite package is installed.
+There is no Nix build definition in this repository. Persist the whole directory,
+including any SQLite journal sidecars, across container replacements. No volume
+or production database is provisioned by this change. Stop database writers for
+a filesystem-level backup, or use a separately authorized SQLite-aware backup;
+do not copy only a live main file and assume it is a consistent backup.</p>
+<h2 id="persistent-container-state">Persistent container state</h2>
+<p>The image remains non-root by default. For an explicitly provisioned volume at
+<code>/inspircd/persistent</code>, enable <code>INSPIRCD_PERSISTENT=yes</code>. The bootstrap initializes
+private <code>conf</code>, <code>data</code>, and <code>logs</code> children and <code>data/script-databases</code>, then maps
+the existing <code>/inspircd/conf</code>, <code>/inspircd/data</code>, and <code>/inspircd/logs</code> paths to them.
+It refuses nonempty existing directories rather than silently moving or deleting
+state. The mount itself must remain traversable by UID 10000.</p>
+<p>On a fresh root-owned mount, the static bootstrap may run as root solely for this
+initialization. It clears supplementary groups and drops real, effective and
+saved UID/GID to 10000 before the existing entrypoint, secret materialization,
+configuration helpers, certificate generation or daemon. It never recursively
+changes volume ownership and rejects unsafe paths/links. A non-root start
+validates an already initialized layout. A platform root-start setting must not
+bypass this bootstrap or invoke the original entrypoint directly.</p>
+<p><code>INSPIRCD_SQLITE=yes</code> separately emits the fixed SQLite settings. It grants no
+script access: every script still needs an explicit <code>databases</code> list. Both flags
+default to no. Custom configuration must include the supplied helpers or define
+the equivalent settings itself. Image-managed JavaScript and binaries remain
+outside the volume, as does <code>/inspircd/.secrets/nocodb-token</code>; the existing token
+materialization process remains ephemeral.</p>
+<p>Persistent configuration is seeded from image defaults. Later starts replace
+only files unchanged since their last managed version, preserving user edits,
+custom files and TLS material. A bundled checksum baseline recognizes unchanged
+configuration migrated from image commit <code>1a389a61967e3ef3b63c892824b6262560dc6393</code>.
+Unknown existing files are not adopted as managed defaults. Review preserved
+custom configurations when changing image versions; migration does not silently
+overwrite an edited configuration to add newly required settings.</p>
+<p>The persistent helper explicitly stores X-lines and permanent-channel data in
+<code>/inspircd/data</code>. It enables <code>permchannels</code> but does not mark channels permanent:
+a channel must have mode <code>+P</code> to be saved. Normal file logs use the bounded sink,
+with five files including the active file, each at most 10 MiB (50 MiB total).
+Rotation happens before a write, not on a periodic timer. Debug and raw protocol
+logging are not accepted by this sink. Existing oversized or unexpected archive
+files cause initialization to fail instead of being silently truncated. Runtime
+logging failures disable the sink and emit a content-free error; monitor stderr.
+These limits cover this file sink, not Railway's independent log retention or
+additional sinks an administrator configures.</p>
+<p>Before the first replacement, inventory and securely preserve existing config,
+TLS keys and daemon data. A fresh volume does not recover the old container's
+files. Never expose private keys in logs, command output or public uploads.
+Provisioning, migration and backups are operational steps, not automatic results
+of building this image. A 1 GiB volume is not an aggregate SQLite quota: the
+per-database limits can collectively exceed it, and config, journals and daemon
+state need space too. Monitor usage and reserve headroom; no automatic backup or
+retention service is enabled here.</p>
+<h3 id="first-import-maintenance-gate">First-import maintenance gate</h3>
+<p>For a migration of existing configuration and TLS identity, additionally set
+<code>INSPIRCD_PERSISTENT_IMPORT=yes</code>. The nonroot configuration helper waits before
+seeding defaults or generating certificates, for at most 30 minutes. No IRC
+listener is started during this maintenance window. A timeout, signal, unsafe
+file or identity mismatch fails startup; it is not a healthy deployment.</p>
+<p>Restore the verified archive into the private persistent <code>conf</code> directory,
+validate every restored file against the captured archive, then create
+<code>.migration-ready</code> atomically as the final step. Its owner/group must be
+10000:10000 and mode 0600. Its exact format is a <code>persistent-import-v1</code> header,
+then the lowercase SHA-256 digest of <code>key.pem</code>, one space and <code>key.pem</code>, then
+the digest of <code>cert.pem</code>, one space and <code>cert.pem</code>, each terminated by a newline.
+The helper accepts only those two entries in that order. It checks private-key
+mode 0600, safe regular singly-linked files, ownership and exact digest matches.
+Never print the key, archive contents or sensitive configuration into logs.</p>
+<p>Keep the import flag enabled after migration to fail closed on a missing or
+changed identity. An intentional future certificate/key rotation requires a
+separately approved maintenance operation: stop the daemon, replace the files
+safely, verify the intended new identity, and atomically replace the readiness
+manifest with the new hashes before restarting. Do not silently regenerate the
+manifest to work around a mismatch. The marker is an operational integrity guard,
+not protection against an attacker already able to write as the daemon user.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "../..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../../js/base.js"></script>
+        <script src="../../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

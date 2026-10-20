@@ -96,6 +96,10 @@
 </li>
                                     
 <li>
+    <a href="../sqlite/" class="dropdown-item">SQLite databases</a>
+</li>
+                                    
+<li>
     <a href="../limits/" class="dropdown-item">Execution and failure limits</a>
 </li>
                                 </ul>
@@ -127,7 +131,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" href="../limits/" class="nav-link">
+                                <a rel="next" href="../sqlite/" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -186,6 +190,7 @@ inspircd.h or the whole SDK</strong>. New bindings require explicit conversion, 
 effect, and authorization policy plus an implementation and tests.</p>
 <p>Additional explicit host methods:</p>
 <ul>
+<li><code>sqlite.open(name)</code> opens a host-granted named SQLite database (see <a href="https://r33drichards.github.io/docker/reference/sqlite/">SQLite reference</a>).</li>
 <li><code>userById(uuid)</code> returns an owned <code>{ id, nick }</code> snapshot or null.</li>
 <li><code>notice(targetUuid, text)</code> queues a server notice (maximum 400 UTF-8 bytes).</li>
 <li><code>rename(targetUuid, nick)</code> queues a validated nickname change.</li>
