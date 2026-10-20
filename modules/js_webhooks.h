@@ -375,6 +375,7 @@ public:
 		if (found == generation->endpoints.end())
 			return nullptr;
 		js_async_http::Policy policy;
+		policy.ownerGeneration = generation->http;
 		policy.headers = *found->second.headers;
 		for (const auto& header : generation->ForUrl(script, found->second.url))
 		{

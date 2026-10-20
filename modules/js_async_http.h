@@ -110,6 +110,8 @@ struct Policy
 	bool configuredEndpoint = false, discard = false, reportCancelled = false;
 	long connectTimeout = 3000, timeout = 8000;
 	std::size_t maxResponse = MaxBody, maxTotal = 0;
+	// Optional enclosing configuration generation; both lifetimes must remain live.
+	std::shared_ptr<Generation> ownerGeneration;
 	std::function<void(bool)> completion;
 };
 inline bool ConfiguredUrl(const std::string& url)
@@ -144,6 +146,10 @@ class Dispatcher
 		std::atomic<bool> cancelled{false};
 		bool committed = false, ready = false;
 		Policy policy;
+		bool Active() const
+		{
+			return generation->active && (!policy.ownerGeneration || policy.ownerGeneration->active);
+		}
 		Result result;
 		Clock::time_point created = Clock::now(), completed;
 	};
@@ -162,7 +168,7 @@ class Dispatcher
 		Job& job;
 		std::string body;
 		std::size_t headers = 0;
-		bool Cancelled() const { return owner.stopping || job.cancelled || !job.generation->active; }
+		bool Cancelled() const { return owner.stopping || job.cancelled || !job.Active(); }
 	};
 	static std::size_t Write(char* data, std::size_t size, std::size_t count, void* user)
 	{
@@ -271,8 +277,7 @@ class Dispatcher
 		for (auto it = entries.begin(); it != entries.end();)
 		{
 			auto& job = *it->second;
-			if (!job.generation->active || job.cancelled ||
-				(job.ready && now - job.completed > std::chrono::seconds(60)) ||
+			if (!job.Active() || job.cancelled || (job.ready && now - job.completed > std::chrono::seconds(60)) ||
 				(!job.committed && now - job.created > std::chrono::seconds(60)))
 			{
 				job.cancelled = true;
@@ -297,7 +302,7 @@ class Dispatcher
 				job = std::move(queue.front());
 				queue.pop_front();
 			}
-			const bool attempted = !job->cancelled && job->generation->active;
+			const bool attempted = !job->cancelled && job->Active();
 			Result result;
 			try
 			{
@@ -308,7 +313,7 @@ class Dispatcher
 				result.error = "HTTP transport failed";
 			}
 			std::lock_guard<std::mutex> lock(mutex);
-			if (!job->cancelled && job->generation->active)
+			if (!job->cancelled && job->Active())
 			{
 				job->result = std::move(result);
 				job->ready = true;
@@ -347,7 +352,8 @@ public:
 	std::string Stage(const std::shared_ptr<Generation>& generation, const std::string& method, const std::string& url,
 		const std::string& body = {}, Policy policy = {})
 	{
-		if (!generation || !generation->active || (method != "GET" && method != "POST") ||
+		if (!generation || !generation->active || (policy.ownerGeneration && !policy.ownerGeneration->active) ||
+			(method != "GET" && method != "POST") ||
 			(!ValidUrl(url) && !(policy.configuredEndpoint && ConfiguredUrl(url))) || body.size() > MaxRequestBody ||
 			(method == "GET" && !body.empty()))
 			return {};

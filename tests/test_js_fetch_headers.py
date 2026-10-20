@@ -48,6 +48,12 @@ class Receiver:
                         )
                     status, response = (200, b"ready") if ready else (504, b"not observed")
                 else:
+                    if self.path == "/owner-control":
+                        with owner.condition:
+                            owner.condition.wait_for(
+                                lambda: any(item[1] == "/release-owner" for item in owner.requests),
+                                5,
+                            )
                     if self.path in ("/cancel", "/retired"):
                         owner.release.wait(15)
                     status = (
@@ -90,15 +96,18 @@ class Receiver:
             "/discard": 1,
             "/failure": 1,
             "/legacy": 2,
+            "/owner-control": 1,
+            "/wait/owner-control": 1,
+            "/release-owner": 1,
         }
         assert set(paths) == set(expected), paths  # No redirect or cancelled-before-commit I/O.
         assert {path: paths.count(path) for path in paths} == expected, paths
         for method, path, body, headers in self.requests:
-            if path.startswith("/wait/"):
+            if path.startswith("/wait/") or path == "/release-owner":
                 assert method == "GET"
                 token = None
             elif (
-                path in ("/post/child", "/post?extra=1")
+                path in ("/post/child", "/post?extra=1", "/owner-control")
                 or (path == "/post" and body == b"{}")
                 or (path == "/legacy" and body == b'{"wrongscript":true}')
             ):

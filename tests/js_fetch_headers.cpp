@@ -142,7 +142,54 @@ void TestLegacyAdapter(const std::string& base)
 	generation = std::make_shared<Generation>(std::map<std::string, Endpoint>{{"legacy", endpoint}}, rules);
 	generation->alive = true;
 	Check(!dispatcher.Stage(generation, "legacy", "{}", script), "conflicting legacy and URL headers rejected");
+
 	dispatcher.Stop();
+	// The script can stay alive while a preceding script destructor joins a
+	// slow dispatcher. Configuration retirement must independently cancel it.
+	auto scriptGeneration = std::make_shared<js_async_http::Generation>();
+	auto retired = std::make_shared<Generation>(std::map<std::string, Endpoint>{{"legacy", endpoint}});
+	retired->alive = true;
+	Dispatcher queued;
+	auto request = queued.Stage(retired, "legacy", "{}", script, scriptGeneration);
+	Check(request != nullptr, "explicit live-script webhook staged");
+	queued.Commit(std::move(request));
+	retired->alive = false;
+	Check(scriptGeneration->active, "script intentionally survives retired config");
+	queued.Start();
+	queued.Stop();
+	Check(queued.Stats().sent == 0 && queued.Stats().pending == 0,
+		"retired config suppresses queued live-script webhook");
+}
+
+void TestCommittedConfigRetirement(const std::string& base)
+{
+	using namespace js_webhooks;
+	auto config = std::make_shared<Generation>(
+		std::map<std::string, Endpoint>{{"control", ValidateEndpoint(base + "/owner-control", true)},
+			{"stale", ValidateEndpoint(base + "/never-committed-owner", true)}});
+	config->alive = true;
+	auto first = std::make_shared<js_async_http::Generation>();
+	auto second = std::make_shared<js_async_http::Generation>();
+	Dispatcher serial;
+	serial.Start();
+	serial.Commit(serial.Stage(config, "control", "{}", "first", first));
+	js_async_http::Dispatcher probe;
+	auto monitor = std::make_shared<js_async_http::Generation>();
+	auto barrier = probe.Stage(monitor, "GET", base + "/wait/owner-control");
+	Check(probe.Commit(barrier) && Wait(probe, monitor, barrier).body == "ready",
+		"control occupies single webhook worker");
+	serial.Commit(serial.Stage(config, "stale", "{}", "second", second));
+	config->alive = false;
+	Check(first->active && second->active, "both scripts intentionally survive config retirement");
+	auto release = probe.Stage(monitor, "GET", base + "/release-owner");
+	Check(probe.Commit(release) && Wait(probe, monitor, release).ok, "release occupied worker after retiring config");
+	const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+	while (serial.Stats().pending && std::chrono::steady_clock::now() < deadline)
+		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+	Check(serial.Stats().pending == 0 && serial.Stats().sent == 0 && serial.Stats().discarded == 1,
+		"committed queued webhook suppressed by retired config");
+	serial.Stop();
+	probe.Stop();
 }
 
 void TestTransport(const std::string& base)
@@ -225,6 +272,17 @@ void TestTransport(const std::string& base)
 	Check(cancelledCallbacks == 0 && retiredCallbacks == 0, "cancelled and retired jobs suppress completion callbacks");
 	Check(dispatcher.Stage(other, "GET", base + "/never-stopped").empty(), "stopped dispatcher rejects new requests");
 
+	Dispatcher enclosing;
+	Policy guarded;
+	guarded.ownerGeneration = std::make_shared<Generation>();
+	id = enclosing.Stage(other, "POST", base + "/never-retired-owner", "{}", guarded);
+	Check(!id.empty(), "job stages while script and config are active");
+	guarded.ownerGeneration->active = false;
+	Check(other->active && !enclosing.Commit(id), "retired config prevents commit despite live script");
+	Check(!Wait(enclosing, other, id).ok, "retired config result discarded");
+	Check(enclosing.Stage(other, "POST", base + "/never-retired-owner", "{}", guarded).empty(),
+		"retired config cannot stage");
+	enclosing.Stop();
 	std::atomic<unsigned> completed{0}, successful{0};
 	Dispatcher discard(1);
 	for (const auto* path : {"/discard", "/failure"})
@@ -255,6 +313,7 @@ int main(int argc, char** argv)
 		TestExactRules();
 #ifdef JS_ASYNC_HTTP_TEST_LOOPBACK
 		Check(argc == 2, "usage: js_fetch_headers FIXTURE_URL");
+		TestCommittedConfigRetirement(argv[1]);
 		TestTransport(argv[1]);
 		TestLegacyAdapter(argv[1]);
 #else
