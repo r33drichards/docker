@@ -123,8 +123,8 @@ class PersistentConfigTests(unittest.TestCase):
     def put_destination(self, name, content, mode=0o644):
         path = self.destination / name
         path.write_text(content)
-        path.chmod(mode)
         self.own(path)
+        path.chmod(mode)
         return path
 
     def make_baseline(self, records):
@@ -660,6 +660,13 @@ class PersistentConfigTests(unittest.TestCase):
         self.assertFalse((self.destination / METADATA_STAGE).exists())
         for name in names:
             self.assertEqual((self.destination / name).read_text(), SECRET)
+
+    def test_destination_fixture_applies_special_modes_after_ownership(self):
+        # chown clears set-ID bits, even when changing to the same owner. The
+        # root CI fixture must exercise the intended unsafe mode, not a safe file.
+        self.own = lambda path: os.chown(path, os.getuid(), os.getgid())
+        path = self.put_destination(CONFIG_STAGE, SECRET, 0o4600)
+        self.assertEqual(path.stat().st_mode & 0o7777, 0o4600)
 
     def test_unsafe_fixed_stages_are_refused_not_deleted(self):
         external = self.outside / "secret"
