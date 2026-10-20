@@ -4,6 +4,13 @@
 # CXXFLAGS/LDFLAGS can add sanitizers or other compiler/linker options.
 set -eu
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+# The legacy image job runs on Ubuntu 22.04. Test against the matched Alpine
+# SDK rather than an older host SQLite; native CI still compiles directly.
+if [ -n "${SQLITE_TEST_IMAGE:-}" ]; then
+    exec docker run --rm --user inspircd --entrypoint sh \
+        -v "$SCRIPT_DIR/..:/repo:ro" "$SQLITE_TEST_IMAGE" \
+        -ec 'cd /repo && sh tests/js_sqlite.sh'
+fi
 TESTDIR=$(mktemp -d)
 trap 'rm -rf "$TESTDIR"' EXIT
 trap 'exit 1' HUP INT TERM
