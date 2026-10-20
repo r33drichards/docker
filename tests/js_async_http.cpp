@@ -16,6 +16,13 @@ static bool Address(const char* value)
 	Check(inet_pton(AF_INET, value, &a.sin_addr) == 1);
 	return js_async_http::PublicAddress(reinterpret_cast<sockaddr*>(&a));
 }
+static bool Address6(const char* value)
+{
+	sockaddr_in6 a{};
+	a.sin6_family = AF_INET6;
+	Check(inet_pton(AF_INET6, value, &a.sin6_addr) == 1);
+	return js_async_http::PublicAddress(reinterpret_cast<sockaddr*>(&a));
+}
 #ifdef JS_ASYNC_HTTP_TEST_LOOPBACK
 class Fixture
 {
@@ -140,6 +147,14 @@ int main()
 			"198.51.101.0", "203.0.112.255", "203.0.114.0", "198.17.255.255", "198.20.0.0", "100.63.255.255",
 			"100.128.0.0", "172.15.255.255", "172.32.0.0", "192.167.255.255", "192.169.0.0", "223.255.255.255"})
 		Check(Address(ip));
+	// IANA IPv6 documentation prefix is 3fff::/20, not 3ff0::/12.
+	for (auto ip : {"::", "::1", "::ffff:8.8.8.8", "fc00::1", "fdff::1", "fe80::1", "ff02::1",
+			 "2001::", "2001:1ff:ffff:ffff:ffff:ffff:ffff:ffff", "2001:db8::1", "2002::1",
+			 "3fff::", "3fff:fff:ffff:ffff:ffff:ffff:ffff:ffff"})
+		Check(!Address6(ip));
+	for (auto ip :
+		{"2001:200::", "2001:4860:4860::8888", "3ff0::1", "3ffe:ffff:ffff:ffff:ffff:ffff:ffff:ffff", "3fff:1000::"})
+		Check(Address6(ip));
 	Dispatcher d;
 	auto g = std::make_shared<Generation>(), other = std::make_shared<Generation>();
 	Check(d.Stage(g, "PUT", "https://example.com/").empty());
