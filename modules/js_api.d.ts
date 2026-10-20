@@ -1,3 +1,4 @@
+/// <reference path="js_fetch.d.ts" />
 /// <reference path="js_sqlite.d.ts" />
 /// <reference path="js_events.d.ts" />
 /// <reference path="js_hooks.d.ts" />
@@ -26,7 +27,10 @@ interface IrcdApi {
   /** Aggregate process/module-lifetime counters; never URLs, headers or payloads. */
   webhookStats(): {pending: number; sent: number; failed: number; discarded: number};
   wasm(name: string): Uint8Array;
-  userById(id: string): { id: string; nick: string | null } | null;
+  userById(id: string): { id: string; nick: string | null; isOper: boolean } | null;
+  /** User UUID, or existing #channel for admin authority. Queued, not delivery acknowledgement. */
   notice(targetId: string, text: string): void;
+  /** Same target/authority/queue rules as notice; emits PRIVMSG instead. */
+  privmsg(targetId: string, text: string): void;
   rename(targetId: string, nick: string): void;
 }

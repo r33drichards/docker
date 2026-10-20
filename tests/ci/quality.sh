@@ -48,6 +48,7 @@ check_cpp \
     modules/m_precommand.cpp modules/parsed_command.h \
     modules/extra/m_javascript.cpp modules/js_native_utilities.h \
     modules/js_sqlite.h modules/js_sqlite_bridge.h tests/test_js_sqlite.cpp \
+    modules/js_async_http.h modules/js_fetch_methods.inc tests/js_async_http.cpp tests/js_replay.cpp \
     modules/js_webhooks.h tests/js_webhooks.cpp tests/js_webhook_headers.inc \
     modules/js_runtime.h modules/js_script_loader.h modules/js_wire_validation.h modules/js_hook_snapshot.h \
     modules/js_hook_mutations.h modules/js_event_listeners.h modules/js_event_specs.h \
@@ -65,13 +66,13 @@ check_python()
 check_python \
     tools/generate_js_bindings.py tools/generate_module_hooks.py \
     tests/test_generate_module_hooks.py tests/test_generate_js_bindings.py tests/test_authorize_heavy.py \
-    tests/javascript_native.py tests/javascript_sqlite_native.py tests/wchat_nocodb_native.py tests/precommand_client.py tests/test_precommand_client.py \
+    tests/javascript_native.py tests/javascript_sqlite_native.py tests/rss_native.py tests/rss_fetch_native.py tests/replay/native.py tests/wchat_nocodb_native.py tests/precommand_client.py tests/test_precommand_client.py \
     tests/precommand_log.py tests/primary_image.py tests/test_js_webhooks.py tests/test_materialize_nocodb_token.py tests/test_nocodb_config.py \
     tests/ci/*.py tests/fuzz/*.py
 
 "$SHELLCHECK" --severity=style \
     tests/js_sqlite.sh tests/javascript_sqlite.sh tests/primaryImage.sh tests/javascript.sh tests/js_bindings.sh tests/js_runtime.sh \
-    tests/js_script_loader.sh tests/precommand.sh tests/precommand_struct.sh \
+    tests/js_async_http.sh tests/js_replay.sh tests/js_script_loader.sh tests/precommand.sh tests/precommand_struct.sh \
     tools/materialize-nocodb-token.sh conf/nocodb.sh tests/ci/*.sh tests/fuzz/*.sh
 
 # Generated files have one canonical formatter: the generator itself.

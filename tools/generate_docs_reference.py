@@ -55,6 +55,7 @@ def main():
             + body
             + "\n"
         )
+    outputs["site-docs/assets/js_fetch.d.ts"] = (ROOT / "modules/js_fetch.d.ts").read_text()
     outputs["site-docs/assets/js_sqlite.d.ts"] = (ROOT / "modules/js_sqlite.d.ts").read_text()
     outputs["site-docs/assets/js_api.d.ts"] = (ROOT / "modules/js_api.d.ts").read_text()
     outputs["site-docs/assets/js_events.d.ts"] = (ROOT / "modules/js_events.d.ts").read_text()

@@ -3,11 +3,13 @@
 /// $LinkerFlags: -lnode -pthread -Wl,-z,nodelete find_linker_flags("libcurl") find_linker_flags("sqlite3")
 
 #include "inspircd.h"
+#include "clientprotocolmsg.h"
 #include "js_runtime.h"
 #include "js_sqlite.h"
 #include <cmath>
 #include <sstream>
 #include "js_webhooks.h"
+#include "js_async_http.h"
 #include "js_wire_validation.h"
 #include "js_script_loader.h"
 #include "js_native_utilities.h"
@@ -22,12 +24,26 @@
 namespace
 {
 using Authority = js_scripts::Authority;
+struct HttpTicket
+{
+	std::shared_ptr<js_async_http::Dispatcher> transport;
+	std::shared_ptr<js_async_http::Generation> generation;
+	std::string id;
+	bool committed = false;
+	~HttpTicket()
+	{
+		if (!committed)
+			transport->Cancel(generation, id);
+	}
+};
 struct Effect
 {
 	std::string actor, target, text;
 	Authority authority;
 	bool rename;
 	std::shared_ptr<js_webhooks::Request> webhook = nullptr;
+	bool privmsg = false;
+	std::shared_ptr<HttpTicket> http;
 };
 struct DispatchState
 {
@@ -180,6 +196,15 @@ public:
 	Authority authority;
 	std::string actor;
 	bool loading = true;
+	std::shared_ptr<js_async_http::Dispatcher> http;
+	std::shared_ptr<js_async_http::Generation> httpgeneration = std::make_shared<js_async_http::Generation>();
+	void InvalidateHttp()
+	{
+		httpgeneration->active = false;
+		if (http)
+			http->Invalidate(httpgeneration);
+	}
+	~Script() { InvalidateHttp(); }
 	js_webhooks::Dispatcher& delivery;
 	std::shared_ptr<js_webhooks::Generation> generation;
 	const std::vector<js_scripts::WasmAsset>& wasm;
@@ -330,7 +355,7 @@ public:
 			return;
 		args.GetReturnValue().Set(value);
 	}
-	static void EffectCall(const v8::FunctionCallbackInfo<v8::Value>& args, bool rename)
+	static void EffectCall(const v8::FunctionCallbackInfo<v8::Value>& args, bool rename, bool privmsg = false)
 	{
 		auto* self = Self(args);
 		std::string target, text;
@@ -346,7 +371,7 @@ public:
 		}
 		if (!Text(args.GetIsolate(), args[0], target) || !Text(args.GetIsolate(), args[1], text))
 			return;
-		if (self->effects.size() >= 16 || target.size() > 32 || !WireText(target) || !WireText(text) ||
+		if (self->effects.size() >= 16 || target.size() > 64 || !WireText(target) || !WireText(text) ||
 			text.size() > 400)
 		{
 			Error(args.GetIsolate(), "Invalid or excessive state change");
@@ -362,10 +387,12 @@ public:
 			Error(args.GetIsolate(), "Invalid nickname");
 			return;
 		}
-		self->effects.push_back({self->actor, target, text, self->authority, rename});
+		self->effects.push_back({self->actor, target, text, self->authority, rename, nullptr, privmsg});
 	}
 	static void Notice(const v8::FunctionCallbackInfo<v8::Value>& args) { EffectCall(args, false); }
+	static void Privmsg(const v8::FunctionCallbackInfo<v8::Value>& args) { EffectCall(args, false, true); }
 	static void Rename(const v8::FunctionCallbackInfo<v8::Value>& args) { EffectCall(args, true); }
+#include "js_fetch_methods.inc"
 	static void UserById(const v8::FunctionCallbackInfo<v8::Value>& args)
 	{
 		std::string uuid;
@@ -385,7 +412,8 @@ public:
 		auto context = args.GetIsolate()->GetCurrentContext();
 		auto object = v8::Object::New(args.GetIsolate());
 		if (!Put(context, object, "id", Display(args.GetIsolate(), user->uuid)) ||
-			!Put(context, object, "nick", Display(args.GetIsolate(), user->nick)))
+			!Put(context, object, "nick", Display(args.GetIsolate(), user->nick)) ||
+			!Put(context, object, "isOper", v8::Boolean::New(args.GetIsolate(), user->IsOper())))
 			return;
 		args.GetReturnValue().Set(object);
 	}
@@ -405,9 +433,11 @@ public:
 				api->Set(Key(isolate, "postWebhook"), v8::FunctionTemplate::New(isolate, Safe<PostWebhook>, data));
 				api->Set(Key(isolate, "webhookStats"), v8::FunctionTemplate::New(isolate, Safe<WebhookStats>, data));
 				api->Set(Key(isolate, "wasm"), v8::FunctionTemplate::New(isolate, Safe<Wasm>, data));
-				api->Set(Key(isolate, "notice"), v8::FunctionTemplate::New(isolate, Safe<Notice>, data));
-				api->Set(Key(isolate, "rename"), v8::FunctionTemplate::New(isolate, Safe<Rename>, data));
 				api->Set(Key(isolate, "userById"), v8::FunctionTemplate::New(isolate, Safe<UserById>, data));
+				api->Set(Key(isolate, "notice"), v8::FunctionTemplate::New(isolate, Safe<Notice>, data));
+				api->Set(Key(isolate, "privmsg"), v8::FunctionTemplate::New(isolate, Safe<Privmsg>, data));
+				api->Set(Key(isolate, "rename"), v8::FunctionTemplate::New(isolate, Safe<Rename>, data));
+				RegisterFetch(isolate, api, data);
 				auto sqlite = v8::ObjectTemplate::New(isolate);
 				sqlite->Set(Key(isolate, "open"), v8::FunctionTemplate::New(isolate, Safe<DatabaseOpen>, data));
 				api->Set(Key(isolate, "sqlite"), sqlite);
@@ -445,14 +475,52 @@ public:
 		auto owner = state.lock();
 		if (!owner || !owner->alive)
 			return;
+		if (effect.http)
+		{
+			// HTTP follows the same deferred effect order as IRC messaging.
+			effect.http->committed = effect.http->transport->Commit(effect.http->id);
+			return;
+		}
+		if (!effect.rename && !effect.target.empty() && effect.target[0] == '#')
+		{
+			if (effect.authority != Authority::Admin)
+				return;
+			auto* channel = ServerInstance->Channels.Find(effect.target);
+			if (!channel)
+				return;
+			FlagGuard guard(owner->internal);
+			if (effect.privmsg)
+			{
+				ClientProtocol::Messages::Privmsg message(
+					ClientProtocol::Messages::Privmsg::nocopy, ServerInstance->FakeClient, channel, effect.text);
+				channel->Write(ServerInstance->GetRFCEvents().privmsg, message);
+				ServerInstance->PI->SendMessage(channel, 0, effect.text);
+			}
+			else
+				channel->WriteRemoteNotice(effect.text);
+			return;
+		}
 		auto* actor = ServerInstance->Users.FindUUID<LocalUser>(effect.actor);
-		auto* target = ServerInstance->Users.FindUUID<LocalUser>(effect.target);
+		auto* target = ServerInstance->Users.FindUUID(effect.target);
 		if (!target || target->quitting ||
 			(effect.authority == Authority::User && (!actor || actor->quitting || target != actor)))
 			return;
 		FlagGuard guard(owner->internal);
 		if (!effect.rename)
-			target->WriteNotice(effect.text);
+		{
+			if (!effect.privmsg)
+				target->WriteRemoteNotice(effect.text);
+			else if (auto* local = IS_LOCAL(target))
+			{
+				ClientProtocol::Messages::Privmsg message(
+					ClientProtocol::Messages::Privmsg::nocopy, ServerInstance->FakeClient, local, effect.text);
+				local->Send(ServerInstance->GetRFCEvents().privmsg, message);
+			}
+			else
+				ServerInstance->PI->SendMessage(target, effect.text);
+		}
+		else if (!IS_LOCAL(target))
+			return;
 		else if (effect.authority == Authority::Admin)
 		{
 			if (ServerInstance->IsNick(effect.text))
@@ -471,9 +539,34 @@ public:
 
 #include "js_event_listeners.h"
 
+// Core command registration preserves operator access and flood accounting.
+// The configured RSS script handles successful commands via postCommand.
+class CommandRss final : public Command
+{
+public:
+	explicit CommandRss(Module* module)
+		: Command(module, "RSS", 2, 2)
+	{
+		access_needed = CmdAccess::OPERATOR;
+		syntax = {"<channel> <feed-url|off>"};
+	}
+	CmdResult Handle(User* user, const Params& parameters) override
+	{
+		if (!IS_LOCAL(user))
+			return CmdResult::FAILURE;
+		if (!ServerInstance->Channels.IsChannel(parameters[0]) || !ServerInstance->Channels.Find(parameters[0]))
+		{
+			user->WriteNotice("RSS requires an existing channel");
+			return CmdResult::FAILURE;
+		}
+		return CmdResult::SUCCESS;
+	}
+};
+
 class ModuleJavaScript final : public Module
 {
 	js_webhooks::Dispatcher delivery;
+	CommandRss rsscommand;
 	std::unique_ptr<ScriptSet> active;
 	std::shared_ptr<DispatchState> state = std::make_shared<DispatchState>();
 	const CommandBase::Params* rewriteparams = nullptr;
@@ -639,6 +732,8 @@ class ModuleJavaScript final : public Module
 			script->actor.clear();
 			if (!ok || denied)
 			{
+				if (!script->runtime.IsHealthy())
+					script->InvalidateHttp();
 				script->effects.clear();
 				effects.clear();
 				if (!ok && washealthy)
@@ -723,7 +818,7 @@ class ModuleJavaScript final : public Module
 	ModResult DispatchHook(
 		const char* stage, const std::string& actor, const SnapshotBuilder& build, const MutationHandler& mutate = {})
 	{
-		if (!active || state->internal || state->running)
+		if (!state->alive || !active || state->internal || state->running)
 			return MOD_RES_PASSTHRU;
 		const auto& hook = *FindHook(stage);
 		FlagGuard running(state->running);
@@ -768,6 +863,8 @@ class ModuleJavaScript final : public Module
 			script->actor.clear();
 			if (!success || result == MOD_RES_DENY)
 			{
+				if (!script->runtime.IsHealthy())
+					script->InvalidateHttp();
 				script->effects.clear();
 				if (!success && washealthy)
 					ServerInstance->Logs.Normal(
@@ -788,6 +885,7 @@ class ModuleJavaScript final : public Module
 public:
 	ModuleJavaScript()
 		: Module(VF_NONE, "Runs trusted local JavaScript and Wasm Module hooks with explicit authority.")
+		, rsscommand(this)
 		, events(this, [this](const auto* stage, const auto& actor, const auto& build)
 			  { return DispatchHook(stage, actor, build); })
 	{
@@ -892,7 +990,7 @@ public:
 	ModResult OnPreCommand(
 		std::string& command, CommandBase::Params& parameters, LocalUser* user, bool validated) override
 	{
-		if (state->internal || state->running)
+		if (!state->alive || state->internal || state->running)
 			return MOD_RES_PASSTHRU;
 		if (dispatchdepth >= 8)
 			return MOD_RES_DENY;
@@ -941,7 +1039,7 @@ public:
 	void OnPostCommand(
 		Command* handler, const CommandBase::Params& parameters, LocalUser* user, CmdResult result, bool loop) override
 	{
-		if (state->internal || state->running)
+		if (!state->alive || state->internal || state->running)
 			return;
 		std::string command = handler->name;
 		std::vector<std::string> params = parameters;
