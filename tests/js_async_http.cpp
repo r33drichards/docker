@@ -218,6 +218,18 @@ int main()
 	Check(!r.ok && r.body.empty());
 	g = std::make_shared<Generation>();
 	id = d.Stage(g, "GET", fixture.url + "/");
+	const auto completedbefore = fixture.requests.load();
+	Check(d.Commit(id));
+	for (unsigned i = 0; i < 500 && fixture.requests == completedbefore; ++i)
+		std::this_thread::sleep_for(std::chrono::milliseconds(2));
+	Check(fixture.requests == completedbefore + 1);
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	// A response from an earlier successful callback must not survive poison.
+	d.Invalidate(g);
+	r = Wait(d, g, id);
+	Check(!r.ok && r.body.empty() && r.error == "expired or unknown HTTP request");
+	g = std::make_shared<Generation>();
+	id = d.Stage(g, "GET", fixture.url + "/");
 	Check(d.Cancel(g, id));
 	Check(!d.Commit(id));
 #endif

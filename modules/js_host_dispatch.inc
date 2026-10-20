@@ -27,6 +27,8 @@ bool InvokeHost(Script& script, v8::Global<v8::Function>& callback, const std::s
 		},
 		error);
 	script.actor.clear();
+	if (!script.runtime.IsHealthy())
+		script.InvalidateHttp();
 	if (ok)
 		Schedule(script.effects);
 	script.effects.clear();

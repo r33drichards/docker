@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Exercise host APIs in a disposable loopback InspIRCd daemon, never production."""
+"""Exercise host APIs in a disposable loopback InspIRCd daemon, never production.
+
+For the HTTP self-unload regression, separately compile the test module with
+-DJS_ASYNC_HTTP_TEST_LOOPBACK and set INSPIRCD_HTTP_TEST_LOOPBACK=1. Never enable
+that transport bypass in production builds. A positive-control POST must arrive
+before the negative stale-request assertion can pass.
+"""
 
 import grp
 import json
@@ -194,6 +200,55 @@ ircd.on('preCommand', e => {
     )
 
 
+def exercise_http_poison(caller, reload):
+    """Prior committed queue and current staged effects die with their script."""
+    for mode in ("command-throw", "command-timeout", "preCommand", "backgroundTimer", "hostTimer"):
+        receiver = Receiver()
+        try:
+            url = json.dumps(receiver.url)
+            poison = "ircd.fetch(base+'/current',{method:'POST',body:'current'});"
+            poison += "while(true){}" if mode == "command-timeout" else "throw Error('poison');"
+            source = (
+                f"const base={url};\n"
+                + """
+ircd.registerCommand('HTTPPRIME',0,0,false,e=>{
+  for(let i=0;i<2;i++) ircd.fetch(base+'/slow',{method:'POST',body:'inflight'});
+  for(let i=0;i<2;i++) ircd.fetch(base+'/queued',{method:'POST',body:'prior'});
+});
+"""
+            )
+            if mode.startswith("command-"):
+                source += "ircd.registerCommand('HTTPPOISON',0,0,false,e=>{" + poison + "});"
+            elif mode == "preCommand":
+                source += (
+                    "ircd.on('preCommand',e=>{if(e.command==='PING'&&e.params[0]==='POISON'){"
+                    + poison
+                    + "}});"
+                )
+            elif mode == "backgroundTimer":
+                source += (
+                    "let armed=false;ircd.registerCommand('HTTPPOISON',0,0,false,e=>{armed=true;});"
+                )
+                source += "ircd.on('backgroundTimer',()=>{if(armed){" + poison + "}});"
+            else:
+                source += (
+                    "ircd.registerCommand('HTTPPOISON',0,0,false,e=>ircd.setTimer(1,false,()=>{"
+                    + poison
+                    + "}));"
+                )
+            reload(source, "admin")
+            caller.send("HTTPPRIME")
+            receiver.wait(2)
+            caller.send("PING POISON" if mode == "preCommand" else "HTTPPOISON")
+            time.sleep(4.2)  # Both already-sent /slow requests have completed.
+            assert [p[0] for p in receiver.posts] == ["/slow", "/slow"], (mode, receiver.posts)
+        finally:
+            receiver.close()
+    print(
+        "PASS: poison cancels prior queued HTTP and current staged HTTP on throw/timeout/hooks/timers"
+    )
+
+
 def exercise_http_self_unload(caller, reload):
     """Requires a test-only module built with JS_ASYNC_HTTP_TEST_LOOPBACK.
 
@@ -315,6 +370,7 @@ def main():
                 print("PASS: native rehash and self-unload discard stale queued effects")
                 reload(SOURCE, "admin")
                 if os.environ.get("INSPIRCD_HTTP_TEST_LOOPBACK") == "1":
+                    exercise_http_poison(caller, reload)
                     exercise_http_self_unload(caller, reload)
                     reload(SOURCE, "admin")
                 # Shutdown is tested only after every other check in this disposable process.

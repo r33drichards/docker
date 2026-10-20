@@ -222,12 +222,13 @@ public:
 	std::weak_ptr<LocalTransaction> timertransaction;
 	std::shared_ptr<js_async_http::Dispatcher> http;
 	std::shared_ptr<js_async_http::Generation> httpgeneration = std::make_shared<js_async_http::Generation>();
-	~Script()
+	void InvalidateHttp()
 	{
 		httpgeneration->active = false;
 		if (http)
 			http->Invalidate(httpgeneration);
 	}
+	~Script() { InvalidateHttp(); }
 	js_webhooks::Dispatcher& delivery;
 	std::shared_ptr<js_webhooks::Generation> generation;
 	const std::vector<js_scripts::WasmAsset>& wasm;
@@ -715,6 +716,8 @@ class ModuleJavaScript final : public Module
 			script->actor.clear();
 			if (!ok || denied)
 			{
+				if (!script->runtime.IsHealthy())
+					script->InvalidateHttp();
 				script->effects.clear();
 				effects.clear();
 				if (!ok && washealthy)
@@ -848,6 +851,8 @@ class ModuleJavaScript final : public Module
 			script->actor.clear();
 			if (!success || result == MOD_RES_DENY)
 			{
+				if (!script->runtime.IsHealthy())
+					script->InvalidateHttp();
 				script->effects.clear();
 				if (!success && washealthy)
 					ServerInstance->Logs.Normal(
