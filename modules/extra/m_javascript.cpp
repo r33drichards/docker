@@ -14,6 +14,7 @@
 #include "numeric.h"
 #include "xline.h"
 #include "js_generated/hook_specs.h"
+#include "js_event_specs.h"
 
 namespace
 {
@@ -153,10 +154,14 @@ v8::Local<v8::Value> Display(v8::Isolate* isolate, const std::string& text)
 }
 
 #include "js_hook_snapshot.h"
+#include "js_hook_mutations.h"
 
 const HookSpec* FindHook(const std::string& stage)
 {
 	for (const auto& hook : HookSpecs)
+		if (stage == hook.name)
+			return &hook;
+	for (const auto& hook : EventHookSpecs)
 		if (stage == hook.name)
 			return &hook;
 	return nullptr;
@@ -439,6 +444,8 @@ public:
 };
 } // namespace
 
+#include "js_event_listeners.h"
+
 class ModuleJavaScript final : public Module
 {
 	js_webhooks::Dispatcher delivery;
@@ -446,9 +453,11 @@ class ModuleJavaScript final : public Module
 	std::shared_ptr<DispatchState> state = std::make_shared<DispatchState>();
 	const CommandBase::Params* rewriteparams = nullptr;
 	unsigned int dispatchdepth = 0;
+	JavaScriptEventListeners events;
 
 	static bool Snapshot(v8::Local<v8::Context> context, v8::Local<v8::Object>& event, const std::string& command,
-		const std::vector<std::string>& parameters, const std::string& actor, const char* result, bool loop)
+		const std::vector<std::string>& parameters, const std::string& actor, const char* result, bool loop,
+		bool validated)
 	{
 		auto* isolate = context->GetIsolate();
 		event = v8::Object::New(isolate);
@@ -462,18 +471,18 @@ class ModuleJavaScript final : public Module
 			Put(context, event, "commandBytes", Bytes(isolate, command)) && Put(context, event, "params", params) &&
 			Put(context, event, "paramBytes", raw) && Put(context, event, "userId", Display(isolate, actor)) &&
 			Put(context, event, "stage", Key(isolate, result ? "postCommand" : "preCommand")) &&
-			Put(context, event, "validated", v8::Boolean::New(isolate, result != nullptr)) &&
+			Put(context, event, "validated", v8::Boolean::New(isolate, validated)) &&
 			Put(context, event, "result",
 				result ? v8::Local<v8::Value>(Key(isolate, result)) : v8::Local<v8::Value>(v8::Null(isolate))) &&
 			Put(context, event, "loop", v8::Boolean::New(isolate, loop));
 	}
 	static bool RewriteValue(v8::Local<v8::Context> context, v8::Local<v8::Value> value, std::string& command,
-		std::vector<std::string>& params, bool& denied)
+		std::vector<std::string>& params, bool& denied, bool validated)
 	{
 		auto* isolate = context->GetIsolate();
 		if (value->IsUndefined())
 			return true;
-		if (!value->IsObject() || value->IsArray())
+		if (!value->IsObject() || value->IsArray() || value->IsProxy())
 		{
 			Error(isolate, "Expected undefined or a decision object");
 			return false;
@@ -488,9 +497,9 @@ class ModuleJavaScript final : public Module
 			std::string name;
 			if (!keys->Get(context, i).ToLocal(&key) || !Text(isolate, key, name))
 				return false;
-			if (name != "action" && name != "command" && name != "params")
+			if (name != "action" && (validated || (name != "command" && name != "params")))
 			{
-				Error(isolate, "Unknown decision field");
+				Error(isolate, "Unknown decision field or rewrite attempted after validation");
 				return false;
 			}
 		}
@@ -499,6 +508,11 @@ class ModuleJavaScript final : public Module
 			!decision->Get(context, Key(isolate, "command")).ToLocal(&cmd) ||
 			!decision->Get(context, Key(isolate, "params")).ToLocal(&arguments))
 			return false;
+		if (validated && (!cmd->IsUndefined() || !arguments->IsUndefined()))
+		{
+			Error(isolate, "Command rewrites are not permitted after validation");
+			return false;
+		}
 		std::string actionname;
 		if (!Text(isolate, action, actionname))
 			return false;
@@ -561,7 +575,7 @@ class ModuleJavaScript final : public Module
 		return true;
 	}
 	bool Invoke(bool pre, std::string& command, std::vector<std::string>& params, const std::string& actor,
-		const char* result, bool loop, bool& denied, std::vector<Effect>& effects)
+		const char* result, bool loop, bool& denied, std::vector<Effect>& effects, bool validated)
 	{
 		if (!active)
 			return true;
@@ -583,13 +597,13 @@ class ModuleJavaScript final : public Module
 					for (auto& callback : callbacks)
 					{
 						v8::Local<v8::Object> event;
-						if (!Snapshot(context, event, command, params, actor, result, loop))
+						if (!Snapshot(context, event, command, params, actor, result, loop, validated))
 							return false;
 						v8::Local<v8::Value> arg = event, returned;
 						if (!callback.Get(isolate)->Call(context, v8::Undefined(isolate), 1, &arg).ToLocal(&returned) ||
 							!js_runtime::Runtime::RequireSynchronous(isolate, returned))
 							return false;
-						if (pre && !RewriteValue(context, returned, command, params, denied))
+						if (pre && !RewriteValue(context, returned, command, params, denied, validated))
 							return false;
 						if (denied)
 							break;
@@ -624,55 +638,72 @@ class ModuleJavaScript final : public Module
 	}
 
 	static std::string Actor(User* user) { return user && IS_LOCAL(user) ? user->uuid : std::string(); }
+	using MutationHandler = std::function<bool(
+		v8::Local<v8::Context>, v8::Local<v8::Value>, Authority, std::vector<std::function<void()>>&)>;
 	static bool HookDecision(v8::Local<v8::Context> context, v8::Local<v8::Value> returned, const HookSpec& hook,
-		Authority authority, ModResult& result)
+		Authority authority, ModResult& result, const MutationHandler& mutate, const std::string& actor,
+		std::vector<std::function<void()>>& commits)
 	{
 		auto* isolate = context->GetIsolate();
 		if (returned->IsUndefined())
 			return true;
-		if (!returned->IsObject() || returned->IsArray())
+		if (!returned->IsObject() || returned->IsArray() || returned->IsProxy())
 		{
 			Error(isolate, "Expected undefined or a hook decision");
 			return false;
 		}
 		auto object = returned.As<v8::Object>();
 		v8::Local<v8::Array> keys;
-		if (!object->GetOwnPropertyNames(context).ToLocal(&keys) || keys->Length() != 1)
-		{
-			Error(isolate, "Hook decisions contain only action; snapshots are read-only");
+		if (!object->GetOwnPropertyNames(context, v8::ALL_PROPERTIES).ToLocal(&keys) || keys->Length() > 2)
 			return false;
-		}
-		v8::Local<v8::Value> key, action;
-		std::string keyname, name;
-		if (!keys->Get(context, 0).ToLocal(&key) || !Text(isolate, key, keyname) || keyname != "action" ||
-			!object->Get(context, Key(isolate, "action")).ToLocal(&action) || !Text(isolate, action, name))
+		for (uint32_t i = 0; i < keys->Length(); ++i)
 		{
-			Error(isolate, "Expected action");
+			v8::Local<v8::Value> key;
+			std::string name;
+			if (!keys->Get(context, i).ToLocal(&key) || !Text(isolate, key, name))
+				return false;
+			if (name != "action" && (name != "patch" || !mutate))
+			{
+				Error(isolate, "Unknown decision field or unsupported mutation");
+				return false;
+			}
+		}
+		v8::Local<v8::Value> action, patch;
+		std::string name;
+		if (!object->Get(context, Key(isolate, "action")).ToLocal(&action) || !Text(isolate, action, name) ||
+			!object->Get(context, Key(isolate, "patch")).ToLocal(&patch))
 			return false;
-		}
-		if (name == "pass")
-			return true;
-		if (name == "deny")
-		{
+		if (name == "deny" && hook.decision)
 			result = MOD_RES_DENY;
-			return true;
-		}
-		if (name == "allow" && hook.allow && authority == Authority::Admin)
-		{
+		else if (name == "allow" && hook.decision && hook.allow && authority == Authority::Admin)
 			result = MOD_RES_ALLOW;
-			return true;
+		else if (name != "pass")
+		{
+			Error(isolate, "Invalid action for this hook or script authority");
+			return false;
 		}
-		Error(isolate, "allow requires admin authority and a hook that does not transfer socket ownership");
-		return false;
+		if (!patch->IsUndefined())
+		{
+			if (name != "pass" || !mutate || (authority != Authority::Admin && actor.empty()))
+			{
+				Error(isolate, "Mutation requires action pass and a mutable hook");
+				return false;
+			}
+			return mutate(context, patch, authority, commits);
+		}
+		return true;
 	}
+
 	using SnapshotBuilder = std::function<bool(HookSnapshot&, v8::Local<v8::Object>)>;
-	ModResult DispatchHook(const char* stage, const std::string& actor, const SnapshotBuilder& build)
+	ModResult DispatchHook(
+		const char* stage, const std::string& actor, const SnapshotBuilder& build, const MutationHandler& mutate = {})
 	{
 		if (!active || state->internal || state->running)
 			return MOD_RES_PASSTHRU;
 		const auto& hook = *FindHook(stage);
 		FlagGuard running(state->running);
 		std::vector<Effect> effects;
+		std::vector<std::function<void()>> commits;
 		ModResult result = MOD_RES_PASSTHRU;
 		for (auto& script : active->scripts)
 		{
@@ -700,7 +731,8 @@ class ModuleJavaScript final : public Module
 						if (!callback.Get(isolate)->Call(context, v8::Undefined(isolate), 1, &arg).ToLocal(&returned) ||
 							!js_runtime::Runtime::RequireSynchronous(isolate, returned))
 							return false;
-						if (hook.decision && !HookDecision(context, returned, hook, script->authority, result))
+						if ((hook.decision || mutate) &&
+							!HookDecision(context, returned, hook, script->authority, result, mutate, actor, commits))
 							return false;
 						if (result != MOD_RES_PASSTHRU)
 							break;
@@ -722,6 +754,8 @@ class ModuleJavaScript final : public Module
 			if (result != MOD_RES_PASSTHRU)
 				break;
 		}
+		for (auto& commit : commits)
+			commit();
 		Schedule(effects);
 		return result;
 	}
@@ -729,6 +763,8 @@ class ModuleJavaScript final : public Module
 public:
 	ModuleJavaScript()
 		: Module(VF_NONE, "Runs trusted local JavaScript and Wasm Module hooks with explicit authority.")
+		, events(this, [this](const auto* stage, const auto& actor, const auto& build)
+			  { return DispatchHook(stage, actor, build); })
 	{
 	}
 	~ModuleJavaScript() override
@@ -810,17 +846,17 @@ public:
 	ModResult OnPreCommand(
 		std::string& command, CommandBase::Params& parameters, LocalUser* user, bool validated) override
 	{
-		if (validated || state->internal || state->running)
+		if (state->internal || state->running)
 			return MOD_RES_PASSTHRU;
 		if (dispatchdepth >= 8)
 			return MOD_RES_DENY;
-		if (&parameters == rewriteparams)
+		if (!validated && &parameters == rewriteparams)
 			return MOD_RES_PASSTHRU;
 		std::string replacement = command;
 		std::vector<std::string> params = parameters;
 		std::vector<Effect> effects;
 		bool denied = false;
-		if (!Invoke(true, replacement, params, user->uuid, nullptr, false, denied, effects) || denied)
+		if (!Invoke(true, replacement, params, user->uuid, nullptr, false, denied, effects, validated) || denied)
 			return MOD_RES_DENY;
 		if (replacement != command || params != static_cast<const std::vector<std::string>&>(parameters))
 		{
@@ -868,7 +904,7 @@ public:
 		const char* name = result == CmdResult::SUCCESS ? "SUCCESS"
 			: result == CmdResult::FAILURE				? "FAILURE"
 														: "INVALID";
-		if (Invoke(false, command, params, user->uuid, name, loop, denied, effects))
+		if (Invoke(false, command, params, user->uuid, name, loop, denied, effects, true))
 			Schedule(effects);
 	}
 };

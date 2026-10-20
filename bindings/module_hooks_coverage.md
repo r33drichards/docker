@@ -1,6 +1,6 @@
 # Module hook coverage (InspIRCd 4.12.1)
 
-All 74 Implementation events plus the direct OnCleanup callback. Native references are owned read-only snapshots; only command rewrites and explicit queued effects mutate native state.
+All 74 Implementation events plus the direct OnCleanup callback. Native references are owned read-only snapshots; only command rewrites, five bounded explicit patch adapters, and explicit queued effects mutate native state.
 
 | Native hook | JS stage | Result | Callback failure |
 |---|---|---|---|

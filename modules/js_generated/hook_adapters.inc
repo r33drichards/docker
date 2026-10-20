@@ -56,10 +56,13 @@
 	}
 	void OnUserPart(Membership* memb, std::string& partmessage, CUList& except_list) override
 	{
+		HookPartMutation mutation(partmessage, except_list);
 		DispatchHook("userPart", Actor(memb->user), [&](HookSnapshot& snapshot, v8::Local<v8::Object> event) {
 			return snapshot.Field(event, "memb", memb) &&
 				snapshot.Field(event, "partmessage", partmessage) &&
 				snapshot.Field(event, "except_list", except_list);
+		}, [&](v8::Local<v8::Context> context, v8::Local<v8::Value> patch, Authority authority, std::vector<std::function<void()>>& commits) {
+			return mutation.Apply(context, patch, authority, commits);
 		});
 	}
 	void OnPreRehash(User* user, const std::string& parameter) override
@@ -86,6 +89,7 @@
 	}
 	ModResult OnUserPreJoin(LocalUser* user, Channel* chan, const std::string& cname, std::string& privs, const std::string& keygiven, bool override) override
 	{
+		HookJoinMutation mutation(privs);
 		return DispatchHook("userPreJoin", Actor(user), [&](HookSnapshot& snapshot, v8::Local<v8::Object> event) {
 			return snapshot.Field(event, "user", user) &&
 				snapshot.Field(event, "chan", chan) &&
@@ -93,6 +97,8 @@
 				snapshot.Field(event, "privs", privs) &&
 				snapshot.Field(event, "keygiven", keygiven) &&
 				snapshot.Field(event, "override", override);
+		}, [&](v8::Local<v8::Context> context, v8::Local<v8::Value> patch, Authority authority, std::vector<std::function<void()>>& commits) {
+			return mutation.Apply(context, patch, authority, commits);
 		});
 	}
 	ModResult OnUserPreKick(User* source, Membership* memb, const std::string& reason) override
@@ -134,18 +140,24 @@
 	}
 	ModResult OnUserPreMessage(User* user, MessageTarget& target, MessageDetails& details) override
 	{
+		HookMessageMutation mutation(details);
 		return DispatchHook("userPreMessage", Actor(user), [&](HookSnapshot& snapshot, v8::Local<v8::Object> event) {
 			return snapshot.Field(event, "user", user) &&
 				snapshot.Field(event, "target", target) &&
 				snapshot.Field(event, "details", details);
+		}, [&](v8::Local<v8::Context> context, v8::Local<v8::Value> patch, Authority authority, std::vector<std::function<void()>>& commits) {
+			return mutation.Apply(context, patch, authority, commits);
 		});
 	}
 	void OnBuildNeighborList(User* source, User::NeighborList& include, User::NeighborExceptions& exceptions) override
 	{
+		HookNeighborMutation mutation(include, exceptions);
 		DispatchHook("buildNeighborList", Actor(source), [&](HookSnapshot& snapshot, v8::Local<v8::Object> event) {
 			return snapshot.Field(event, "source", source) &&
 				snapshot.Field(event, "include", include) &&
 				snapshot.Field(event, "exceptions", exceptions);
+		}, [&](v8::Local<v8::Context> context, v8::Local<v8::Value> patch, Authority authority, std::vector<std::function<void()>>& commits) {
+			return mutation.Apply(context, patch, authority, commits);
 		});
 	}
 	ModResult OnUserPreNick(LocalUser* user, const std::string& newnick) override
@@ -511,10 +523,13 @@
 	}
 	ModResult OnPreChangeConnectClass(LocalUser* user, const std::shared_ptr<ConnectClass>& klass, std::optional<Numeric::Numeric>& errnum) override
 	{
+		HookConnectMutation mutation(errnum);
 		return DispatchHook("preChangeConnectClass", Actor(user), [&](HookSnapshot& snapshot, v8::Local<v8::Object> event) {
 			return snapshot.Field(event, "user", user) &&
 				snapshot.Field(event, "klass", klass) &&
 				snapshot.Field(event, "errnum", errnum);
+		}, [&](v8::Local<v8::Context> context, v8::Local<v8::Value> patch, Authority authority, std::vector<std::function<void()>>& commits) {
+			return mutation.Apply(context, patch, authority, commits);
 		});
 	}
 	void OnChangeConnectClass(LocalUser* user, const std::shared_ptr<ConnectClass>& klass, bool force) override

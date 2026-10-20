@@ -203,7 +203,8 @@
       "actor": "Actor(memb->user)",
       "adapter": "generated",
       "allow": false,
-      "failure": "deny"
+      "failure": "deny",
+      "mutation": "userPart"
     },
     {
       "native": "OnPreRehash",
@@ -316,7 +317,8 @@
       "actor": "Actor(user)",
       "adapter": "generated",
       "allow": true,
-      "failure": "deny"
+      "failure": "deny",
+      "mutation": "userPreJoin"
     },
     {
       "native": "OnUserPreKick",
@@ -476,7 +478,8 @@
       "actor": "Actor(user)",
       "adapter": "generated",
       "allow": true,
-      "failure": "deny"
+      "failure": "deny",
+      "mutation": "userPreMessage"
     },
     {
       "native": "OnBuildNeighborList",
@@ -503,7 +506,8 @@
       "actor": "Actor(source)",
       "adapter": "generated",
       "allow": false,
-      "failure": "deny"
+      "failure": "deny",
+      "mutation": "buildNeighborList"
     },
     {
       "native": "OnUserPreNick",
@@ -1735,7 +1739,8 @@
       "actor": "Actor(user)",
       "adapter": "generated",
       "allow": true,
-      "failure": "deny"
+      "failure": "deny",
+      "mutation": "preChangeConnectClass"
     },
     {
       "native": "OnChangeConnectClass",

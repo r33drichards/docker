@@ -2,7 +2,7 @@ site_name: InspIRCd JavaScript module
 site_description: Trusted JavaScript and WebAssembly hooks for InspIRCd 4.12.1
 site_url: https://r33drichards.github.io/docker/
 repo_url: https://github.com/r33drichards/docker
-edit_uri: edit/feat/local-echo-command/site-docs/
+edit_uri: edit/master/site-docs/
 docs_dir: site-docs
 site_dir: site
 strict: true
@@ -23,6 +23,7 @@ nav:
       - Configuration: reference/configuration.md
       - Command hooks: reference/commands.md
       - Core Module hooks: reference/hooks.md
+      - Separate event-provider hooks: reference/events.md
       - Native API and authority: reference/api.md
       - Execution and failure limits: reference/limits.md
   - Explanation:

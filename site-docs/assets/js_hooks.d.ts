@@ -30,10 +30,13 @@ interface HookWireMessage {
   tags: HookList<{name: HookText; value: HookText}>;
 }
 type HookDecision = {action: 'pass' | 'deny' | 'allow'};
+type ModuleHookResult<K extends keyof ModuleHookEvents> = HookDecision |
+  (K extends keyof ModuleHookPatches ? {action: 'pass'; patch: ModuleHookPatches[K]} : never);
 type ModuleHookEvent<K extends keyof ModuleHookEvents> = ModuleHookEvents[K] & {stage: K; userId: string | null};
 interface IrcdApi {
   /** Native result semantics apply. allow requires authority=admin, never accepts socket ownership.
-   * Void hooks ignore synchronous return values. All snapshots are detached copies, not native handles.
+   * Explicit patches are available only on ModuleHookPatches stages. Void patches require action=pass.
+   * Patches commit atomically on successful dispatch; snapshots remain detached copies, not native handles.
    */
-  on<K extends keyof ModuleHookEvents>(stage: K, callback: (event: ModuleHookEvent<K>) => HookDecision | void): void;
+  on<K extends keyof ModuleHookEvents>(stage: K, callback: (event: ModuleHookEvent<K>) => ModuleHookResult<K> | void): void;
 }

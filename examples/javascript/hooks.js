@@ -2,6 +2,7 @@
 // A pre callback returns undefined, { action: 'deny' }, or
 // { action: 'pass', command?: string, params?: (string | Uint8Array)[] }.
 ircd.on('preCommand', event => {
+  if (event.validated) return; // Rewrites run only before native validation.
   if (event.command === 'EXAMPLEPING') {
     return { action: 'pass', command: 'PING', params: ['hello from JavaScript'] };
   }
