@@ -61,6 +61,7 @@ jobs:
       - name: Required ASan, UBSan, leak and ownership checks
         run: |
           runuser -u ci -- node tests/test_join_webhook.cjs
+          runuser -u ci -- node tests/test_wchat_nocodb.cjs
           runuser -u ci -- python3 tests/test_js_webhooks.py
           runuser -u ci -- env WEBHOOK_TEST_CXXFLAGS="-O1 -fsanitize=address,undefined -fno-sanitize-recover=all" python3 tests/test_js_webhooks.py
           runuser -u ci -- bash tests/ci/native.sh sanitizers

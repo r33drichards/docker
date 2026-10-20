@@ -1,6 +1,10 @@
 #!/bin/sh
 # shellcheck disable=SC2068
 
+# Clear the optional token environment before any child command or daemon.
+# shellcheck source=tools/materialize-nocodb-token.sh
+. /materialize-nocodb-token.sh || exit 1
+
 INSPIRCD_ROOT="/inspircd"
 
 # TODO fix/make configuration better

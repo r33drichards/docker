@@ -775,6 +775,13 @@ public:
 				endpoints.emplace(
 					name, js_webhooks::ValidateEndpoint(tag->getString("url"), tag->getBool("loopbackhttp", false)));
 			}
+			for (const auto& [_, tag] : ServerInstance->Config->ConfTags("javascriptwebhookheader"))
+			{
+				const auto found = endpoints.find(tag->getString("endpoint"));
+				if (found == endpoints.end())
+					throw std::runtime_error("Unknown webhook header endpoint");
+				js_webhooks::AddHeader(found->second, tag->getString("name"), tag->getString("valuefile"));
+			}
 			auto candidate = std::make_unique<ScriptSet>();
 			candidate->generation = std::make_shared<js_webhooks::Generation>(std::move(endpoints));
 			candidate->wasm = js_scripts::LoadWasmAssets(assets, ServerInstance->Config->Paths.Config);

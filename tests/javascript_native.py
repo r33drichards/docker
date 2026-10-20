@@ -17,6 +17,7 @@ import time
 
 from precommand_client import Client
 from test_js_webhooks import Receiver
+from wchat_nocodb_native import exercise_wchat_nocodb
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RUN = pathlib.Path(os.environ["INSPIRCD_NATIVE"]).resolve()
@@ -175,17 +176,23 @@ ircd.on('userPart', e => { if (e.memb.channel.name.text === '#jslive') ircd.noti
     )
 
 
-def exercise_webhooks(caller, reload, receiver):
+def exercise_webhooks(caller, reload, receiver, directory):
     endpoint = f'<javascriptwebhook name="joins" url="{receiver.url}/joins" loopbackhttp="yes">\n'
+    secret = directory / "webhook-secret"
+    secret.write_text("synthetic-first-token")
+    secret.chmod(0o600)
+    header = f'<javascriptwebhookheader endpoint="joins" name="xc-token" valuefile="{secret}">\n'
+    endpoint += header
     example = (ROOT / "examples/javascript/join-webhook.js").read_text()
     reload(example, "admin", endpoint)
     before = len(receiver.posts)
     caller.send("JOIN #example")
     caller.barrier("webhook-real-join")
     posts = receiver.wait(before + 1)
-    route, body, content_type = posts[-1]
+    route, body, headers = posts[-1]
     payload = json.loads(body)
-    assert route == "/joins" and content_type == "application/json"
+    assert route == "/joins" and headers["Content-Type"] == "application/json"
+    assert headers["xc-token"] == "synthetic-first-token"
     assert payload == {
         "event": "irc.channel.join",
         "user": {"id": payload["user"]["id"], "nick": caller.nick},
@@ -210,6 +217,34 @@ def exercise_webhooks(caller, reload, receiver):
     caller.barrier("webhook-failed-rehash-retains-target")
     receiver.wait(before + 3)
     assert receiver.posts[-1][0] == "/joins"
+
+    # Bad/missing files and invalid names fail the complete candidate atomically.
+    for bad in (
+        header.replace(str(secret), str(secret) + ".missing"),
+        header.replace('name="xc-token"', 'name="Host"'),
+        header.replace('endpoint="joins"', 'endpoint="missing"'),
+        header + header,
+    ):
+        count = len(receiver.posts)
+        reload(example, "admin", endpoint.replace(header, bad).replace("/joins", "/wrong-target"))
+        caller.send("PART #example")
+        caller.send("JOIN #example")
+        caller.barrier("webhook-invalid-header-retains-generation")
+        receiver.wait(count + 1)
+        assert receiver.posts[-1][0] == "/joins"
+        assert receiver.posts[-1][2]["xc-token"] == "synthetic-first-token"
+    secret.write_text("synthetic-second-token")
+    count = len(receiver.posts)
+    caller.send("PART #example")
+    caller.send("JOIN #example")
+    receiver.wait(count + 1)
+    assert receiver.posts[-1][2]["xc-token"] == "synthetic-first-token"
+    reload(example, "admin", endpoint)
+    count = len(receiver.posts)
+    caller.send("PART #example")
+    caller.send("JOIN #example")
+    receiver.wait(count + 1)
+    assert receiver.posts[-1][2]["xc-token"] == "synthetic-second-token"
 
     # Every failure is tested in a fresh isolate. Denied/error/Promise batches
     # cannot release even their earlier staged requests to the worker.
@@ -372,8 +407,16 @@ def main():
                         raise AssertionError("Rehash did not complete")
 
                 exercise_module_hooks(caller, reload)
-                exercise_webhooks(caller, reload, receiver)
+                exercise_webhooks(caller, reload, receiver, path)
+                output = (path / "server.log").read_text()
+                for marker in ("synthetic-first-token", "synthetic-second-token", "webhook-secret"):
+                    assert marker not in output
 
+                exercise_wchat_nocodb(caller, other, reload, receiver, path)
+                output = (path / "server.log").read_text()
+                for marker in ("synthetic-adapter-token", "adapter-secret"):
+                    assert marker not in output
+                reload(GOOD)
                 reload('throw Error("candidate fails");')
                 caller.send("XWASM")  # Last-good context survived failed reload.
                 caller.until(lambda line: " PONG " in line and line.endswith("42"))

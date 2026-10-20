@@ -34,7 +34,7 @@ class Receiver:
             def do_POST(self):
                 body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
                 with owner.condition:
-                    owner.posts.append((self.path, body, self.headers.get("Content-Type")))
+                    owner.posts.append((self.path, body, dict(self.headers)))
                     owner.condition.notify_all()
                 if self.path == "/slow":
                     time.sleep(3)
@@ -137,13 +137,21 @@ def main():
                 no_proxy="",
             )
             subprocess.run(
-                [str(binary), receiver.url, tls.url + "/tls"], check=True, timeout=20, env=env
+                [str(binary), receiver.url, tls.url + "/tls", str(directory)],
+                check=True,
+                timeout=20,
+                env=env,
             )
             paths = [post[0] for post in receiver.posts]
             assert paths.count("/ok") == 1 and paths.count("/redirect") == 1, paths
             assert "/must-not-follow" not in paths and tls.posts == [], (paths, tls.posts)
-            for _name, body, content_type in receiver.posts:
-                assert content_type == "application/json"
+            for name, body, headers in receiver.posts:
+                headers = {key.lower(): value for key, value in headers.items()}
+                assert headers["content-type"] == "application/json"
+                assert headers.get("xc-token") == ("synthetic-token" if name == "/ok" else None)
+                assert headers.get("authorization") == (
+                    "synthetic-token" if name == "/redirect" else None
+                )
                 assert json.loads(body) == (
                     {} if body == b"{}" else {"event": "transport.test", "nick": "λ"}
                 )
