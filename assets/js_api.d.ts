@@ -19,6 +19,10 @@ type CommandDecision = { action: 'deny' } | {
 interface IrcdApi {
   on(stage: 'preCommand', callback: (event: CommandEvent) => CommandDecision | void): void;
   on(stage: 'postCommand', callback: (event: CommandEvent) => void): void;
+  /** Admin callback only. JSON object <=16KiB. true is staged, not delivered; false is queue-full. */
+  postWebhook(name: string, json: string): boolean;
+  /** Aggregate process/module-lifetime counters; never URLs, headers or payloads. */
+  webhookStats(): {pending: number; sent: number; failed: number; discarded: number};
   wasm(name: string): Uint8Array;
   userById(id: string): { id: string; nick: string | null } | null;
   notice(targetId: string, text: string): void;

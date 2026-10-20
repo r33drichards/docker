@@ -163,7 +163,8 @@
 </code></pre>
 <p>The primary image uses Alpine 3.22, InspIRCd v4.12.1 by default, and matching
 <code>nodejs-dev</code>/<code>nodejs-libs</code> 22.23.2-r0. Only V8 APIs are used; no Node environment,
-<code>process</code>, <code>require</code>, filesystem API, network API, or WASI is installed in scripts.
+<code>process</code>, <code>require</code>, filesystem API, general networking API (<code>fetch</code>), or WASI is
+installed in scripts. The explicit queued webhook API below is opt-in.
 The root <code>Dockerfile</code> includes the compiled module and its runtime library, but
 leaves it unloaded until explicitly configured. No scripts are installed or enabled
 by default. <code>Dockerfile.javascript</code> has been retired; downstream Railway projects
