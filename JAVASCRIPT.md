@@ -18,7 +18,7 @@ docker build -t inspircd:local .
 The primary image uses Alpine 3.22, InspIRCd v4.12.1 by default, and matching
 `nodejs-dev`/`nodejs-libs` 22.23.2-r0. Only V8 APIs are used; no Node environment,
 `process`, `require`, filesystem API, general networking API (`fetch`), or WASI is
-installed in scripts. The explicit queued webhook API below is opt-in.
+installed in scripts. The explicit queued webhook API below is opt-in. Bounded public RSS/Atom fetching is available to admin scripts.
 The root `Dockerfile` includes the compiled module and its runtime library, but
 leaves it unloaded until explicitly configured. No scripts are installed or enabled
 by default. `Dockerfile.javascript` has been retired; downstream Railway projects
@@ -181,21 +181,27 @@ effect, and authorization policy plus an implementation and tests.
 
 Additional explicit host methods:
 
+- `userById(uuid)` returns an owned `{ id, nick, isOper }` snapshot or null.
+- `notice(target, text)` queues a server NOTICE (maximum 400 UTF-8 bytes).
+- `privmsg(target, text)` queues a server PRIVMSG with identical target and authority rules.
+- `fetch(url, options?)` stages a bounded generic asynchronous HTTP request, returning a request token. Options support GET or POST and an optional string body. Admin callbacks only; invalid requests or full queues throw.
+- `takeFetchResult(token)` polls/consumes `{ok, status, body, bodyBytes, error}`, or null while pending. `body` is null for invalid UTF-8; `bodyBytes` preserves the exact response.
+- `cancelFetch(token)` cancels pending work. Native request tokens are generation-scoped, not persisted JavaScript state.
 - `sqlite.open(name)` opens a host-granted named SQLite database (see [SQLite reference](https://r33drichards.github.io/docker/reference/sqlite/)).
-- `userById(uuid)` returns an owned `{ id, nick }` snapshot or null.
-- `notice(targetUuid, text)` queues a server notice (maximum 400 UTF-8 bytes).
 - `rename(targetUuid, nick)` queues a validated nickname change.
 - `wasm(name)` returns a fresh Uint8Array of a configured asset's bytes.
 - `postWebhook(name, json)` stages a bounded JSON POST to an administrator-configured endpoint (admin callbacks only).
 - `webhookStats()` returns aggregate `{pending, sent, failed, discarded}` counters (admin scripts only).
 
-Default `authority="user"` restricts notice/rename targets to the triggering
+Default `authority="user"` restricts notice/privmsg/rename targets to the triggering
 client. Rename runs ordinary NICK processing as that client, retaining native
-restrictions. Explicit `authority="admin"` permits targeting other local users;
+restrictions. Explicit `authority="admin"` permits messaging any existing local or remote user UUID, or existing #channel;
 rename directly invokes the native administrative nickname change after nickname
 validation. No credential, operator identity, or permission is granted to a user.
 Queued operations re-resolve the original actor and target UUIDs and skip users
-who disconnected. Only local targets are changed in this initial API.
+who disconnected. Rename remains limited to local users. Channel NOTICE and PRIVMSG reach local members and are forwarded once through the network protocol. User messages choose local client delivery or remote forwarding, never both. These are trusted server-origin messages, not impersonated user commands; they do not apply ordinary user speaking restrictions. Targets are re-resolved at flush time; missing users/channels are skipped. No sender or raw-protocol parameter is exposed.
+
+RSS uses the generic asynchronous native HTTP API. RSS/Atom parsing, subscriptions and deduplication are JavaScript application state; no feed-specific native host method or XML dependency is required.
 
 At most 16 effects can be queued per file/event. All effects for the event are
 discarded on pre denial/error. Accepted IRC effects run at the main-loop safe point,
@@ -381,7 +387,7 @@ Snapshots expose no native handles and changing them never changes native state.
 Text is capped at 64 KiB per value and 256 KiB per event; lists at 256 entries.
 Each event has `stage` and nullable `userId`; server events may have no actor.
 User-authority effects require a local actor; explicit admin authority permits
-local-target effects without an actor. The same queued-effect/reentrancy rules
+user/channel messaging without an actor (renames remain local-only). The same queued-effect/reentrancy rules
 apply to all events.
 
 Void hooks observe only unless listed as mutable below; other return values are
@@ -583,6 +589,9 @@ ircd.on('serverSplit', event => {
 The counter and last split live only for this script generation; a successful
 rehash replaces them. Retained snapshots do not authorize any later action.
 
+## RSS feed subscriptions
+
+The opt-in [RSS script](examples/rss.js) implements `/RSS <channel> <feed-url>` and `/RSS <channel> off`. The native command is operator-only. It uses `backgroundTimer`, Map-based state, bounded asynchronous `fetch`/`takeFetchResult`, and admin-authorized `privmsg` channel targets. No feed subscriptions are installed by default. See [RSS setup and limits](site-docs/how-to/rss.md).
 ## Explicit durable SQLite data
 
 See [SQLite API and operations](docs/SQLITE.md) for opt-in per-script database grants,

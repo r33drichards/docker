@@ -60,6 +60,10 @@ jobs:
           chown -R ci:ci "$GITHUB_WORKSPACE"
       - name: Required ASan, UBSan, leak and ownership checks
         run: |
+          runuser -u ci -- bash tests/js_async_http.sh
+          runuser -u ci -- node tests/replay/run.cjs --preload tests/rss_sqlite_mock.js --script examples/rss.js tests/replay/rss.js tests/replay/rss_sqlite.js
+          runuser -u ci -- sh tests/js_replay.sh --preload tests/rss_sqlite_mock.js --script examples/rss.js tests/replay/rss.js tests/replay/rss_sqlite.js
+          runuser -u ci -- node tests/test_rss.cjs
           runuser -u ci -- sh tests/js_sqlite.sh
           runuser -u ci -- env CXXFLAGS="-O1 -fsanitize=address,undefined -fno-sanitize-recover=all" sh tests/js_sqlite.sh
           runuser -u ci -- node tests/test_join_webhook.cjs

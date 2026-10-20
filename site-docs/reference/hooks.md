@@ -25,7 +25,7 @@ Snapshots expose no native handles and changing them never changes native state.
 Text is capped at 64 KiB per value and 256 KiB per event; lists at 256 entries.
 Each event has `stage` and nullable `userId`; server events may have no actor.
 User-authority effects require a local actor; explicit admin authority permits
-local-target effects without an actor. The same queued-effect/reentrancy rules
+user/channel messaging without an actor (renames remain local-only). The same queued-effect/reentrancy rules
 apply to all events.
 
 Void hooks observe only unless listed as mutable below; other return values are

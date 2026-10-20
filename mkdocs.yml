@@ -16,6 +16,7 @@ nav:
   - How-to guides:
       - Build and configure: how-to/configure.md
       - Reload and recover: how-to/reload.md
+      - Subscribe channels to RSS: how-to/rss.md
       - Use WebAssembly: how-to/wasm.md
       - Test changes: how-to/test.md
       - Maintain and publish docs: how-to/documentation.md

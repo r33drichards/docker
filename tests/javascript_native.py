@@ -16,6 +16,7 @@ import tempfile
 import time
 
 from precommand_client import Client
+from rss_native import exercise_messaging, exercise_remote_messaging
 from test_js_webhooks import Receiver
 from wchat_nocodb_native import exercise_wchat_nocodb
 
@@ -692,6 +693,7 @@ def main():
                 exercise_native_mutations(caller, other, reload)
                 exercise_event_listeners(caller, other, reload)
                 exercise_webhooks(caller, reload, receiver, path)
+                exercise_messaging(caller, other, reload)
                 output = (path / "server.log").read_text()
                 for marker in ("synthetic-first-token", "synthetic-second-token", "webhook-secret"):
                     assert marker not in output
@@ -807,3 +809,4 @@ def assert_silent(client):
 
 if __name__ == "__main__":
     main()
+    exercise_remote_messaging()
