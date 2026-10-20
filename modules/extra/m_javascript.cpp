@@ -335,7 +335,7 @@ public:
 			Error(args.GetIsolate(), "Webhook JSON must contain an object");
 			return;
 		}
-		auto request = self->delivery.Stage(self->generation, name, body);
+		auto request = self->delivery.Stage(self->generation, name, body, self->sourcepath, self->httpgeneration);
 		const bool accepted = !!request;
 		if (request)
 		{
@@ -424,8 +424,10 @@ public:
 			return;
 		args.GetReturnValue().Set(object);
 	}
+	std::string sourcepath;
 	bool Load(const js_scripts::Source& source, std::string& error)
 	{
+		sourcepath = source.canonical_path.string();
 		bool result = runtime.Initialize(
 			source.content, source.canonical_path.string(),
 			[this](v8::Isolate* isolate, v8::Local<v8::Context> context)
@@ -478,6 +480,11 @@ public:
 		auto owner = state.lock();
 		if (!owner || !owner->alive)
 			return;
+		if (effect.webhook)
+		{
+			effect.webhook->Commit();
+			return;
+		}
 		if (effect.http)
 		{
 			// Preserve callback effect ordering: accepted self-unload earlier in
@@ -736,8 +743,6 @@ class ModuleJavaScript final : public Module
 		{
 			if (effect.local)
 				effect.local->committed = true;
-			else if (effect.webhook)
-				delivery.Commit(std::move(effect.webhook));
 			else
 				ServerInstance->AtomicActions.AddAction(new DeferredEffect(state, std::move(effect)));
 		}
@@ -928,10 +933,53 @@ public:
 					throw std::runtime_error("Unknown webhook header endpoint");
 				js_webhooks::AddHeader(found->second, tag->getString("name"), tag->getString("valuefile"));
 			}
+			auto loaded = js_scripts::LoadSources(sources, ServerInstance->Config->Paths.Config);
+			js_webhooks::HeaderRules headers;
+			for (const auto& [_, tag] : ServerInstance->Config->ConfTags("javascriptfetchheader"))
+			{
+				std::filesystem::path path = tag->getString("script");
+				if (path.is_relative())
+					path = std::filesystem::path(ServerInstance->Config->Paths.Config) / path;
+				std::error_code ec;
+				path = std::filesystem::canonical(path, ec);
+				if (ec ||
+					std::none_of(loaded.begin(), loaded.end(), [&](const auto& source)
+						{ return source.canonical_path == path && source.authority == Authority::Admin; }))
+					throw std::runtime_error("Fetch header requires a configured admin script");
+				const auto url = tag->getString("url"), key = js_webhooks::ExactUrl(url);
+				// Injection grants no additional network authority. HTTPS only, and
+				// the ordinary fetch destination policy is checked independently.
+				if (key.empty() || (key.compare(0, 8, "https://") != 0 && !js_async_http::FixtureUrl(url)) ||
+					!js_async_http::ValidUrl(url))
+					throw std::runtime_error("Invalid fetch header URL");
+				const auto rule = std::make_pair(path.string(), key);
+				if (!headers.count(rule) && headers.size() >= 32)
+					throw std::runtime_error("Excessive fetch header rules");
+				auto& endpoint = headers[rule];
+				endpoint.url = url;
+				js_webhooks::AddHeader(endpoint, tag->getString("name"), tag->getString("valuefile"));
+			}
+			// Ambiguous same-name legacy/rule credentials are config errors, not
+			// an override order controlled by a script.
+			for (const auto& [_, endpoint] : endpoints)
+				for (const auto& [key, rule] : headers)
+					if (js_webhooks::ExactUrl(endpoint.url) == key.second)
+					{
+						std::size_t bytes = 0;
+						for (const auto* group : {endpoint.headers.get(), rule.headers.get()})
+							for (const auto& [name, value] : *group)
+								bytes += name.size() + value.size() + 4;
+						if (bytes > js_webhooks::MaxHeaderBytes ||
+							endpoint.headers->size() + rule.headers->size() > js_webhooks::MaxHeaders)
+							throw std::runtime_error("Excessive combined HTTP headers");
+						for (const auto& [name, value] : *rule.headers)
+							if (endpoint.headers->count(name))
+								throw std::runtime_error("Conflicting HTTP header rules");
+					}
 			auto candidate = std::make_unique<ScriptSet>();
-			candidate->generation = std::make_shared<js_webhooks::Generation>(std::move(endpoints));
+			candidate->generation = std::make_shared<js_webhooks::Generation>(std::move(endpoints), std::move(headers));
 			candidate->wasm = js_scripts::LoadWasmAssets(assets, ServerInstance->Config->Paths.Config);
-			for (const auto& source : js_scripts::LoadSources(sources, ServerInstance->Config->Paths.Config))
+			for (const auto& source : loaded)
 			{
 				auto script = std::make_unique<Script>(
 					timeout, source.authority, candidate->wasm, delivery, candidate->generation);

@@ -1,4 +1,4 @@
-/** Native asynchronous jobs, not browser Fetch/Promises. Admin callback only. */
+/** Native asynchronous jobs, not browser Fetch/Promises. Fetch creation requires an active admin callback; polling/cancel require admin authority. */
 interface IrcdApi {
   fetch(url: string, options?: {method?: 'GET' | 'POST'; body?: string}): string;
   /** null pending; ready results consumed. body null for invalid UTF-8, bodyBytes exact. */

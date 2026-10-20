@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: MIT */
 #pragma once
 
-// Owned, bounded webhook jobs. The worker never enters V8 or touches IRC state.
+// Legacy named-webhook adapter over the canonical owned HTTP transport.
+#include "js_async_http.h"
 #include <curl/curl.h>
 #include <atomic>
-#include <condition_variable>
 #include <array>
 #include <cerrno>
 #include <vector>
@@ -12,13 +12,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <cstddef>
-#include <deque>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <utility>
 
 namespace js_webhooks
@@ -229,216 +226,209 @@ inline Endpoint ValidateEndpoint(const std::string& url, bool loopbackhttp = fal
 			"Webhooks require HTTPS without userinfo or fragments; HTTP is explicit loopback only");
 	return {url, scheme.second == "http"};
 }
+// Exact destination identity. No wildcard, prefix or URL substring matching.
+// Preserve path/query bytes and distinguish absent query from an empty query.
+inline std::string ExactUrl(const std::string& url)
+{
+	EnsureCurl();
+	if (url.empty() || url.size() > 2048 || url.find('\0') != std::string::npos ||
+		url.find_first_of("\r\n\t \\#") != std::string::npos)
+		return {};
+	std::unique_ptr<CURLU, decltype(&curl_url_cleanup)> parsed(curl_url(), curl_url_cleanup);
+	if (!parsed || curl_url_set(parsed.get(), CURLUPART_URL, url.c_str(), CURLU_PATH_AS_IS) != CURLUE_OK)
+		return {};
+	auto part = [&](CURLUPart field)
+	{
+		char* raw = nullptr;
+		auto status = curl_url_get(parsed.get(), field, &raw, 0);
+		std::string value = raw ? raw : "";
+		curl_free(raw);
+		return std::make_pair(status == CURLUE_OK, value);
+	};
+	auto scheme = part(CURLUPART_SCHEME).second, host = part(CURLUPART_HOST).second, port = part(CURLUPART_PORT).second;
+	for (auto* value : {&scheme, &host})
+		for (char& c : *value)
+			if (c >= 'A' && c <= 'Z')
+				c += ('a' - 'A');
+	if ((scheme != "http" && scheme != "https") || host.empty() || part(CURLUPART_USER).first ||
+		part(CURLUPART_PASSWORD).first || part(CURLUPART_FRAGMENT).first)
+		return {};
+	if (port.empty())
+		port = scheme == "https" ? "443" : "80";
+	auto path = part(CURLUPART_PATH).second;
+	if (path.empty())
+		path = "/";
+	// Do not let curl's dot-segment normalization silently change a matched path.
+	std::size_t start = 0;
+	while (start <= path.size())
+	{
+		auto end = path.find('/', start);
+		auto segment = path.substr(start, end == std::string::npos ? end : end - start);
+		if (segment == "." || segment == "..")
+			return {};
+		if (end == std::string::npos)
+			break;
+		start = end + 1;
+	}
+	const auto query = part(CURLUPART_QUERY);
+	return scheme + "://" + host + ":" + port + path +
+		((query.first || url.find('?') != std::string::npos) ? "?" + query.second : "");
+}
+using HeaderRules = std::map<std::pair<std::string, std::string>, Endpoint>;
 
 struct Generation
 {
 	const std::map<std::string, Endpoint> endpoints;
-	std::atomic<bool> alive{false};
-	explicit Generation(std::map<std::string, Endpoint> values)
+	const HeaderRules headers;
+	std::shared_ptr<js_async_http::Generation> http = std::make_shared<js_async_http::Generation>();
+	std::atomic<bool>& alive = http->active;
+	explicit Generation(std::map<std::string, Endpoint> values, HeaderRules rules = {})
 		: endpoints(std::move(values))
+		, headers(std::move(rules))
 	{
+		alive = false;
 	}
+	Headers ForUrl(const std::string& script, const std::string& url) const
+	{
+		const auto key = ExactUrl(url);
+		if (key.empty())
+			return {};
+		const auto found = headers.find({script, key});
+		return found == headers.end() ? Headers{} : *found->second.headers;
+	}
+	~Generation() { alive = false; }
 };
-
 struct Counters
 {
-	std::atomic<std::size_t> pending{0};
-	std::atomic<std::size_t> sent{0};
-	std::atomic<std::size_t> failed{0};
-	std::atomic<std::size_t> discarded{0};
+	std::atomic<std::size_t> pending{0}, sent{0}, failed{0}, discarded{0};
 };
-
+struct Reservation
+{
+	std::shared_ptr<Counters> counts;
+	bool completed = false, committed = false;
+	explicit Reservation(std::shared_ptr<Counters> value)
+		: counts(std::move(value))
+	{
+		++counts->pending;
+	}
+	~Reservation()
+	{
+		--counts->pending;
+		if (committed && !completed)
+			++counts->discarded;
+	}
+};
 class Request
 {
-	const std::shared_ptr<Counters> counts;
-
 public:
-	const std::shared_ptr<Generation> generation;
-	const Endpoint endpoint;
-	const std::string body;
-	Request(std::shared_ptr<Counters> stats, std::shared_ptr<Generation> owner, Endpoint destination, std::string json)
-		: counts(std::move(stats))
-		, generation(std::move(owner))
-		, endpoint(std::move(destination))
-		, body(std::move(json))
+	std::shared_ptr<Generation> generation;
+	std::shared_ptr<js_async_http::Generation> scriptgeneration;
+	std::shared_ptr<js_async_http::Dispatcher> transport;
+	std::string id;
+	std::shared_ptr<Reservation> reservation;
+	bool committed = false;
+	Request(std::shared_ptr<Generation> owner, std::shared_ptr<js_async_http::Dispatcher> dispatcher, std::string token)
+		: generation(std::move(owner))
+		, transport(std::move(dispatcher))
+		, id(std::move(token))
 	{
 	}
-	~Request() { --counts->pending; }
-	Request(const Request&) = delete;
-	Request& operator=(const Request&) = delete;
+	void Commit()
+	{
+		if (!generation->alive)
+			return;
+		reservation->committed = true;
+		committed = transport->Commit(id);
+	}
+	~Request()
+	{
+		if (!committed)
+			transport->Cancel(scriptgeneration, id);
+	}
 };
-
 class Dispatcher
 {
 	std::shared_ptr<Counters> counts = std::make_shared<Counters>();
-	std::atomic<bool> stopping{false};
-	std::mutex mutex;
-	std::condition_variable wake;
-	std::deque<std::shared_ptr<Request>> queue;
-	std::thread worker;
-
-	struct Transfer
-	{
-		const Dispatcher& owner;
-		const Request& request;
-		std::size_t received = 0;
-		bool Cancelled() const { return owner.stopping || !request.generation->alive; }
-	};
-	static int Progress(void* opaque, curl_off_t, curl_off_t, curl_off_t, curl_off_t)
-	{
-		return static_cast<Transfer*>(opaque)->Cancelled() ? 1 : 0;
-	}
-	static std::size_t Discard(char*, std::size_t size, std::size_t count, void* opaque)
-	{
-		auto& transfer = *static_cast<Transfer*>(opaque);
-		if (transfer.Cancelled() || (size && count > (MaxResponse - transfer.received) / size))
-			return 0;
-		const auto bytes = size * count;
-		transfer.received += bytes;
-		return bytes;
-	}
-	bool Send(const Request& request)
-	{
-		std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> curl(curl_easy_init(), curl_easy_cleanup);
-		if (!curl)
-			return false;
-		curl_slist* rawheaders = nullptr;
-		for (const char* header : {"Content-Type: application/json", "Expect:"})
-		{
-			auto* next = curl_slist_append(rawheaders, header);
-			if (!next)
-			{
-				curl_slist_free_all(rawheaders);
-				return false;
-			}
-			rawheaders = next;
-		}
-		std::unique_ptr<curl_slist, decltype(&curl_slist_free_all)> headers(rawheaders, curl_slist_free_all);
-		for (const auto& header : *request.endpoint.headers)
-		{
-			const auto line = header.first + ": " + header.second;
-			auto* next = curl_slist_append(headers.get(), line.c_str());
-			if (!next)
-				return false;
-			(void)headers.release();
-			headers.reset(next);
-		}
-		Transfer transfer{*this, request};
-		// Every option must be accepted: silently dropping a security option is
-		// not a supported fallback. No environment proxy, redirects or retries.
-		auto set = [&](CURLoption option, auto value)
-		{ return curl_easy_setopt(curl.get(), option, value) == CURLE_OK; };
-		if (!set(CURLOPT_URL, request.endpoint.url.c_str()) ||
-			!set(CURLOPT_PROTOCOLS_STR, request.endpoint.loopbackhttp ? "http" : "https") ||
-			!set(CURLOPT_FOLLOWLOCATION, 0L) || !set(CURLOPT_PROXY, "") || !set(CURLOPT_SSL_VERIFYPEER, 1L) ||
-			!set(CURLOPT_SSL_VERIFYHOST, 2L) || !set(CURLOPT_NOSIGNAL, 1L) || !set(CURLOPT_CONNECTTIMEOUT_MS, 1000L) ||
-			!set(CURLOPT_TIMEOUT_MS, 2000L) || !set(CURLOPT_HTTPHEADER, headers.get()) || !set(CURLOPT_POST, 1L) ||
-			!set(CURLOPT_POSTFIELDS, request.body.data()) ||
-			!set(CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(request.body.size())) ||
-			!set(CURLOPT_WRITEFUNCTION, &Discard) || !set(CURLOPT_WRITEDATA, &transfer) ||
-			!set(CURLOPT_HEADERFUNCTION, &Discard) || !set(CURLOPT_HEADERDATA, &transfer) ||
-			!set(CURLOPT_XFERINFOFUNCTION, &Progress) || !set(CURLOPT_XFERINFODATA, &transfer) ||
-			!set(CURLOPT_NOPROGRESS, 0L))
-			return false;
-		if (transfer.Cancelled() || curl_easy_perform(curl.get()) != CURLE_OK)
-			return false;
-		long status = 0;
-		return curl_easy_getinfo(curl.get(), CURLINFO_RESPONSE_CODE, &status) == CURLE_OK && status >= 200 &&
-			status < 300;
-	}
-	void Run() noexcept
-	{
-		for (;;)
-		{
-			std::shared_ptr<Request> request;
-			{
-				std::unique_lock<std::mutex> lock(mutex);
-				wake.wait(lock, [&] { return stopping || !queue.empty(); });
-				if (stopping)
-					return;
-				request = std::move(queue.front());
-				queue.pop_front();
-			}
-			if (!request->generation->alive)
-			{
-				++counts->discarded;
-				continue;
-			}
-			bool sent = false;
-			try
-			{
-				sent = Send(*request);
-			}
-			catch (...)
-			{ /* Never throw out of the worker. */
-			}
-			if (sent)
-				++counts->sent;
-			else
-				++counts->failed;
-		}
-	}
+	std::shared_ptr<js_async_http::Dispatcher> transport = std::make_shared<js_async_http::Dispatcher>(MaxPending, 1);
 
 public:
-	Dispatcher() = default;
-	~Dispatcher() { Stop(); }
-	Dispatcher(const Dispatcher&) = delete;
-	Dispatcher& operator=(const Dispatcher&) = delete;
+	bool started = false;
+	std::vector<std::shared_ptr<Request>> waiting;
 	void Start()
 	{
-		if (!worker.joinable())
+		EnsureCurl();
+		started = true;
+		for (auto& request : waiting)
 		{
-			EnsureCurl();
-			worker = std::thread([this] { Run(); });
+			if (!transport->Commit(request->id))
+				transport->Cancel(request->scriptgeneration, request->id);
 		}
+		waiting.clear();
 	}
-	// One owner/main thread calls Stage, Commit, Start, Stop. Worker receives
-	// owned requests only. The reservation covers staged, queued AND in-flight
-	// payloads, not merely the deque. Aborted effects release it automatically.
-	std::shared_ptr<Request> Stage(
-		const std::shared_ptr<Generation>& generation, const std::string& name, const std::string& body)
+	std::shared_ptr<Request> Stage(const std::shared_ptr<Generation>& generation, const std::string& name,
+		const std::string& body, const std::string& script = {},
+		std::shared_ptr<js_async_http::Generation> scriptgeneration = {})
 	{
-		if (!generation || !generation->alive || stopping || body.size() > MaxBody)
+		if (!generation || !generation->alive || body.size() > MaxBody || counts->pending >= MaxPending)
 			return nullptr;
 		const auto found = generation->endpoints.find(name);
-		if (found == generation->endpoints.end() || counts->pending >= MaxPending)
+		if (found == generation->endpoints.end())
 			return nullptr;
-		++counts->pending;
-		try
+		js_async_http::Policy policy;
+		policy.ownerGeneration = generation->http;
+		policy.headers = *found->second.headers;
+		for (const auto& header : generation->ForUrl(script, found->second.url))
 		{
-			return std::make_shared<Request>(counts, generation, found->second, body);
+			if (!policy.headers.emplace(header).second)
+				return nullptr;
 		}
-		catch (...)
+		if (policy.headers.size() > MaxHeaders)
+			return nullptr;
+		policy.contentType = "application/json";
+		policy.configuredEndpoint = true;
+		policy.discard = true;
+		policy.reportCancelled = true;
+		policy.connectTimeout = 1000;
+		policy.timeout = 2000;
+		policy.maxResponse = MaxResponse;
+		policy.maxTotal = MaxResponse;
+		auto reservation = std::make_shared<Reservation>(counts);
+		policy.completion = [stats = counts, reservation](bool sent)
 		{
-			--counts->pending;
-			throw;
-		}
+			reservation->completed = true;
+			if (sent)
+				++stats->sent;
+			else
+				++stats->failed;
+		};
+		if (!scriptgeneration)
+			scriptgeneration = generation->http;
+		const auto id = transport->Stage(scriptgeneration, "POST", found->second.url, body, std::move(policy));
+		if (id.empty())
+			return nullptr;
+		auto request = std::make_shared<Request>(generation, transport, id);
+		request->reservation = std::move(reservation);
+		request->scriptgeneration = std::move(scriptgeneration);
+		return request;
 	}
 	void Commit(std::shared_ptr<Request> request)
 	{
 		if (!request)
 			return;
-		std::lock_guard<std::mutex> lock(mutex);
-		if (stopping || !request->generation->alive)
+		request->reservation->committed = true;
+		if (!started)
 		{
-			++counts->discarded;
-			return;
+			request->committed = true;
+			waiting.push_back(std::move(request));
 		}
-		queue.push_back(std::move(request));
-		wake.notify_one();
+		else
+			request->Commit();
 	}
 	const Counters& Stats() const { return *counts; }
 	void Stop()
 	{
-		{
-			std::lock_guard<std::mutex> lock(mutex);
-			stopping = true;
-			counts->discarded += queue.size();
-			queue.clear();
-		}
-		wake.notify_one();
-		if (worker.joinable())
-			worker.join();
+		transport->Stop();
+		waiting.clear();
 	}
 };
 } // namespace js_webhooks
