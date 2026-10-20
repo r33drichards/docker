@@ -17,9 +17,18 @@ ARG TEST_HOOK_PROBE=0
 COPY modules/ /src/modules/
 COPY tests/fixtures/ /tmp/js-hook-fixtures/
 
-RUN apk add --no-cache gcc g++ make git pkgconfig perl binutils curl-dev \
+RUN apk add --no-cache gcc g++ make git pkgconfig perl binutils curl-dev sqlite-dev openssl-dev openssl-libs-static \
        perl-net-ssleay perl-crypt-ssleay perl-lwp-protocol-https \
        perl-libwww wget gnutls-dev "nodejs-dev=${NODEJS_VERSION}" $BUILD_DEPENDENCIES
+
+# Static bootstrap: no dynamic-loader environment or shell runs while root.
+COPY tools/sqlite-bootstrap.c /tmp/sqlite-bootstrap.c
+RUN cc -std=c11 -Os -static -Wall -Wextra -Werror \
+    -o /sqlite-bootstrap /tmp/sqlite-bootstrap.c
+
+COPY tools/seed-persistent-config.c /tmp/seed-persistent-config.c
+RUN cc -std=c11 -Os -static -Wall -Wextra -Werror \
+    -o /seed-persistent-config /tmp/seed-persistent-config.c $(pkg-config --static --libs libcrypto)
 
 RUN addgroup -g 10000 -S inspircd
 RUN adduser -u 10000 -h /inspircd/ -D -S -G inspircd inspircd
@@ -41,10 +50,11 @@ RUN echo $CONFIGUREARGS | xargs --no-run-if-empty ./configure
 RUN make -j`getconf _NPROCESSORS_ONLN` install && \
     test -s /inspircd/modules/m_javascript.so && \
     readelf -d /inspircd/modules/m_javascript.so | grep -q 'libnode.so.127' && \
+    readelf -d /inspircd/modules/m_javascript.so | grep -q 'libsqlite3.so.0' && \
     readelf -d /inspircd/modules/m_javascript.so | grep -q NODELETE
 
 ## Wipe out vanilla config; entrypoint.sh will handle repopulating it at runtime
-RUN rm -rf /inspircd/conf/*
+RUN mkdir -p /inspircd/conf /inspircd/data /inspircd/logs && rm -rf /inspircd/conf/*
 
 # Stage 1: Create optimized runtime container
 FROM alpine:3.22
@@ -52,13 +62,16 @@ FROM alpine:3.22
 ARG NODEJS_VERSION
 ARG RUN_DEPENDENCIES=
 
-RUN apk add --no-cache libgcc libstdc++ gnutls gnutls-utils libcurl ca-certificates "nodejs-libs=${NODEJS_VERSION}" $RUN_DEPENDENCIES && \
+RUN apk add --no-cache libgcc libstdc++ gnutls gnutls-utils libcurl sqlite-libs ca-certificates "nodejs-libs=${NODEJS_VERSION}" $RUN_DEPENDENCIES && \
     addgroup -g 10000 -S inspircd && \
     adduser -u 10000 -h /inspircd/ -D -S -G inspircd inspircd
 
 COPY --chown=inspircd:inspircd conf/ /conf/
 COPY --chown=inspircd:inspircd entrypoint.sh /entrypoint.sh
 COPY --chown=inspircd:inspircd tools/materialize-nocodb-token.sh /materialize-nocodb-token.sh
+COPY --from=builder /sqlite-bootstrap /sqlite-bootstrap
+COPY --from=builder /seed-persistent-config /seed-persistent-config
+COPY --chown=0:0 --chmod=0644 tools/seed-persistent-config.baseline /seed-persistent-config.baseline
 COPY --from=builder --chown=inspircd:inspircd /inspircd/ /inspircd/
 COPY --chown=inspircd:inspircd examples/javascript/wchat-nocodb.js /inspircd/scripts/wchat-nocodb.js
 
@@ -67,7 +80,7 @@ USER inspircd
 EXPOSE 6667 6697 7000 7001
 
 WORKDIR /
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/sqlite-bootstrap"]
 
 HEALTHCHECK \
         --interval=60s \

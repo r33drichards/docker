@@ -25,6 +25,7 @@ nav:
       - Core Module hooks: reference/hooks.md
       - Separate event-provider hooks: reference/events.md
       - Native API and authority: reference/api.md
+      - SQLite databases: reference/sqlite.md
       - Execution and failure limits: reference/limits.md
   - Explanation:
       - Trust and containment: explanation/trust.md

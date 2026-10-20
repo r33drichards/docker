@@ -97,6 +97,13 @@ int main(int argc, char** argv)
 		Check(authorities.front().authority == Authority::User, "explicit User source gained authority");
 		for (std::size_t i = 1; i < authorities.size(); ++i)
 			Check(authorities[i].authority == Authority::Admin, "directory/file authority was not inherited");
+		const auto grants = LoadSources({{Kind::File, "before.js", Authority::Admin, {"private"}},
+											{Kind::Directory, "plugins", Authority::User, {"rss", "cache"}}},
+			root);
+		Check(grants.front().databases == std::set<std::string>{"private"}, "file database grants lost");
+		for (std::size_t i = 1; i < grants.size(); ++i)
+			Check(grants[i].databases == std::set<std::string>({"rss", "cache"}), "directory database grants lost");
+		Check(ordered.front().databases.empty(), "omitted grants must deny databases");
 		ExpectError("duplicate canonical path",
 			[&]
 			{

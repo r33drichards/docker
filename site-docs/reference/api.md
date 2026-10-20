@@ -20,6 +20,7 @@ effect, and authorization policy plus an implementation and tests.
 
 Additional explicit host methods:
 
+- `sqlite.open(name)` opens a host-granted named SQLite database (see [SQLite reference](https://r33drichards.github.io/docker/reference/sqlite/)).
 - `userById(uuid)` returns an owned `{ id, nick }` snapshot or null.
 - `notice(targetUuid, text)` queues a server notice (maximum 400 UTF-8 bytes).
 - `rename(targetUuid, nick)` queues a validated nickname change.

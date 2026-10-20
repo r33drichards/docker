@@ -45,6 +45,7 @@ jobs:
     timeout-minutes: 15
     env:
       CXX: g++-14
+      CC: gcc-14
       CI_NATIVE_LOG_DIR: artifacts/native
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -53,13 +54,21 @@ jobs:
       - name: Install distro-matched V8 and native tools
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends g++-14 libc6-dbg libnode-dev libcurl4-openssl-dev valgrind pkg-config python3 openssl nodejs
+          apt-get install -y --no-install-recommends g++-14 libc6-dbg libnode-dev libcurl4-openssl-dev libsqlite3-dev libssl-dev valgrind pkg-config python3 openssl nodejs
           mkdir -p artifacts/native
           dpkg-query -W > artifacts/native/packages.txt
           useradd --create-home --uid 1000 ci
           chown -R ci:ci "$GITHUB_WORKSPACE"
       - name: Required ASan, UBSan, leak and ownership checks
         run: |
+          python3 tests/test_sqlite_bootstrap.py
+          python3 tests/test_persistent_config.py
+          runuser -u ci -- python3 tests/test_sqlite_bootstrap.py
+          runuser -u ci -- python3 tests/test_persistent_config.py
+          runuser -u ci -- sh tests/bounded_log.sh
+          runuser -u ci -- env CXXFLAGS="-O1 -fsanitize=address,undefined -fno-sanitize-recover=all" sh tests/bounded_log.sh
+          runuser -u ci -- sh tests/js_sqlite.sh
+          runuser -u ci -- env CXXFLAGS="-O1 -fsanitize=address,undefined -fno-sanitize-recover=all" sh tests/js_sqlite.sh
           runuser -u ci -- node tests/test_join_webhook.cjs
           runuser -u ci -- node tests/test_wchat_nocodb.cjs
           runuser -u ci -- python3 tests/test_js_webhooks.py
@@ -117,7 +126,7 @@ jobs:
       - name: Install compile dependencies
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git g++-14 make perl pkg-config libnode-dev libcurl4-openssl-dev binutils python3
+          apt-get install -y --no-install-recommends ca-certificates git g++-14 make perl pkg-config libnode-dev libcurl4-openssl-dev libsqlite3-dev binutils python3
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           repository: inspircd/inspircd
