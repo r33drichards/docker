@@ -46,15 +46,20 @@ check_cpp()
 
 check_cpp \
     modules/m_precommand.cpp modules/parsed_command.h \
+    modules/m_log_bounded.cpp modules/bounded_log.h tests/test_bounded_log.cpp \
     modules/extra/m_javascript.cpp modules/js_native_utilities.h \
     modules/js_sqlite.h modules/js_sqlite_bridge.h tests/test_js_sqlite.cpp \
     modules/js_webhooks.h tests/js_webhooks.cpp tests/js_webhook_headers.inc \
     modules/js_runtime.h modules/js_script_loader.h modules/js_wire_validation.h modules/js_hook_snapshot.h \
     modules/js_hook_mutations.h modules/js_event_listeners.h modules/js_event_specs.h \
-    tests/fixtures/m_js_hook_probe.cpp tests/fixtures/m_js_event_probe.cpp \
+    tests/fixtures/m_js_hook_probe.cpp tests/fixtures/m_js_event_probe.cpp tests/fixtures/m_bounded_log_probe.cpp \
     tests/precommand_struct.cpp tests/js_runtime.cpp tests/js_script_loader.cpp \
     tests/js_runtime_lifecycle.cpp tests/js_runtime_lifecycle_host.cpp \
     tests/fuzz/*.cpp tests/fuzz/*.h
+
+"$CLANG_FORMAT" --dry-run --Werror tools/sqlite-bootstrap.c tools/seed-persistent-config.c
+"$CPPCHECK" --language=c --std=c11 --enable=warning,performance,portability \
+    --check-level=exhaustive --inline-suppr --error-exitcode=1 tools/sqlite-bootstrap.c tools/seed-persistent-config.c
 
 check_python()
 {
@@ -65,14 +70,14 @@ check_python()
 check_python \
     tools/generate_js_bindings.py tools/generate_module_hooks.py \
     tests/test_generate_module_hooks.py tests/test_generate_js_bindings.py tests/test_authorize_heavy.py \
-    tests/javascript_native.py tests/javascript_sqlite_native.py tests/wchat_nocodb_native.py tests/precommand_client.py tests/test_precommand_client.py \
-    tests/precommand_log.py tests/primary_image.py tests/test_js_webhooks.py tests/test_materialize_nocodb_token.py tests/test_nocodb_config.py \
+    tests/bounded_log_native.py tests/javascript_native.py tests/javascript_sqlite_native.py tests/wchat_nocodb_native.py tests/precommand_client.py tests/test_precommand_client.py \
+    tests/precommand_log.py tests/primary_image.py tests/test_js_webhooks.py tests/test_materialize_nocodb_token.py tests/test_nocodb_config.py tests/test_sqlite_config.py tests/test_sqlite_bootstrap.py tests/test_persistent_config.py \
     tests/ci/*.py tests/fuzz/*.py
 
 "$SHELLCHECK" --severity=style \
-    tests/js_sqlite.sh tests/javascript_sqlite.sh tests/primaryImage.sh tests/javascript.sh tests/js_bindings.sh tests/js_runtime.sh \
+    tests/bounded_log.sh tests/js_sqlite.sh tests/javascript_sqlite.sh tests/primaryImage.sh tests/javascript.sh tests/js_bindings.sh tests/js_runtime.sh \
     tests/js_script_loader.sh tests/precommand.sh tests/precommand_struct.sh \
-    tools/materialize-nocodb-token.sh conf/nocodb.sh tests/ci/*.sh tests/fuzz/*.sh
+    tools/materialize-nocodb-token.sh conf/nocodb.sh conf/sqlite.sh conf/logging.sh conf/persistent.sh tests/ci/*.sh tests/fuzz/*.sh
 
 # Generated files have one canonical formatter: the generator itself.
 "$PYTHON" tools/generate_js_bindings.py --check
@@ -83,4 +88,5 @@ check_python \
 "$PYTHON" tests/test_precommand_client.py
 "$PYTHON" tests/test_materialize_nocodb_token.py
 "$PYTHON" tests/test_nocodb_config.py
+"$PYTHON" tests/test_sqlite_config.py
 printf '%s\n' 'PASS: C++/Python formatting, static analysis, shell lint, generator drift, CI selector, and registration tests'

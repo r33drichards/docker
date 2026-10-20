@@ -112,3 +112,81 @@ including any SQLite journal sidecars, across container replacements. No volume
 or production database is provisioned by this change. Stop database writers for
 a filesystem-level backup, or use a separately authorized SQLite-aware backup;
 do not copy only a live main file and assume it is a consistent backup.
+
+## Persistent container state
+
+The image remains non-root by default. For an explicitly provisioned volume at
+`/inspircd/persistent`, enable `INSPIRCD_PERSISTENT=yes`. The bootstrap initializes
+private `conf`, `data`, and `logs` children and `data/script-databases`, then maps
+the existing `/inspircd/conf`, `/inspircd/data`, and `/inspircd/logs` paths to them.
+It refuses nonempty existing directories rather than silently moving or deleting
+state. The mount itself must remain traversable by UID 10000.
+
+On a fresh root-owned mount, the static bootstrap may run as root solely for this
+initialization. It clears supplementary groups and drops real, effective and
+saved UID/GID to 10000 before the existing entrypoint, secret materialization,
+configuration helpers, certificate generation or daemon. It never recursively
+changes volume ownership and rejects unsafe paths/links. A non-root start
+validates an already initialized layout. A platform root-start setting must not
+bypass this bootstrap or invoke the original entrypoint directly.
+
+`INSPIRCD_SQLITE=yes` separately emits the fixed SQLite settings. It grants no
+script access: every script still needs an explicit `databases` list. Both flags
+default to no. Custom configuration must include the supplied helpers or define
+the equivalent settings itself. Image-managed JavaScript and binaries remain
+outside the volume, as does `/inspircd/.secrets/nocodb-token`; the existing token
+materialization process remains ephemeral.
+
+Persistent configuration is seeded from image defaults. Later starts replace
+only files unchanged since their last managed version, preserving user edits,
+custom files and TLS material. A bundled checksum baseline recognizes unchanged
+configuration migrated from image commit `1a389a61967e3ef3b63c892824b6262560dc6393`.
+Unknown existing files are not adopted as managed defaults. Review preserved
+custom configurations when changing image versions; migration does not silently
+overwrite an edited configuration to add newly required settings.
+
+The persistent helper explicitly stores X-lines and permanent-channel data in
+`/inspircd/data`. It enables `permchannels` but does not mark channels permanent:
+a channel must have mode `+P` to be saved. Normal file logs use the bounded sink,
+with five files including the active file, each at most 10 MiB (50 MiB total).
+Rotation happens before a write, not on a periodic timer. Debug and raw protocol
+logging are not accepted by this sink. Existing oversized or unexpected archive
+files cause initialization to fail instead of being silently truncated. Runtime
+logging failures disable the sink and emit a content-free error; monitor stderr.
+These limits cover this file sink, not Railway's independent log retention or
+additional sinks an administrator configures.
+
+Before the first replacement, inventory and securely preserve existing config,
+TLS keys and daemon data. A fresh volume does not recover the old container's
+files. Never expose private keys in logs, command output or public uploads.
+Provisioning, migration and backups are operational steps, not automatic results
+of building this image. A 1 GiB volume is not an aggregate SQLite quota: the
+per-database limits can collectively exceed it, and config, journals and daemon
+state need space too. Monitor usage and reserve headroom; no automatic backup or
+retention service is enabled here.
+
+### First-import maintenance gate
+
+For a migration of existing configuration and TLS identity, additionally set
+`INSPIRCD_PERSISTENT_IMPORT=yes`. The nonroot configuration helper waits before
+seeding defaults or generating certificates, for at most 30 minutes. No IRC
+listener is started during this maintenance window. A timeout, signal, unsafe
+file or identity mismatch fails startup; it is not a healthy deployment.
+
+Restore the verified archive into the private persistent `conf` directory,
+validate every restored file against the captured archive, then create
+`.migration-ready` atomically as the final step. Its owner/group must be
+10000:10000 and mode 0600. Its exact format is a `persistent-import-v1` header,
+then the lowercase SHA-256 digest of `key.pem`, one space and `key.pem`, then
+the digest of `cert.pem`, one space and `cert.pem`, each terminated by a newline.
+The helper accepts only those two entries in that order. It checks private-key
+mode 0600, safe regular singly-linked files, ownership and exact digest matches.
+Never print the key, archive contents or sensitive configuration into logs.
+
+Keep the import flag enabled after migration to fail closed on a missing or
+changed identity. An intentional future certificate/key rotation requires a
+separately approved maintenance operation: stop the daemon, replace the files
+safely, verify the intended new identity, and atomically replace the readiness
+manifest with the new hashes before restarting. Do not silently regenerate the
+manifest to work around a mismatch. The marker is an operational integrity guard,
+not protection against an attacker already able to write as the daemon user.
