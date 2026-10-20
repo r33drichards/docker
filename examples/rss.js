@@ -282,21 +282,19 @@ ircd.on('backgroundTimer', event => {
   const now = event.curtime;
   if (!Number.isFinite(now)) return;
   try { rssInitializeStorage(); } catch (_) { return; }
-  let posts = 0, starts = 0, completions = 0, restores = 0;
-  for (const sub of rssSubscriptions.values()) {
+  let posts = 0, starts = 0, completions = 0;
+  const ordered = [...rssSubscriptions.values()].sort((a, b) =>
+    (a.job === null) - (b.job === null) || a.startedAt - b.startedAt);
+  let activeJobs = ordered.filter(sub => sub.job !== null).length;
+  for (const sub of ordered) {
     if (sub.storageRetryAt && now < sub.storageRetryAt) continue;
-    if (sub.restoring) {
-      if (restores++ < 1) {
-        try { rssStorage.restoreSeenPage(sub); } catch (_) { sub.storageRetryAt = now + RSS_INTERVAL; }
-      }
-      continue;
-    }
     if (sub.job !== null) {
       // Consume at most one response per callback: XML parsing uses the V8 time budget.
       const result = completions < 1 ? ircd.takeFetchResult(sub.job) : null;
       if (result !== null) {
         ++completions;
         sub.job = null;
+        --activeJobs;
         const items = result.ok && result.status === 200 && typeof result.body === 'string' ? rssParseFeed(result.body) : null;
         if (items === null) {
           rssRetry(sub, now);
@@ -323,7 +321,12 @@ ircd.on('backgroundTimer', event => {
             sub.seeded = true;
           } else {
             // Feeds conventionally list newest first. Deliver new entries oldest first.
-            sub.pending = [...unique.values()].filter(item => !sub.seen.has(item.id)).reverse();
+            // Indexed lookup of only this bounded batch avoids replaying all saved
+            // history at startup and makes the database the dedup source of truth.
+            let known;
+            try { known = rssStorage.known(sub.channel, sub.feed, [...unique.keys()]); }
+            catch (_) { rssRetry(sub, now); continue; }
+            sub.pending = [...unique.values()].filter(item => !known.has(item.id)).reverse();
           }
           sub.failures = 0;
           sub.nextDue = now + RSS_INTERVAL;
@@ -332,6 +335,7 @@ ircd.on('backgroundTimer', event => {
         // Native work is not persisted. A restored job token must never stall a feed.
         ircd.cancelFetch(sub.job);
         sub.job = null;
+        --activeJobs;
         rssRetry(sub, now);
       }
     }
@@ -346,11 +350,12 @@ ircd.on('backgroundTimer', event => {
       ircd.privmsg(sub.channel, item.text);
       ++posts;
     }
-    if (sub.job === null && sub.pending.length === 0 && now >= sub.nextDue && starts < 4) {
+    if (sub.job === null && sub.pending.length === 0 && now >= sub.nextDue && starts < 4 && activeJobs < 8) {
       ++starts;
       let job = null;
       try { job = ircd.fetch(sub.feed); } catch (_) { /* Invalid URL or full native queue. */ }
       if (job !== null) {
+        ++activeJobs;
         sub.job = job;
         sub.startedAt = now;
       } else {
@@ -428,8 +433,7 @@ function rssSqliteStore(validators) {
       });
       initialized = true;
     },
-    // Startup-safe, read-only. restoreSeenPage finishes seen state incrementally;
-    // do not schedule a subscription until restoring becomes false.
+    // Startup-safe, read-only. No history replay is needed before scheduling.
     load() {
       const subscriptions = new Map();
       if (!version()) return subscriptions;
@@ -439,12 +443,19 @@ function rssSqliteStore(validators) {
         if (!((Number.isSafeInteger(storageId) && storageId > 0) || (typeof storageId === 'bigint' && storageId > 0n && storageId <= 9223372036854775807n)) || !valid(channel, feed) || key !== keyFor(channel, feed) || (seeded !== 0 && seeded !== 1)) continue;
         subscriptions.set(key, {storageId, channel, channelKey: validators.channelKey(channel), feed,
           seeded: seeded === 1, seen: new Map(), pending: [], job: null,
-          startedAt: 0, nextDue: 0, failures: 0, restoring: true, restoreCursor: 0});
+          startedAt: 0, nextDue: 0, failures: 0, restoring: false, restoreCursor: 0});
       }
       return subscriptions;
     },
+    known(channel, feed, ids) {
+      checkIds(ids);
+      if (!ids.length) return new Set();
+      const placeholders = ids.map(() => '?').join(',');
+      return new Set(rows('SELECT entry_id FROM rss_seen WHERE subscription = (SELECT id FROM rss_subscriptions WHERE key = ?) AND entry_id IN (' + placeholders + ')', [keyFor(channel, feed), ...ids]).map(row => row[0]));
+    },
+    // Diagnostic/test inspection only; live scheduling uses indexed known().
     restoreSeenPage(sub) {
-      if (!sub.restoring) return true;
+      sub.restoring = true;
       // Newest first ensures even a corrupt oversized table cannot force unbounded work.
       const stored = rows('SELECT seq, entry_id FROM rss_seen WHERE subscription = ? AND (? = 0 OR seq < ?) ORDER BY seq DESC LIMIT 16', [sub.storageId, sub.restoreCursor, sub.restoreCursor]);
       for (const [seq, id] of stored) {

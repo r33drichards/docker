@@ -7,7 +7,8 @@ loop. Bounded RSS/Atom parsing runs in the JavaScript script. The script keeps s
 pending posts, retry counts and next-fetch times in ordinary JavaScript Maps and
 objects for transient runtime state. Subscriptions and seen entry IDs are stored
 in a host-granted SQLite database. Startup restores subscriptions read-only;
-seen IDs are restored in bounded pages before fetching resumes. Native request
+each fetched batch checks at most 64 IDs using the durable indexed table. There
+is no full-history replay or startup warmup. Native request
 tokens and pending messages are never restored.
 
 ## Enable the script
@@ -68,7 +69,7 @@ fetches may finish, but their results are no longer posted.
   malformed XML and unknown entities are rejected. RSS2 and Atom are supported;
   arbitrary XML/HTML is not. Parsing is bounded independently of the generic
   transport response limit.
-- Limits are 32 subscriptions, four fetch starts and eight channel messages per
+- Limits are 32 subscriptions, four fetch starts, eight concurrent requests and eight channel messages per
   timer callback, 64 parsed entries per fetch, one completed response parsed per callback, and 2,048 remembered IDs per
   subscription, additionally capped at 128 KiB of ID text. Large IDs shorten the
   retained history. Older remembered IDs are evicted; feeds that recycle very old
@@ -83,7 +84,10 @@ fetches may finish, but their results are no longer posted.
   at most 350 UTF-8 bytes.
 - Native work is not JavaScript state. An in-flight job with no result after 180
   seconds is abandoned and retried with backoff. This exceeds the bounded native
-  queue wait (16 jobs, each limited to eight seconds). Unknown job tokens after
+  queue wait (16 native jobs, each limited to eight seconds). Oldest requests are
+  processed first; at normal five-second timer cadence eight RSS completions
+  drain within 40 seconds, below the native 60-second ready-result TTL. Long daemon
+  pauses can still expire results; they retry with backoff. Unknown job tokens after
   restoration return failure and are retried with backoff.
 - A successful `ircd.privmsg` call queues output; it is not a delivery receipt. IRC
   sending and persistence commits are not atomic. Seen IDs commit before output is

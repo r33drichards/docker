@@ -41,7 +41,7 @@ replay.assert("replay.effects.filter(effect => effect.kind === 'privmsg').length
 // Load into a new heap Map from the stored records; no in-flight native job survives.
 const sqliteRestored = rssStorage.load();
 replay.assert('sqliteRestored instanceof Map && sqliteRestored !== rssSubscriptions');
-replay.assert('sqliteRestored.get(sqliteKey).job === null && sqliteRestored.get(sqliteKey).restoring');
+replay.assert('sqliteRestored.get(sqliteKey).job === null && !sqliteRestored.get(sqliteKey).restoring');
 rssStorage.restoreSeenPage(sqliteRestored.get(sqliteKey));
 replay.assert("sqliteRestored.get(sqliteKey).seen instanceof Map && sqliteRestored.get(sqliteKey).seen.has('new') && !sqliteRestored.get(sqliteKey).restoring");
 // Failed unsubscribe leaves both heap and stored rows intact.

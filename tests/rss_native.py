@@ -228,6 +228,58 @@ ircd.on('preCommand', e => {
     )
 
 
+def exercise_http_poison(caller, reload):
+    """Test-only loopback build: disabling a script cancels committed work."""
+    import json
+    import time
+
+    from test_js_webhooks import Receiver
+
+    for mode in ("postCommand", "timeout", "preCommand", "userPreMessage"):
+        receiver = Receiver()
+        try:
+            source = (
+                f"const base={json.dumps(receiver.url)};\n"
+                + """
+ircd.on('postCommand',e=>{
+  if(e.command==='PING' && e.params[0]==='PRIME') {
+    for(let i=0;i<2;i++) ircd.fetch(base+'/slow',{method:'POST',body:'inflight'});
+    for(let i=0;i<2;i++) ircd.fetch(base+'/queued',{method:'POST',body:'prior'});
+  }
+});
+"""
+            )
+            poison = "ircd.fetch(base+'/current',{method:'POST',body:'current'});"
+            poison += "while(true){}" if mode == "timeout" else "throw Error('poison');"
+            if mode == "userPreMessage":
+                source += "ircd.on('userPreMessage',()=>{" + poison + "});"
+            else:
+                hook = "preCommand" if mode == "preCommand" else "postCommand"
+                source += (
+                    "ircd.on('"
+                    + hook
+                    + "',e=>{if(e.command==='PING'&&e.params[0]==='POISON'){"
+                    + poison
+                    + "}});"
+                )
+            reload(source, "admin")
+            caller.send("JOIN #http-poison")
+            caller.barrier("poison-joined")
+            caller.send("PING PRIME")
+            receiver.wait(2)
+            caller.send(
+                "PRIVMSG #http-poison :poison" if mode == "userPreMessage" else "PING POISON"
+            )
+            time.sleep(4.2)
+            assert [post[0] for post in receiver.posts] == ["/slow", "/slow"], (
+                mode,
+                receiver.posts,
+            )
+        finally:
+            receiver.close()
+    print("PASS: poisoned scripts cancel queued HTTP and discard staged requests on hooks/timeout")
+
+
 def main():
     """Run this focused suite without the longer native hook inventory tests."""
     import grp
@@ -253,6 +305,7 @@ def main():
         username = pwd.getpwuid(os.getuid()).pw_name
         base = f'''<server name="js.test" description="Synthetic messaging tests" id="001" network="JSTest">
 <admin name="Test" email="test@example.invalid">
+<path moduledir="{run / "modules"}">
 <bind address="127.0.0.1" port="{port}" type="clients">
 <connect name="test" allow="127.0.0.1" maxlocal="20" maxglobal="20" fakelag="yes" threshold="100000">
 <security user="{username}" group="{grp.getgrgid(os.getgid()).gr_name}">
@@ -295,7 +348,10 @@ def main():
                         time.sleep(0.1)
                     raise AssertionError("Rehash did not complete: " + logfile.read_text()[offset:])
 
-                exercise_messaging(caller, other, reload)
+                if os.environ.get("RSS_HTTP_POISON_TEST"):
+                    exercise_http_poison(caller, reload)
+                else:
+                    exercise_messaging(caller, other, reload)
             except Exception:
                 print(logfile.read_text())
                 raise
@@ -453,4 +509,5 @@ ircd.on('postCommand', e => {
 
 if __name__ == "__main__":
     main()
-    exercise_remote_messaging()
+    if not __import__("os").environ.get("RSS_HTTP_POISON_TEST"):
+        exercise_remote_messaging()

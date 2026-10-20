@@ -123,6 +123,28 @@ assert.equal(sub.seen.has('big-sequence'), true);
 assert.equal(sub.seen.has('failure'), false);
 reopened.close();
 assert.ok(fs.statSync(databasePath).size < 64 * 1024 * 1024);
+// Full durable capacity: indexed batch lookup starts immediately, with no
+// 65,536-row heap replay and no timer-driven warmup.
+sql = new DatabaseSync(':memory:');
+const capacityStore = vm.runInContext('rssSqliteStore(validators)', fresh);
+callback(() => capacityStore.initialize());
+for (let i = 0; i < 32; ++i) callback(() => capacityStore.add('#capacity' + i, 'https://example.org/feed'));
+const insert = sql.prepare('INSERT INTO rss_seen (subscription, entry_id) VALUES (?, ?)');
+sql.exec('BEGIN');
+for (let subscription = 1; subscription <= 32; ++subscription)
+  for (let id = 0; id < 2048; ++id) insert.run(subscription, 'saved' + id);
+sql.exec('UPDATE rss_subscriptions SET seeded = 1; COMMIT');
+const capacityStart = performance.now();
+const capacity = capacityStore.load();
+assert.equal(capacity.size, 32);
+assert.equal([...capacity.values()].every(sub => !sub.restoring && sub.seen.size === 0), true);
+for (const sub of capacity.values()) {
+  const ids = Array.from({length: 64}, (_, i) => 'saved' + (1984 + i));
+  assert.equal(capacityStore.known(sub.channel, sub.feed, ids).size, 64);
+  assert.equal(capacityStore.known(sub.channel, sub.feed, ['new']).size, 0);
+}
+console.log('Full 32 x 2048 indexed startup/read sample:', (performance.now() - capacityStart).toFixed(2), 'ms; no history warmup');
+capacityStore.close();
 fs.rmSync(directory, {recursive: true});
 console.log('PASS: SQLite adapter, real SQL, read-only startup, versioning, parameter binding, rollback, bounds, BigInt sequences and file-backed fresh-realm restart');
 

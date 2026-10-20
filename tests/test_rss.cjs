@@ -105,19 +105,20 @@ const item = (id, title = id) => ({id, title, url: 'https://example.com/' + enco
 {
   const h = harness();
   for (let i = 0; i < 16; ++i) h.command('#queued' + i);
-  h.tick(1); h.tick(2); h.tick(3); h.tick(4);
+  const readyAt = new Map(); let completed = 0, maximumWait = 0;
+  for (let now = 0; now <= 100; now += 5) {
+    for (const [id, ready] of readyAt) {
+      if (!h.results.has(id)) { maximumWait = Math.max(maximumWait, now - 5 - ready); readyAt.delete(id); }
+      else assert.ok(now - ready < 60, 'ready completion must be consumed before native TTL');
+    }
+    h.tick(now);
+    assert.ok(vm.runInContext('[...rssSubscriptions.values()].filter(s => s.job !== null).length', h.context) <= 8);
+    while (completed < h.jobs.length) { const id = String(++completed); h.finish(id, []); readyAt.set(id, now); }
+  }
   assert.equal(h.jobs.length, 16);
-  h.tick(31); h.tick(127);
-  assert.equal(h.jobs.length, 16);
-  assert.equal(vm.runInContext('[...rssSubscriptions.values()].every(s => s.job !== null && s.failures === 0)', h.context), true);
-  // Even the last bounded queued job can complete without being abandoned.
-  h.finish(16, []); h.tick(128);
-  assert.equal(vm.runInContext('[...rssSubscriptions.values()][15].seeded', h.context), true);
-  // Native restart makes old tokens explicitly ready failures, not infinite pending work.
-  h.finish(1, [], false); h.tick(129);
-  assert.equal(vm.runInContext('[...rssSubscriptions.values()][0].job', h.context), null);
-  h.tick(429); assert.equal(h.jobs.length, 18);
-  assert.equal(vm.runInContext('[...rssSubscriptions.values()][0].job', h.context), '17');
+  assert.equal(vm.runInContext('[...rssSubscriptions.values()].every(s => s.seeded && s.failures === 0)', h.context), true);
+  assert.ok(maximumWait <= 40);
+
 }
 {
   const h = harness();
@@ -209,7 +210,7 @@ const item = (id, title = id) => ({id, title, url: 'https://example.com/' + enco
   // A fresh isolate reconstructs persistent subscriptions and dedup IDs, not jobs.
   const restarted = harness(h.database);
   assert.equal(vm.runInContext('rssSubscriptions.size', restarted.context), 1);
-  restarted.tick(1); assert.equal(restarted.jobs.length, 0); // bounded restore page
+  restarted.tick(1); assert.equal(restarted.jobs.length, 1); // indexed lookup needs no history replay
   restarted.tick(2); restarted.finish(1, [item('durable'), item('after-restart')]); restarted.tick(3);
   assert.equal(restarted.posts().length, 1);
   assert.match(restarted.posts()[0].text, /after-restart/);
@@ -222,5 +223,21 @@ const item = (id, title = id) => ({id, title, url: 'https://example.com/' + enco
   h.failStorage(false); h.tick(302); h.finish(2, [item('baseline')]); h.tick(303);
   assert.equal(vm.runInContext('[...rssSubscriptions.values()][0].seeded', h.context), true);
   assert.equal(h.posts().length, 0);
+}
+{
+  const initial = harness();
+  for (let i = 0; i < 32; ++i) initial.command('#full' + i);
+  const db = initial.database.state;
+  for (const sub of db.subscriptions) {
+    sub.seeded = 1;
+    for (let i = 0; i < 2048; ++i) db.seen.push({subscription: sub.id, seq: db.nextSeq++, id: 'saved' + i});
+  }
+  const restarted = harness(initial.database);
+  restarted.tick(0);
+  assert.equal(restarted.jobs.length, 4, 'full-capacity startup starts work on first tick');
+  assert.equal(vm.runInContext('[...rssSubscriptions.values()].every(s => !s.restoring && s.seen.size === 0)', restarted.context), true);
+  restarted.finish(1, [item('saved2047'), item('genuinely-new')]); restarted.tick(5);
+  assert.equal(restarted.posts().length, 1);
+  assert.match(restarted.posts()[0].text, /genuinely-new/);
 }
 console.log('PASS: RSS authorization, Map state, deduplication, baseline, multi-channel isolation, bounded scheduling/output, UTF-8 sanitation, backoff, stale jobs and removal');

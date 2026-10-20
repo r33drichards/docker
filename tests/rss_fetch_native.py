@@ -41,7 +41,12 @@ ircd.on('postCommand', e => {
   if (e.params[0] !== 'rss-test-new' && e.params[0] !== 'rss-test-repeat') return;
   const sub = [...rssSubscriptions.values()][0];
   if (!sub || !sub.seeded || sub.job !== null || sub.pending.length) throw Error('test not ready');
-  if (!rssTestFixture && e.params[0] === 'rss-test-new') sub.seen.clear();
+  if (!rssTestFixture && e.params[0] === 'rss-test-new') {
+    sub.seen.clear();
+    const testDb = ircd.sqlite.open('rss');
+    testDb.exec('DELETE FROM rss_seen WHERE subscription = (SELECT id FROM rss_subscriptions WHERE key = ?)', [sub.channelKey + '\n' + sub.feed]);
+    testDb.close();
+  }
   sub.nextDue = 0;
   rssTestPhase = e.params[0] === 'rss-test-new' ? 'new' : 'repeat';
   rssTestWaiting = false;
@@ -54,8 +59,8 @@ ircd.on('backgroundTimer', () => {
     rssTestPhase = 'idle';
     return;
   }
-  if (rssTestPhase === 'baseline' && sub.seeded) {
-    ircd.notice('#rss-fetch-test', sub.seen.size ? 'rss-test-baseline' : 'rss-test-empty-feed');
+  if (rssTestPhase === 'baseline' && sub.seeded && sub.job === null && sub.nextDue > 0) {
+    ircd.notice('#rss-fetch-test', (sub.seen.size || (rssTestFixture && rssStorage.known(sub.channel, sub.feed, ['old']).size)) ? 'rss-test-baseline' : 'rss-test-empty-feed');
     rssTestPhase = 'idle';
     return;
   }
@@ -264,7 +269,7 @@ def main():
         thread.start()
         try:
             exercise("http://127.0.0.1/rss", http.server_port)
-            assert Fixture.requests == 4, Fixture.requests
+            assert Fixture.requests == 5, Fixture.requests
         finally:
             http.shutdown()
             http.server_close()

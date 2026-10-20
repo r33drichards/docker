@@ -20,6 +20,8 @@ function createRssSqliteMock(existing) {
         const row = subscription(p[0]); rows = row ? [[row.id,row.width]] : [];
       } else if (sql === 'SELECT seq, entry_id FROM rss_seen WHERE subscription = ? AND (? = 0 OR seq < ?) ORDER BY seq DESC LIMIT 16')
         rows = state.seen.filter(r => r.subscription === p[0] && (!p[1] || r.seq < p[2])).sort((a,b) => b.seq-a.seq).slice(0,16).map(r => [r.seq,r.id]);
+      else if (sql.startsWith('SELECT entry_id FROM rss_seen WHERE subscription = (SELECT id FROM rss_subscriptions WHERE key = ?) AND entry_id IN ('))
+        rows = state.seen.filter(r => r.subscription === (subscription(p[0]) || {}).id && p.slice(1).includes(r.id)).map(r => [r.id]);
       else if (sql === 'SELECT seq FROM rss_seen WHERE subscription = ? ORDER BY seq DESC LIMIT 1 OFFSET ?')
         rows = state.seen.filter(r => r.subscription === p[0]).sort((a,b) => b.seq-a.seq).slice(p[1],p[1]+1).map(r => [r.seq]);
       else throw new Error('Unsupported RSS mock query: ' + sql);
