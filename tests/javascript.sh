@@ -5,3 +5,5 @@ if [ -z "${INSPIRCD_NATIVE:-}" ]; then
     exit 0
 fi
 python3 "$(dirname "$0")/javascript_native.py"
+
+python3 "$(dirname "$0")/native_host_api.py"

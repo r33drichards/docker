@@ -48,12 +48,25 @@ class GeneratorTests(unittest.TestCase):
         self.assertEqual(
             rows,
             [
+                'IRC_JS_BINDING("defaultIsNick", JsIrcdDefaultIsNick, 1)',
+                'IRC_JS_BINDING("defaultIsUser", JsIrcdDefaultIsUser, 1)',
                 'IRC_JS_BINDING("isChannel", JsIrcdIsChannel, 1)',
+                'IRC_JS_BINDING("isFQDN", JsIrcdIsFQDN, 1)',
+                'IRC_JS_BINDING("isHost", JsIrcdIsHost, 2)',
                 'IRC_JS_BINDING("isNick", JsIrcdIsNick, 1)',
+                'IRC_JS_BINDING("isSID", JsIrcdIsSID, 1)',
+                'IRC_JS_BINDING("isUser", JsIrcdIsUser, 1)',
+                'IRC_JS_BINDING("isValidMask", JsIrcdIsValidMask, 1)',
                 'IRC_JS_BINDING("match", JsIrcdMatch, 2)',
                 'IRC_JS_BINDING("matchCIDR", JsIrcdMatchCIDR, 2)',
+                'IRC_JS_BINDING("matchMask", JsIrcdMatchMask, 3)',
+                'IRC_JS_BINDING("processColors", JsIrcdProcessColors, 1)',
+                'IRC_JS_BINDING("randomInt", JsIrcdRandomInt, 1)',
+                'IRC_JS_BINDING("randomString", JsIrcdRandomString, 1)',
                 'IRC_JS_BINDING("stripColor", JsIrcdStripColor, 1)',
                 'IRC_JS_BINDING("time", JsIrcdTime, 0)',
+                'IRC_JS_BINDING("timeNanoseconds", JsIrcdTimeNanoseconds, 0)',
+                'IRC_JS_BINDING("timingSafeCompare", JsIrcdTimingSafeCompare, 2)',
             ],
         )
         declarations = outputs["inspircd.d.ts"]
@@ -64,6 +77,10 @@ class GeneratorTests(unittest.TestCase):
             "matchCIDR(str: string, pattern: string): boolean;",
             "stripColor(value: string): string;",
             "time(): number;",
+            "isHost(value: string, allowsimple: boolean): boolean;",
+            "randomInt(maximum: number): number;",
+            "randomString(length: number): string;",
+            "timingSafeCompare(first: string, second: string): boolean;",
         ):
             self.assertIn(signature, declarations)
 
@@ -73,9 +90,9 @@ class GeneratorTests(unittest.TestCase):
         self.assertEqual(
             inventory["counts"],
             {
-                "exposed": 6,
+                "exposed": 19,
                 "excluded": 23,
-                "requires_manual_wrapper": 16,
+                "requires_manual_wrapper": 3,
                 "planned_mutation": 9,
             },
         )

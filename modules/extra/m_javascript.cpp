@@ -26,7 +26,21 @@ struct HttpTicket
 	std::shared_ptr<js_async_http::Generation> generation;
 	std::string id;
 	bool committed = false;
-	~HttpTicket() { if (!committed) transport->Cancel(generation, id); }
+	~HttpTicket()
+	{
+		if (!committed)
+			transport->Cancel(generation, id);
+	}
+};
+struct LocalTransaction
+{
+	bool committed = false;
+	std::function<void()> rollback;
+	~LocalTransaction()
+	{
+		if (!committed && rollback)
+			rollback();
+	}
 };
 struct Effect
 {
@@ -35,6 +49,10 @@ struct Effect
 	bool rename;
 	std::shared_ptr<js_webhooks::Request> webhook = nullptr;
 	std::shared_ptr<HttpTicket> http;
+	std::shared_ptr<LocalTransaction> local;
+	std::string operation;
+	std::vector<std::string> params;
+	std::weak_ptr<js_webhooks::Generation> owner;
 };
 struct DispatchState
 {
@@ -187,9 +205,29 @@ public:
 	Authority authority;
 	std::string actor;
 	bool loading = true;
+	struct CommandSpec
+	{
+		unsigned int minimum, maximum;
+		bool oper;
+		v8::Global<v8::Function> callback;
+	};
+	struct TimerSpec
+	{
+		time_t due, interval;
+		v8::Global<v8::Function> callback;
+	};
+	std::map<std::string, CommandSpec> commands;
+	std::map<unsigned int, TimerSpec> timers;
+	unsigned int nexttimer = 0;
+	std::weak_ptr<LocalTransaction> timertransaction;
 	std::shared_ptr<js_async_http::Dispatcher> http;
 	std::shared_ptr<js_async_http::Generation> httpgeneration = std::make_shared<js_async_http::Generation>();
-	~Script() { httpgeneration->active = false; if (http) http->Invalidate(httpgeneration); }
+	~Script()
+	{
+		httpgeneration->active = false;
+		if (http)
+			http->Invalidate(httpgeneration);
+	}
 	js_webhooks::Dispatcher& delivery;
 	std::shared_ptr<js_webhooks::Generation> generation;
 	const std::vector<js_scripts::WasmAsset>& wasm;
@@ -360,7 +398,8 @@ public:
 	}
 	static void Notice(const v8::FunctionCallbackInfo<v8::Value>& args) { EffectCall(args, false); }
 	static void Rename(const v8::FunctionCallbackInfo<v8::Value>& args) { EffectCall(args, true); }
-	#include "js_fetch_methods.inc"
+#include "js_fetch_methods.inc"
+#include "js_host_methods.inc"
 	static void UserById(const v8::FunctionCallbackInfo<v8::Value>& args)
 	{
 		std::string uuid;
@@ -401,6 +440,7 @@ public:
 				api->Set(Key(isolate, "rename"), v8::FunctionTemplate::New(isolate, Safe<Rename>, data));
 				api->Set(Key(isolate, "userById"), v8::FunctionTemplate::New(isolate, Safe<UserById>, data));
 				RegisterFetch(isolate, api, data);
+				RegisterHost(isolate, api, data);
 				v8::Local<v8::Object> instance;
 				return api->NewInstance(context).ToLocal(&instance) &&
 					Put(context, context->Global(), "ircd", instance);
@@ -417,6 +457,8 @@ struct ScriptSet
 	std::vector<js_scripts::WasmAsset> wasm;
 	std::vector<std::unique_ptr<Script>> scripts;
 };
+
+#include "js_host_effects.inc"
 
 class DeferredEffect final : public ActionBase
 {
@@ -435,6 +477,22 @@ public:
 		auto owner = state.lock();
 		if (!owner || !owner->alive)
 			return;
+		if (!effect.operation.empty())
+		{
+			auto generation = effect.owner.lock();
+			if (!generation || !generation->alive || effect.authority != Authority::Admin)
+				return;
+			FlagGuard guard(owner->internal);
+			try
+			{
+				ApplyHostEffect(effect, *owner);
+			}
+			catch (...)
+			{
+				ServerInstance->Logs.Normal(MODNAME, "Deferred native operation failed");
+			}
+			return;
+		}
 		auto* actor = ServerInstance->Users.FindUUID<LocalUser>(effect.actor);
 		auto* target = ServerInstance->Users.FindUUID<LocalUser>(effect.target);
 		if (!target || target->quitting ||
@@ -461,6 +519,25 @@ public:
 
 #include "js_event_listeners.h"
 
+class JavaScriptCommand final : public Command
+{
+	std::function<CmdResult(LocalUser*, const CommandBase::Params&)> invoke;
+
+public:
+	JavaScriptCommand(Module* module, const std::string& name, unsigned int minimum, unsigned int maximum, bool oper,
+		std::function<CmdResult(LocalUser*, const CommandBase::Params&)> callback)
+		: Command(module, name, minimum, maximum)
+		, invoke(std::move(callback))
+	{
+		access_needed = oper ? CmdAccess::OPERATOR : CmdAccess::NORMAL;
+	}
+	CmdResult Handle(User* user, const Params& params) override
+	{
+		auto* local = IS_LOCAL(user);
+		return local ? invoke(local, params) : CmdResult::FAILURE;
+	}
+};
+
 class ModuleJavaScript final : public Module
 {
 	js_webhooks::Dispatcher delivery;
@@ -469,6 +546,8 @@ class ModuleJavaScript final : public Module
 	const CommandBase::Params* rewriteparams = nullptr;
 	unsigned int dispatchdepth = 0;
 	JavaScriptEventListeners events;
+	std::vector<std::unique_ptr<JavaScriptCommand>> registeredcommands;
+#include "js_host_dispatch.inc"
 
 	static bool Snapshot(v8::Local<v8::Context> context, v8::Local<v8::Object>& event, const std::string& command,
 		const std::vector<std::string>& parameters, const std::string& actor, const char* result, bool loop,
@@ -645,7 +724,9 @@ class ModuleJavaScript final : public Module
 	{
 		for (auto& effect : effects)
 		{
-			if (effect.http)
+			if (effect.local)
+				effect.local->committed = true;
+			else if (effect.http)
 			{
 				effect.http->committed = effect.http->transport->Commit(effect.http->id);
 			}
@@ -719,6 +800,8 @@ class ModuleJavaScript final : public Module
 	{
 		if (!active || state->internal || state->running)
 			return MOD_RES_PASSTHRU;
+		if (std::string(stage) == "backgroundTimer")
+			TickTimers();
 		const auto& hook = *FindHook(stage);
 		FlagGuard running(state->running);
 		std::vector<Effect> effects;
@@ -849,12 +932,15 @@ public:
 					throw std::runtime_error("JavaScript initialization failed (active scripts retained)");
 				candidate->scripts.push_back(std::move(script));
 			}
+			ValidateCommands(*candidate);
 			if (!candidate->generation->endpoints.empty())
 				delivery.Start();
 			if (active)
 				active->generation->alive = false;
 			candidate->generation->alive = true;
+			registeredcommands.clear();
 			active.swap(candidate);
+			InstallCommands();
 			ServerInstance->Logs.Normal(MODNAME, "JavaScript configuration loaded");
 		}
 		catch (const std::exception& error)

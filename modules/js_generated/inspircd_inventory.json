@@ -2,6 +2,60 @@
   "api_namespace": "ircd",
   "bindings": [
     {
+      "adapter": "JsIrcdDefaultIsNick",
+      "arguments": [
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.",
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "authorization": "read_only",
+      "description": "Validate using the built-in nickname rules, bypassing custom hooks.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "defaultIsNick",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "InspIRCd::DefaultIsNick(value)",
+        "declaration": "static bool DefaultIsNick(const std::string_view& nick);",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::DefaultIsNick"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "boolean"
+      },
+      "side_effects": "read_server_state"
+    },
+    {
+      "adapter": "JsIrcdDefaultIsUser",
+      "arguments": [
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.",
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "authorization": "read_only",
+      "description": "Validate using the built-in username rules, bypassing custom hooks.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "defaultIsUser",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "InspIRCd::DefaultIsUser(value)",
+        "declaration": "static bool DefaultIsUser(const std::string_view& user);",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::DefaultIsUser"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "boolean"
+      },
+      "side_effects": "read_server_state"
+    },
+    {
       "adapter": "JsIrcdIsChannel",
       "arguments": [
         {
@@ -29,6 +83,65 @@
       "side_effects": "read_server_state"
     },
     {
+      "adapter": "JsIrcdIsFQDN",
+      "arguments": [
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.",
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "authorization": "read_only",
+      "description": "Validate a fully qualified hostname.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "isFQDN",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "InspIRCd::IsFQDN(value)",
+        "declaration": "inline static auto IsFQDN(const std::string_view& host) { return IsHost(host, false); }",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::IsFQDN"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "boolean"
+      },
+      "side_effects": "pure"
+    },
+    {
+      "adapter": "JsIrcdIsHost",
+      "arguments": [
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.",
+          "name": "value",
+          "type": "string"
+        },
+        {
+          "conversion": "Strict primitive boolean; no coercion.",
+          "name": "allowsimple",
+          "type": "boolean"
+        }
+      ],
+      "authorization": "read_only",
+      "description": "Validate a hostname with explicit simple-hostname policy.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "isHost",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "InspIRCd::IsHost(value, allowsimple)",
+        "declaration": "static bool IsHost(const std::string_view& host, bool allowsimple);",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::IsHost"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "boolean"
+      },
+      "side_effects": "pure"
+    },
+    {
       "adapter": "JsIrcdIsNick",
       "arguments": [
         {
@@ -54,6 +167,87 @@
         "type": "boolean"
       },
       "side_effects": "read_server_state"
+    },
+    {
+      "adapter": "JsIrcdIsSID",
+      "arguments": [
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.",
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "authorization": "read_only",
+      "description": "Validate a server identifier.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "isSID",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "InspIRCd::IsSID(value)",
+        "declaration": "static bool IsSID(const std::string_view& sid);",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::IsSID"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "boolean"
+      },
+      "side_effects": "pure"
+    },
+    {
+      "adapter": "JsIrcdIsUser",
+      "arguments": [
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.",
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "authorization": "read_only",
+      "description": "Validate using the current username hook.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "isUser",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "ServerInstance->IsUser(value)",
+        "declaration": "std::function<bool(const std::string_view&)> IsUser = &DefaultIsUser;",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::IsUser"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "boolean"
+      },
+      "side_effects": "read_server_state"
+    },
+    {
+      "adapter": "JsIrcdIsValidMask",
+      "arguments": [
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.",
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "authorization": "read_only",
+      "description": "Validate a nickname!username@hostname mask.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "isValidMask",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "InspIRCd::IsValidMask(value)",
+        "declaration": "static bool IsValidMask(const std::string& mask);",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::IsValidMask"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "boolean"
+      },
+      "side_effects": "pure"
     },
     {
       "adapter": "JsIrcdMatch",
@@ -120,6 +314,124 @@
       "side_effects": "read_server_state"
     },
     {
+      "adapter": "JsIrcdMatchMask",
+      "arguments": [
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.",
+          "name": "masks",
+          "type": "string"
+        },
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.",
+          "name": "hostname",
+          "type": "string"
+        },
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Reject embedded NUL.",
+          "name": "address",
+          "type": "string"
+        }
+      ],
+      "authorization": "read_only",
+      "description": "Match host and address against a space-separated mask list.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "matchMask",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "InspIRCd::MatchMask(masks, hostname, address)",
+        "declaration": "static bool MatchMask(const std::string& masks, const std::string& hostname, const std::string& address);",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::MatchMask"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "boolean"
+      },
+      "side_effects": "read_server_state"
+    },
+    {
+      "adapter": "JsIrcdProcessColors",
+      "arguments": [
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Preserve embedded NUL.",
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "authorization": "read_only",
+      "description": "Expand color escapes in an owned string copy.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "processColors",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "InspIRCd::ProcessColors(value_copy)",
+        "declaration": "static void ProcessColors(std::string& str);",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::ProcessColors"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "string"
+      },
+      "side_effects": "copy_only"
+    },
+    {
+      "adapter": "JsIrcdRandomInt",
+      "arguments": [
+        {
+          "conversion": "Require uint32 in 1..4294967295.",
+          "name": "maximum",
+          "type": "number"
+        }
+      ],
+      "authorization": "read_only",
+      "description": "Return an integer in [0, maximum). Native modulo reduction may be biased; not a cryptographic API guarantee.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "randomInt",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "ServerInstance->GenRandomInt(maximum)",
+        "declaration": "unsigned long GenRandomInt(unsigned long max) const;",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::GenRandomInt"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "number"
+      },
+      "side_effects": "randomness"
+    },
+    {
+      "adapter": "JsIrcdRandomString",
+      "arguments": [
+        {
+          "conversion": "Require uint32 in 0..4096.",
+          "name": "length",
+          "type": "number"
+        }
+      ],
+      "authorization": "read_only",
+      "description": "Return an alphanumeric random string of length 0..4096; uses server randomness, not a cryptographic API guarantee.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "randomString",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "ServerInstance->GenRandomStr(length)",
+        "declaration": "std::string GenRandomStr(size_t length) const;",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::GenRandomStr"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "string"
+      },
+      "side_effects": "randomness"
+    },
+    {
       "adapter": "JsIrcdStripColor",
       "arguments": [
         {
@@ -166,13 +478,66 @@
         "type": "number"
       },
       "side_effects": "read_server_state"
+    },
+    {
+      "adapter": "JsIrcdTimeNanoseconds",
+      "arguments": [],
+      "authorization": "read_only",
+      "description": "Return the fractional nanosecond component of cached server time, not an epoch timestamp.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "timeNanoseconds",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "ServerInstance->Time_ns()",
+        "declaration": "inline auto Time_ns() const { return ts.tv_nsec; }",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::Time_ns"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "number"
+      },
+      "side_effects": "read_server_state"
+    },
+    {
+      "adapter": "JsIrcdTimingSafeCompare",
+      "arguments": [
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Preserve embedded NUL.",
+          "name": "first",
+          "type": "string"
+        },
+        {
+          "conversion": "Strict primitive string; at most 4096 UTF-16 units; reject malformed UTF-16; own UTF-8 bytes. Preserve embedded NUL.",
+          "name": "second",
+          "type": "string"
+        }
+      ],
+      "authorization": "read_only",
+      "description": "Native equal-length comparison is timing-safe; length and JavaScript conversion are not constant-time.",
+      "errors": "strict_arguments_native_exception_translation",
+      "exposed": true,
+      "js_name": "timingSafeCompare",
+      "lifetime": "owned_values_call_only",
+      "native": {
+        "call": "InspIRCd::TimingSafeCompare(first, second)",
+        "declaration": "static bool TimingSafeCompare(const std::string& str1, const std::string& str2);",
+        "header": "include/inspircd.h",
+        "symbol": "InspIRCd::TimingSafeCompare"
+      },
+      "returns": {
+        "conversion": "Return owned primitive value; output is bounded by the documented argument and native result limits.",
+        "type": "boolean"
+      },
+      "side_effects": "pure"
     }
   ],
   "counts": {
     "excluded": 23,
-    "exposed": 6,
+    "exposed": 19,
     "planned_mutation": 9,
-    "requires_manual_wrapper": 16
+    "requires_manual_wrapper": 3
   },
   "generated_by": "tools/generate_js_bindings.py",
   "inventory": [
@@ -378,36 +743,6 @@
     },
     {
       "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "default_is_nick",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "static bool DefaultIsNick(const std::string_view& nick);",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::DefaultIsNick"
-      },
-      "reason": "Bypasses the current IsNick hook; decide whether default-only validation is intended.",
-      "side_effects": "read_server_state"
-    },
-    {
-      "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "default_is_user",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "static bool DefaultIsUser(const std::string_view& user);",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::DefaultIsUser"
-      },
-      "reason": "Bypasses the current IsUser hook; decide whether default-only validation is intended.",
-      "side_effects": "read_server_state"
-    },
-    {
-      "authorization": "not_exposed",
       "classification": "excluded",
       "conversion": "No JavaScript conversion or registration is generated.",
       "exposed": false,
@@ -465,81 +800,6 @@
       },
       "reason": "Process ownership and raw argv are not script capabilities.",
       "side_effects": "process_control"
-    },
-    {
-      "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "is_fqdn",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "inline static auto IsFQDN(const std::string_view& host) { return IsHost(host, false); }",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::IsFQDN"
-      },
-      "reason": "Needs a dedicated validated string adapter.",
-      "side_effects": "pure"
-    },
-    {
-      "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "is_host",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "static bool IsHost(const std::string_view& host, bool allowsimple);",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::IsHost"
-      },
-      "reason": "Needs explicit boolean argument conversion and string ownership.",
-      "side_effects": "pure"
-    },
-    {
-      "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "is_sid",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "static bool IsSID(const std::string_view& sid);",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::IsSID"
-      },
-      "reason": "Needs a dedicated validated string adapter.",
-      "side_effects": "pure"
-    },
-    {
-      "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "is_user",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "std::function<bool(const std::string_view&)> IsUser = &DefaultIsUser;",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::IsUser"
-      },
-      "reason": "Current hook needs a separate approved primitive adapter.",
-      "side_effects": "read_server_state"
-    },
-    {
-      "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "is_valid_mask",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "static bool IsValidMask(const std::string& mask);",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::IsValidMask"
-      },
-      "reason": "Needs a dedicated validated string adapter.",
-      "side_effects": "pure"
     },
     {
       "authorization": "pending_authority_decision",
@@ -620,21 +880,6 @@
     },
     {
       "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "match_mask",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "static bool MatchMask(const std::string& masks, const std::string& hostname, const std::string& address);",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::MatchMask"
-      },
-      "reason": "Needs a three-string adapter and bounded input policy.",
-      "side_effects": "read_server_state"
-    },
-    {
-      "authorization": "not_exposed",
       "classification": "excluded",
       "conversion": "No JavaScript conversion or registration is generated.",
       "exposed": false,
@@ -681,21 +926,6 @@
     },
     {
       "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "process_colors",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "static void ProcessColors(std::string& str);",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::ProcessColors"
-      },
-      "reason": "Must mutate only an owned copy and return an owned string.",
-      "side_effects": "mutates_argument"
-    },
-    {
-      "authorization": "not_exposed",
       "classification": "excluded",
       "conversion": "No JavaScript conversion or registration is generated.",
       "exposed": false,
@@ -739,36 +969,6 @@
       },
       "reason": "Writable raw buffers and hook replacement are excluded.",
       "side_effects": "mutates_argument"
-    },
-    {
-      "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "random_int",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "unsigned long GenRandomInt(unsigned long max) const;",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::GenRandomInt"
-      },
-      "reason": "Requires platform-width bounds, safe integer conversion, and explicit randomness policy.",
-      "side_effects": "randomness"
-    },
-    {
-      "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "random_string",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "std::string GenRandomStr(size_t length) const;",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::GenRandomStr"
-      },
-      "reason": "Requires allocation limits, length conversion, and randomness policy.",
-      "side_effects": "randomness"
     },
     {
       "authorization": "not_exposed",
@@ -862,36 +1062,6 @@
     },
     {
       "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "time_ns",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "inline auto Time_ns() const { return ts.tv_nsec; }",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::Time_ns"
-      },
-      "reason": "Returns the fractional nanosecond component, not an epoch timestamp; needs explicit naming and bounds.",
-      "side_effects": "read_server_state"
-    },
-    {
-      "authorization": "not_exposed",
-      "classification": "requires_manual_wrapper",
-      "conversion": "No JavaScript conversion or registration is generated.",
-      "exposed": false,
-      "id": "timing_safe_compare",
-      "lifetime": "No native object is exposed to JavaScript.",
-      "native": {
-        "declaration": "static bool TimingSafeCompare(const std::string& str1, const std::string& str2);",
-        "header": "include/inspircd.h",
-        "symbol": "InspIRCd::TimingSafeCompare"
-      },
-      "reason": "Native unequal-length inputs leak length; do not imply constant-time JavaScript conversion or end-to-end comparison.",
-      "side_effects": "pure"
-    },
-    {
-      "authorization": "not_exposed",
       "classification": "excluded",
       "conversion": "No JavaScript conversion or registration is generated.",
       "exposed": false,
@@ -906,10 +1076,10 @@
       "side_effects": "mutates_server"
     }
   ],
-  "manifest_sha256": "0455c6954aedac5436467972cf4658db7991e4fcf838d9b38f99e68a96232ea5",
+  "manifest_sha256": "64297820b154d0f773ae4d3395ec816b238ff29a24ffa2e11d9a323352070b96",
   "policies": {
     "arguments": "Exact arity and primitive types only; never perform JavaScript string or numeric coercion. Reject unpaired UTF-16 surrogates, preserve embedded NUL bytes in UTF-8 conversion, and use length-aware native strings.",
-    "authorization": "These six utility bindings are read-only with respect to IRC state. The manifest does not grant mutation authority. Reentrancy, hook context, and module unload remain responsibilities of the embedding runtime.",
+    "authorization": "Utility bindings do not mutate IRC state; randomness bindings consume the server random generator. The manifest grants no mutation authority.",
     "errors": "Throw TypeError for wrong arity or type and malformed UTF-16; throw RangeError for results outside the documented numeric or string bounds. Native exceptions must become JavaScript Error without crossing the V8 callback boundary. No pending exception may be ignored.",
     "lifetime": "All arguments are owned native copies for the duration of the synchronous adapter call. Return JavaScript-owned primitive values only. Do not retain native pointers, references, string_views, V8 locals, or user/channel objects across calls.",
     "registration": "Only entries in bindings are emitted as registration rows. Inventory entries, including proposed mutation names, never produce callbacks or TypeScript methods. Handwritten native adapters must implement the declared conversion and policy contracts.",

@@ -5,7 +5,7 @@ ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 : "${INSPIRCD_SOURCE:?Set INSPIRCD_SOURCE to the upstream checkout}"
 : "${INSPIRCD_SHA:?Set INSPIRCD_SHA to its expected full commit SHA}"
 test "$(git -C "$INSPIRCD_SOURCE" rev-parse HEAD)" = "$INSPIRCD_SHA"
-cp "$ROOT"/modules/js_*.h "$INSPIRCD_SOURCE/src/modules/"
+cp "$ROOT"/modules/js_*.h "$ROOT"/modules/js_*.inc "$INSPIRCD_SOURCE/src/modules/"
 mkdir -p "$INSPIRCD_SOURCE/src/modules/js_generated"
 cp "$ROOT"/modules/js_generated/* "$INSPIRCD_SOURCE/src/modules/js_generated/"
 cp "$ROOT/modules/extra/m_javascript.cpp" "$INSPIRCD_SOURCE/src/modules/extra/"

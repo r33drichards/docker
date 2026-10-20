@@ -18,6 +18,7 @@ nav:
       - Reload and recover: how-to/reload.md
       - Use WebAssembly: how-to/wasm.md
       - Test changes: how-to/test.md
+      - Native host APIs: how-to/native-host-api.md
       - Maintain and publish docs: how-to/documentation.md
   - Reference:
       - Configuration: reference/configuration.md

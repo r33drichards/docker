@@ -21,7 +21,9 @@ from wchat_nocodb_native import exercise_wchat_nocodb
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RUN = pathlib.Path(os.environ["INSPIRCD_NATIVE"]).resolve()
-GOOD = r"""
+GOOD = (
+    (ROOT / "tests/fixtures/native_utilities.js").read_text()
+    + r"""
 if (!ircd.match('hello', 'h*') || !ircd.matchCIDR('192.0.2.4', '192.0.2.0/24') ||
     !ircd.isNick('ValidNick') || !ircd.isChannel('#valid') ||
     ircd.stripColor('\x0304red') !== 'red' || ircd.time() <= 0) throw Error('native utilities');
@@ -60,6 +62,7 @@ ircd.on('postCommand', e => {
   if (e.command === 'VERSION') ircd.notice(e.userId, 'post:' + e.result);
 });
 """
+)
 
 
 HOOKS = json.loads((ROOT / "bindings/module_hooks.json").read_text())["hooks"]
