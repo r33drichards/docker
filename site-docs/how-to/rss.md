@@ -33,7 +33,8 @@ startup. Deploying or provisioning storage is a separate operator action.
 ## Add or remove a feed
 
 As an IRC operator, send the server command `RSS <channel> <feed-url>`.
-In WeeChat, use `/quote` so the client sends this custom command to the server:
+In WeeChat, including its Glowing Bear web front end, use `/quote` so the client
+sends this custom command to the server:
 
 ```text
 /quote RSS #news https://example.org/feed.xml
@@ -41,7 +42,8 @@ In WeeChat, use `/quote` so the client sends this custom command to the server:
 
 Clients that forward unknown commands directly may also accept
 `/rss #news https://example.org/feed.xml`. Run it from a buffer on the intended
-server. Operator status is required; channel operator (`@`) status alone is not
+server. Check that server's buffer for the confirmation notice or error; it may
+not appear in the channel buffer. Operator status is required; channel operator (`@`) status alone is not
 enough, and the server's operator class must permit the `RSS` command. Use your
 existing operator access; do not paste operator credentials into chat.
 
