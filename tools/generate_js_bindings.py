@@ -114,6 +114,158 @@ CANONICAL_BINDINGS = {
 }
 
 
+# Additional reviewed primitive utility contracts.
+CANONICAL_BINDINGS.update(
+    {
+        "isUser": (
+            "JsIrcdIsUser",
+            "InspIRCd::IsUser",
+            "include/inspircd.h",
+            "std::function<bool(const std::string_view&)> IsUser = &DefaultIsUser;",
+            "ServerInstance->IsUser(value)",
+            ("value",),
+            "boolean",
+            "read_server_state",
+        ),
+        "defaultIsNick": (
+            "JsIrcdDefaultIsNick",
+            "InspIRCd::DefaultIsNick",
+            "include/inspircd.h",
+            "static bool DefaultIsNick(const std::string_view& nick);",
+            "InspIRCd::DefaultIsNick(value)",
+            ("value",),
+            "boolean",
+            "read_server_state",
+        ),
+        "defaultIsUser": (
+            "JsIrcdDefaultIsUser",
+            "InspIRCd::DefaultIsUser",
+            "include/inspircd.h",
+            "static bool DefaultIsUser(const std::string_view& user);",
+            "InspIRCd::DefaultIsUser(value)",
+            ("value",),
+            "boolean",
+            "read_server_state",
+        ),
+        "isFQDN": (
+            "JsIrcdIsFQDN",
+            "InspIRCd::IsFQDN",
+            "include/inspircd.h",
+            "inline static auto IsFQDN(const std::string_view& host) { return IsHost(host, false); }",
+            "InspIRCd::IsFQDN(value)",
+            ("value",),
+            "boolean",
+            "pure",
+        ),
+        "isHost": (
+            "JsIrcdIsHost",
+            "InspIRCd::IsHost",
+            "include/inspircd.h",
+            "static bool IsHost(const std::string_view& host, bool allowsimple);",
+            "InspIRCd::IsHost(value, allowsimple)",
+            ("value", "allowsimple"),
+            "boolean",
+            "pure",
+        ),
+        "isSID": (
+            "JsIrcdIsSID",
+            "InspIRCd::IsSID",
+            "include/inspircd.h",
+            "static bool IsSID(const std::string_view& sid);",
+            "InspIRCd::IsSID(value)",
+            ("value",),
+            "boolean",
+            "pure",
+        ),
+        "isValidMask": (
+            "JsIrcdIsValidMask",
+            "InspIRCd::IsValidMask",
+            "include/inspircd.h",
+            "static bool IsValidMask(const std::string& mask);",
+            "InspIRCd::IsValidMask(value)",
+            ("value",),
+            "boolean",
+            "pure",
+        ),
+        "matchMask": (
+            "JsIrcdMatchMask",
+            "InspIRCd::MatchMask",
+            "include/inspircd.h",
+            "static bool MatchMask(const std::string& masks, const std::string& hostname, const std::string& address);",
+            "InspIRCd::MatchMask(masks, hostname, address)",
+            ("masks", "hostname", "address"),
+            "boolean",
+            "read_server_state",
+        ),
+        "processColors": (
+            "JsIrcdProcessColors",
+            "InspIRCd::ProcessColors",
+            "include/inspircd.h",
+            "static void ProcessColors(std::string& str);",
+            "InspIRCd::ProcessColors(value_copy)",
+            ("value",),
+            "string",
+            "copy_only",
+        ),
+        "timingSafeCompare": (
+            "JsIrcdTimingSafeCompare",
+            "InspIRCd::TimingSafeCompare",
+            "include/inspircd.h",
+            "static bool TimingSafeCompare(const std::string& str1, const std::string& str2);",
+            "InspIRCd::TimingSafeCompare(first, second)",
+            ("first", "second"),
+            "boolean",
+            "pure",
+        ),
+        "randomInt": (
+            "JsIrcdRandomInt",
+            "InspIRCd::GenRandomInt",
+            "include/inspircd.h",
+            "unsigned long GenRandomInt(unsigned long max) const;",
+            "ServerInstance->GenRandomInt(maximum)",
+            ("maximum",),
+            "number",
+            "randomness",
+        ),
+        "randomString": (
+            "JsIrcdRandomString",
+            "InspIRCd::GenRandomStr",
+            "include/inspircd.h",
+            "std::string GenRandomStr(size_t length) const;",
+            "ServerInstance->GenRandomStr(length)",
+            ("length",),
+            "string",
+            "randomness",
+        ),
+        "timeNanoseconds": (
+            "JsIrcdTimeNanoseconds",
+            "InspIRCd::Time_ns",
+            "include/inspircd.h",
+            "inline auto Time_ns() const { return ts.tv_nsec; }",
+            "ServerInstance->Time_ns()",
+            (),
+            "number",
+            "read_server_state",
+        ),
+    }
+)
+CANONICAL_ARGUMENT_TYPES = {
+    "isUser": ("string",),
+    "defaultIsNick": ("string",),
+    "defaultIsUser": ("string",),
+    "isFQDN": ("string",),
+    "isHost": ("string", "boolean"),
+    "isSID": ("string",),
+    "isValidMask": ("string",),
+    "matchMask": ("string", "string", "string"),
+    "processColors": ("string",),
+    "timingSafeCompare": ("string", "string"),
+    "randomInt": ("number",),
+    "randomString": ("number",),
+    "timeNanoseconds": (),
+}
+
+
 class ManifestError(ValueError):
     """An invalid or unaudited manifest cannot produce bindings."""
 
@@ -266,8 +418,9 @@ def validate_manifest(data: Any) -> dict[str, Any]:
         )
         if actual != (adapter, symbol, header, declaration, call, args, result, effects):
             fail(path, "mapping differs from the reviewed canonical native contract")
-        if any(argument["type"] != "string" for argument in binding["arguments"]):
-            fail(f"{path}.arguments", "these reviewed adapters accept only strings")
+        expected_types = CANONICAL_ARGUMENT_TYPES.get(binding["js_name"], ("string",) * len(args))
+        if tuple(argument["type"] for argument in binding["arguments"]) != expected_types:
+            fail(f"{path}.arguments", "argument types differ from reviewed native contract")
     ids: set[str] = set()
     for index, entry in enumerate(data["inventory"]):
         path = f"inventory[{index}]"

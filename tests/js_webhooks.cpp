@@ -15,6 +15,11 @@ static void Drain(Dispatcher& dispatcher)
 	assert(dispatcher.Stats().pending == 0);
 }
 
+static void Rejected(const std::shared_ptr<Request>& request)
+{
+	assert(!request);
+}
+
 int main(int argc, char** argv)
 {
 	assert(argc == 4);
@@ -49,10 +54,10 @@ int main(int argc, char** argv)
 	auto generation =
 		std::make_shared<Generation>(std::map<std::string, Endpoint>{{"joins", ValidateEndpoint(base + "/ok", true)}});
 	Dispatcher bounded;
-	assert(!bounded.Stage(generation, "joins", "{}")); // Inactive candidate cannot post.
+	Rejected(bounded.Stage(generation, "joins", "{}")); // Inactive candidate cannot post.
 	generation->alive = true;
-	assert(!bounded.Stage(generation, "missing", "{}"));
-	assert(!bounded.Stage(generation, "joins", std::string(MaxBody + 1, 'x')));
+	Rejected(bounded.Stage(generation, "missing", "{}"));
+	Rejected(bounded.Stage(generation, "joins", std::string(MaxBody + 1, 'x')));
 	std::vector<std::shared_ptr<Request>> reservations;
 	for (std::size_t i = 0; i < MaxPending; ++i)
 	{
@@ -60,13 +65,13 @@ int main(int argc, char** argv)
 		assert(request);
 		reservations.push_back(std::move(request));
 	}
-	assert(!bounded.Stage(generation, "joins", "{}"));
+	Rejected(bounded.Stage(generation, "joins", "{}"));
 	assert(bounded.Stats().pending == MaxPending);
 	reservations.clear(); // Failure/denial/candidate rollback frees staged requests without I/O.
 	assert(bounded.Stats().pending == 0);
 	for (std::size_t i = 0; i < MaxPending; ++i)
 		bounded.Commit(bounded.Stage(generation, "joins", "{}"));
-	assert(!bounded.Stage(generation, "joins", "{}"));
+	Rejected(bounded.Stage(generation, "joins", "{}"));
 	generation->alive = false;
 	bounded.Start();
 	Drain(bounded);
@@ -95,7 +100,7 @@ int main(int argc, char** argv)
 	assert(transport.Stats().sent == 1 && transport.Stats().failed == 5);
 	transport.Stop();
 	transport.Stop(); // Idempotent shutdown.
-	assert(!transport.Stage(generation, "ok", "{}"));
+	Rejected(transport.Stage(generation, "ok", "{}"));
 
 	Dispatcher cancellation;
 	cancellation.Start();

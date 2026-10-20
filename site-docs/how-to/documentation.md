@@ -6,6 +6,7 @@ Use Python 3.11+ in a virtual environment, from the repository root:
 python3 -m venv .venv-docs
 .venv-docs/bin/pip install -r requirements-docs.txt
 python3 tools/generate_docs_reference.py
+python3 tests/test_docs_contract.py
 .venv-docs/bin/mkdocs build --strict
 .venv-docs/bin/mkdocs serve --dev-addr 127.0.0.1:8000
 ~~~
@@ -32,3 +33,8 @@ to publish docs. An administrator can publish a reviewed checkout manually:
 Use an ephemeral approved Git credential, not a token in a URL or committed file.
 This command changes the documentation branch only. Site publication is not an
 IRC daemon/module deployment, and a successful build alone does not prove Pages is live.
+
+The docs contract checks complete declaration coverage, MOTD source wiring and JavaScript
+example syntax, and executes the replay example against the modeled host. This is not
+a TypeScript typecheck or live-server deployment check. Review semantics against the
+native bridge and run native integration when changing behavior.

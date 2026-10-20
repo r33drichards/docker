@@ -16,7 +16,7 @@ appear more than once. Therefore the hook stream is neither an exactly-once audi
 log nor proof that another client received a message.
 
 Calling arbitrary native operations synchronously could recurse into the same hooks with partially
-processed native state. Notices and renames instead queue explicit effects to a
+processed native state. Notices, renames, channel/user/admin operations and fetch starts queue explicit effects to a
 safe main-loop point, re-resolve actors/targets, and suppress JS feedback while the
 effect runs. This avoids unbounded recursion but also means queuing an effect is
 not a success receipt or transaction. Later native rejection does not retract an

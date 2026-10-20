@@ -61,6 +61,10 @@ jobs:
           chown -R ci:ci "$GITHUB_WORKSPACE"
       - name: Required ASan, UBSan, leak and ownership checks
         run: |
+          runuser -u ci -- bash tests/js_async_http.sh
+          runuser -u ci -- node tests/replay/run.cjs --preload tests/rss_sqlite_mock.js --script examples/rss.js tests/replay/rss.js tests/replay/rss_sqlite.js
+          runuser -u ci -- sh tests/js_replay.sh --preload tests/rss_sqlite_mock.js --script examples/rss.js tests/replay/rss.js tests/replay/rss_sqlite.js
+          runuser -u ci -- node tests/test_rss.cjs
           python3 tests/test_sqlite_bootstrap.py
           python3 tests/test_persistent_config.py
           runuser -u ci -- python3 tests/test_sqlite_bootstrap.py
@@ -71,6 +75,11 @@ jobs:
           runuser -u ci -- env CXXFLAGS="-O1 -fsanitize=address,undefined -fno-sanitize-recover=all" sh tests/js_sqlite.sh
           runuser -u ci -- node tests/test_join_webhook.cjs
           runuser -u ci -- node tests/test_wchat_nocodb.cjs
+          runuser -u ci -- sh tests/js_async_http.sh
+          runuser -u ci -- node tests/replay/run.cjs
+          runuser -u ci -- sh tests/js_replay.sh
+          runuser -u ci -- python3 tests/test_js_fetch_headers.py
+          runuser -u ci -- env WEBHOOK_TEST_CXXFLAGS="-O1 -fsanitize=address,undefined -fno-sanitize-recover=all" python3 tests/test_js_fetch_headers.py
           runuser -u ci -- python3 tests/test_js_webhooks.py
           runuser -u ci -- env WEBHOOK_TEST_CXXFLAGS="-O1 -fsanitize=address,undefined -fno-sanitize-recover=all" python3 tests/test_js_webhooks.py
           runuser -u ci -- bash tests/ci/native.sh sanitizers

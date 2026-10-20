@@ -13,11 +13,17 @@ nav:
   - Home: index.md
   - Tutorials:
       - Your first command hook: tutorials/first-hook.md
+      - Register a command and timer: tutorials/command-and-timer.md
   - How-to guides:
       - Build and configure: how-to/configure.md
       - Reload and recover: how-to/reload.md
+      - Subscribe channels to RSS: how-to/rss.md
       - Use WebAssembly: how-to/wasm.md
       - Test changes: how-to/test.md
+      - Native host APIs: how-to/native-host-api.md
+      - Fetch and authenticated webhooks: how-to/fetch-and-webhooks.md
+      - Replay and assert heap state: how-to/replay.md
+      - Agent onboarding and MOTD: how-to/agent-onboarding.md
       - Maintain and publish docs: how-to/documentation.md
   - Reference:
       - Configuration: reference/configuration.md
@@ -26,10 +32,13 @@ nav:
       - Separate event-provider hooks: reference/events.md
       - Native API and authority: reference/api.md
       - SQLite databases: reference/sqlite.md
+      - Callable method signatures: reference/callable-api.md
+      - Feature and branch matrix: reference/features.md
       - Execution and failure limits: reference/limits.md
   - Explanation:
       - Trust and containment: explanation/trust.md
       - Snapshots, ordering and effects: explanation/architecture.md
+      - Host authority and lifecycle: explanation/host-lifecycle.md
 markdown_extensions:
   - admonition
   - tables

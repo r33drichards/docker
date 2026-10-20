@@ -3,11 +3,13 @@
 /// $LinkerFlags: -lnode -pthread -Wl,-z,nodelete find_linker_flags("libcurl") find_linker_flags("sqlite3")
 
 #include "inspircd.h"
+#include "clientprotocolmsg.h"
 #include "js_runtime.h"
 #include "js_sqlite.h"
 #include <cmath>
 #include <sstream>
 #include "js_webhooks.h"
+#include "js_async_http.h"
 #include "js_wire_validation.h"
 #include "js_script_loader.h"
 #include "js_native_utilities.h"
@@ -22,12 +24,40 @@
 namespace
 {
 using Authority = js_scripts::Authority;
+struct HttpTicket
+{
+	std::shared_ptr<js_async_http::Dispatcher> transport;
+	std::shared_ptr<js_async_http::Generation> generation;
+	std::string id;
+	bool committed = false;
+	~HttpTicket()
+	{
+		if (!committed)
+			transport->Cancel(generation, id);
+	}
+};
+struct LocalTransaction
+{
+	bool committed = false;
+	std::function<void()> rollback;
+	~LocalTransaction()
+	{
+		if (!committed && rollback)
+			rollback();
+	}
+};
 struct Effect
 {
 	std::string actor, target, text;
 	Authority authority;
 	bool rename;
 	std::shared_ptr<js_webhooks::Request> webhook = nullptr;
+	bool privmsg = false;
+	std::shared_ptr<HttpTicket> http;
+	std::shared_ptr<LocalTransaction> local;
+	std::string operation;
+	std::vector<std::string> params;
+	std::weak_ptr<js_webhooks::Generation> owner;
 };
 struct DispatchState
 {
@@ -180,6 +210,30 @@ public:
 	Authority authority;
 	std::string actor;
 	bool loading = true;
+	struct CommandSpec
+	{
+		unsigned int minimum, maximum;
+		bool oper;
+		v8::Global<v8::Function> callback;
+	};
+	struct TimerSpec
+	{
+		time_t due, interval;
+		v8::Global<v8::Function> callback;
+	};
+	std::map<std::string, CommandSpec> commands;
+	std::map<unsigned int, TimerSpec> timers;
+	unsigned int nexttimer = 0;
+	std::weak_ptr<LocalTransaction> timertransaction;
+	std::shared_ptr<js_async_http::Dispatcher> http;
+	std::shared_ptr<js_async_http::Generation> httpgeneration = std::make_shared<js_async_http::Generation>();
+	void InvalidateHttp()
+	{
+		httpgeneration->active = false;
+		if (http)
+			http->Invalidate(httpgeneration);
+	}
+	~Script() { InvalidateHttp(); }
 	js_webhooks::Dispatcher& delivery;
 	std::shared_ptr<js_webhooks::Generation> generation;
 	const std::vector<js_scripts::WasmAsset>& wasm;
@@ -302,7 +356,7 @@ public:
 			Error(args.GetIsolate(), "Webhook JSON must contain an object");
 			return;
 		}
-		auto request = self->delivery.Stage(self->generation, name, body);
+		auto request = self->delivery.Stage(self->generation, name, body, self->sourcepath, self->httpgeneration);
 		const bool accepted = !!request;
 		if (request)
 		{
@@ -330,7 +384,7 @@ public:
 			return;
 		args.GetReturnValue().Set(value);
 	}
-	static void EffectCall(const v8::FunctionCallbackInfo<v8::Value>& args, bool rename)
+	static void EffectCall(const v8::FunctionCallbackInfo<v8::Value>& args, bool rename, bool privmsg = false)
 	{
 		auto* self = Self(args);
 		std::string target, text;
@@ -346,7 +400,7 @@ public:
 		}
 		if (!Text(args.GetIsolate(), args[0], target) || !Text(args.GetIsolate(), args[1], text))
 			return;
-		if (self->effects.size() >= 16 || target.size() > 32 || !WireText(target) || !WireText(text) ||
+		if (self->effects.size() >= 16 || target.size() > 64 || !WireText(target) || !WireText(text) ||
 			text.size() > 400)
 		{
 			Error(args.GetIsolate(), "Invalid or excessive state change");
@@ -362,10 +416,13 @@ public:
 			Error(args.GetIsolate(), "Invalid nickname");
 			return;
 		}
-		self->effects.push_back({self->actor, target, text, self->authority, rename});
+		self->effects.push_back({self->actor, target, text, self->authority, rename, nullptr, privmsg});
 	}
 	static void Notice(const v8::FunctionCallbackInfo<v8::Value>& args) { EffectCall(args, false); }
+	static void Privmsg(const v8::FunctionCallbackInfo<v8::Value>& args) { EffectCall(args, false, true); }
 	static void Rename(const v8::FunctionCallbackInfo<v8::Value>& args) { EffectCall(args, true); }
+#include "js_fetch_methods.inc"
+#include "js_host_methods.inc"
 	static void UserById(const v8::FunctionCallbackInfo<v8::Value>& args)
 	{
 		std::string uuid;
@@ -385,15 +442,18 @@ public:
 		auto context = args.GetIsolate()->GetCurrentContext();
 		auto object = v8::Object::New(args.GetIsolate());
 		if (!Put(context, object, "id", Display(args.GetIsolate(), user->uuid)) ||
-			!Put(context, object, "nick", Display(args.GetIsolate(), user->nick)))
+			!Put(context, object, "nick", Display(args.GetIsolate(), user->nick)) ||
+			!Put(context, object, "isOper", v8::Boolean::New(args.GetIsolate(), user->IsOper())))
 			return;
 		args.GetReturnValue().Set(object);
 	}
 
 #include "js_sqlite_bridge.h"
 
+	std::string sourcepath;
 	bool Load(const js_scripts::Source& source, std::string& error)
 	{
+		sourcepath = source.canonical_path.string();
 		bool result = runtime.Initialize(
 			source.content, source.canonical_path.string(),
 			[this](v8::Isolate* isolate, v8::Local<v8::Context> context)
@@ -405,9 +465,12 @@ public:
 				api->Set(Key(isolate, "postWebhook"), v8::FunctionTemplate::New(isolate, Safe<PostWebhook>, data));
 				api->Set(Key(isolate, "webhookStats"), v8::FunctionTemplate::New(isolate, Safe<WebhookStats>, data));
 				api->Set(Key(isolate, "wasm"), v8::FunctionTemplate::New(isolate, Safe<Wasm>, data));
-				api->Set(Key(isolate, "notice"), v8::FunctionTemplate::New(isolate, Safe<Notice>, data));
-				api->Set(Key(isolate, "rename"), v8::FunctionTemplate::New(isolate, Safe<Rename>, data));
 				api->Set(Key(isolate, "userById"), v8::FunctionTemplate::New(isolate, Safe<UserById>, data));
+				api->Set(Key(isolate, "notice"), v8::FunctionTemplate::New(isolate, Safe<Notice>, data));
+				api->Set(Key(isolate, "privmsg"), v8::FunctionTemplate::New(isolate, Safe<Privmsg>, data));
+				api->Set(Key(isolate, "rename"), v8::FunctionTemplate::New(isolate, Safe<Rename>, data));
+				RegisterFetch(isolate, api, data);
+				RegisterHost(isolate, api, data);
 				auto sqlite = v8::ObjectTemplate::New(isolate);
 				sqlite->Set(Key(isolate, "open"), v8::FunctionTemplate::New(isolate, Safe<DatabaseOpen>, data));
 				api->Set(Key(isolate, "sqlite"), sqlite);
@@ -428,6 +491,8 @@ struct ScriptSet
 	std::vector<std::unique_ptr<Script>> scripts;
 };
 
+#include "js_host_effects.inc"
+
 class DeferredEffect final : public ActionBase
 {
 	std::weak_ptr<DispatchState> state;
@@ -445,14 +510,74 @@ public:
 		auto owner = state.lock();
 		if (!owner || !owner->alive)
 			return;
+		if (effect.webhook)
+		{
+			effect.webhook->Commit();
+			return;
+		}
+		if (effect.http)
+		{
+			// Preserve callback effect ordering: accepted self-unload earlier in
+			// this queue prevents this request from ever reaching a worker.
+			effect.http->committed = effect.http->transport->Commit(effect.http->id);
+			return;
+		}
+		if (!effect.operation.empty())
+		{
+			auto generation = effect.owner.lock();
+			if (!generation || !generation->alive || effect.authority != Authority::Admin)
+				return;
+			FlagGuard guard(owner->internal);
+			try
+			{
+				ApplyHostEffect(effect, *owner);
+			}
+			catch (...)
+			{
+				ServerInstance->Logs.Normal(MODNAME, "Deferred native operation failed");
+			}
+			return;
+		}
+		if (!effect.rename && !effect.target.empty() && effect.target[0] == '#')
+		{
+			if (effect.authority != Authority::Admin)
+				return;
+			auto* channel = ServerInstance->Channels.Find(effect.target);
+			if (!channel)
+				return;
+			FlagGuard guard(owner->internal);
+			if (effect.privmsg)
+			{
+				ClientProtocol::Messages::Privmsg message(
+					ClientProtocol::Messages::Privmsg::nocopy, ServerInstance->FakeClient, channel, effect.text);
+				channel->Write(ServerInstance->GetRFCEvents().privmsg, message);
+				ServerInstance->PI->SendMessage(channel, 0, effect.text);
+			}
+			else
+				channel->WriteRemoteNotice(effect.text);
+			return;
+		}
 		auto* actor = ServerInstance->Users.FindUUID<LocalUser>(effect.actor);
-		auto* target = ServerInstance->Users.FindUUID<LocalUser>(effect.target);
+		auto* target = ServerInstance->Users.FindUUID(effect.target);
 		if (!target || target->quitting ||
 			(effect.authority == Authority::User && (!actor || actor->quitting || target != actor)))
 			return;
 		FlagGuard guard(owner->internal);
 		if (!effect.rename)
-			target->WriteNotice(effect.text);
+		{
+			if (!effect.privmsg)
+				target->WriteRemoteNotice(effect.text);
+			else if (auto* local = IS_LOCAL(target))
+			{
+				ClientProtocol::Messages::Privmsg message(
+					ClientProtocol::Messages::Privmsg::nocopy, ServerInstance->FakeClient, local, effect.text);
+				local->Send(ServerInstance->GetRFCEvents().privmsg, message);
+			}
+			else
+				ServerInstance->PI->SendMessage(target, effect.text);
+		}
+		else if (!IS_LOCAL(target))
+			return;
 		else if (effect.authority == Authority::Admin)
 		{
 			if (ServerInstance->IsNick(effect.text))
@@ -471,14 +596,60 @@ public:
 
 #include "js_event_listeners.h"
 
+class JavaScriptCommand final : public Command
+{
+	std::function<CmdResult(LocalUser*, const CommandBase::Params&)> invoke;
+
+public:
+	JavaScriptCommand(Module* module, const std::string& name, unsigned int minimum, unsigned int maximum, bool oper,
+		std::function<CmdResult(LocalUser*, const CommandBase::Params&)> callback)
+		: Command(module, name, minimum, maximum)
+		, invoke(std::move(callback))
+	{
+		access_needed = oper ? CmdAccess::OPERATOR : CmdAccess::NORMAL;
+	}
+	CmdResult Handle(User* user, const Params& params) override
+	{
+		auto* local = IS_LOCAL(user);
+		return local ? invoke(local, params) : CmdResult::FAILURE;
+	}
+};
+
+// Core command registration preserves operator access and flood accounting.
+// The configured RSS script handles successful commands via postCommand.
+class CommandRss final : public Command
+{
+public:
+	explicit CommandRss(Module* module)
+		: Command(module, "RSS", 2, 2)
+	{
+		access_needed = CmdAccess::OPERATOR;
+		syntax = {"<channel> <feed-url|off>"};
+	}
+	CmdResult Handle(User* user, const Params& parameters) override
+	{
+		if (!IS_LOCAL(user))
+			return CmdResult::FAILURE;
+		if (!ServerInstance->Channels.IsChannel(parameters[0]) || !ServerInstance->Channels.Find(parameters[0]))
+		{
+			user->WriteNotice("RSS requires an existing channel");
+			return CmdResult::FAILURE;
+		}
+		return CmdResult::SUCCESS;
+	}
+};
+
 class ModuleJavaScript final : public Module
 {
 	js_webhooks::Dispatcher delivery;
+	CommandRss rsscommand;
 	std::unique_ptr<ScriptSet> active;
 	std::shared_ptr<DispatchState> state = std::make_shared<DispatchState>();
 	const CommandBase::Params* rewriteparams = nullptr;
 	unsigned int dispatchdepth = 0;
 	JavaScriptEventListeners events;
+	std::vector<std::unique_ptr<JavaScriptCommand>> registeredcommands;
+#include "js_host_dispatch.inc"
 
 	static bool Snapshot(v8::Local<v8::Context> context, v8::Local<v8::Object>& event, const std::string& command,
 		const std::vector<std::string>& parameters, const std::string& actor, const char* result, bool loop,
@@ -639,6 +810,8 @@ class ModuleJavaScript final : public Module
 			script->actor.clear();
 			if (!ok || denied)
 			{
+				if (!script->runtime.IsHealthy())
+					script->InvalidateHttp();
 				script->effects.clear();
 				effects.clear();
 				if (!ok && washealthy)
@@ -655,8 +828,8 @@ class ModuleJavaScript final : public Module
 	{
 		for (auto& effect : effects)
 		{
-			if (effect.webhook)
-				delivery.Commit(std::move(effect.webhook));
+			if (effect.local)
+				effect.local->committed = true;
 			else
 				ServerInstance->AtomicActions.AddAction(new DeferredEffect(state, std::move(effect)));
 		}
@@ -723,8 +896,10 @@ class ModuleJavaScript final : public Module
 	ModResult DispatchHook(
 		const char* stage, const std::string& actor, const SnapshotBuilder& build, const MutationHandler& mutate = {})
 	{
-		if (!active || state->internal || state->running)
+		if (!state->alive || !active || state->internal || state->running)
 			return MOD_RES_PASSTHRU;
+		if (std::string(stage) == "backgroundTimer")
+			TickTimers();
 		const auto& hook = *FindHook(stage);
 		FlagGuard running(state->running);
 		std::vector<Effect> effects;
@@ -768,6 +943,8 @@ class ModuleJavaScript final : public Module
 			script->actor.clear();
 			if (!success || result == MOD_RES_DENY)
 			{
+				if (!script->runtime.IsHealthy())
+					script->InvalidateHttp();
 				script->effects.clear();
 				if (!success && washealthy)
 					ServerInstance->Logs.Normal(
@@ -788,6 +965,7 @@ class ModuleJavaScript final : public Module
 public:
 	ModuleJavaScript()
 		: Module(VF_NONE, "Runs trusted local JavaScript and Wasm Module hooks with explicit authority.")
+		, rsscommand(this)
 		, events(this, [this](const auto* stage, const auto& actor, const auto& build)
 			  { return DispatchHook(stage, actor, build); })
 	{
@@ -864,10 +1042,53 @@ public:
 			for (const auto& source : sources)
 				if (!source.databases.empty() && !database_root)
 					throw std::runtime_error("SQLite database grants require sqlitedirectory");
+			auto loaded = js_scripts::LoadSources(sources, ServerInstance->Config->Paths.Config);
+			js_webhooks::HeaderRules headers;
+			for (const auto& [_, tag] : ServerInstance->Config->ConfTags("javascriptfetchheader"))
+			{
+				std::filesystem::path path = tag->getString("script");
+				if (path.is_relative())
+					path = std::filesystem::path(ServerInstance->Config->Paths.Config) / path;
+				std::error_code ec;
+				path = std::filesystem::canonical(path, ec);
+				if (ec ||
+					std::none_of(loaded.begin(), loaded.end(), [&](const auto& source)
+						{ return source.canonical_path == path && source.authority == Authority::Admin; }))
+					throw std::runtime_error("Fetch header requires a configured admin script");
+				const auto url = tag->getString("url"), key = js_webhooks::ExactUrl(url);
+				// Injection grants no additional network authority. HTTPS only, and
+				// the ordinary fetch destination policy is checked independently.
+				if (key.empty() || (key.compare(0, 8, "https://") != 0 && !js_async_http::FixtureUrl(url)) ||
+					!js_async_http::ValidUrl(url))
+					throw std::runtime_error("Invalid fetch header URL");
+				const auto rule = std::make_pair(path.string(), key);
+				if (!headers.count(rule) && headers.size() >= 32)
+					throw std::runtime_error("Excessive fetch header rules");
+				auto& endpoint = headers[rule];
+				endpoint.url = url;
+				js_webhooks::AddHeader(endpoint, tag->getString("name"), tag->getString("valuefile"));
+			}
+			// Ambiguous same-name legacy/rule credentials are config errors, not
+			// an override order controlled by a script.
+			for (const auto& [_, endpoint] : endpoints)
+				for (const auto& [key, rule] : headers)
+					if (js_webhooks::ExactUrl(endpoint.url) == key.second)
+					{
+						std::size_t bytes = 0;
+						for (const auto* group : {endpoint.headers.get(), rule.headers.get()})
+							for (const auto& [name, value] : *group)
+								bytes += name.size() + value.size() + 4;
+						if (bytes > js_webhooks::MaxHeaderBytes ||
+							endpoint.headers->size() + rule.headers->size() > js_webhooks::MaxHeaders)
+							throw std::runtime_error("Excessive combined HTTP headers");
+						for (const auto& [name, value] : *rule.headers)
+							if (endpoint.headers->count(name))
+								throw std::runtime_error("Conflicting HTTP header rules");
+					}
 			auto candidate = std::make_unique<ScriptSet>();
-			candidate->generation = std::make_shared<js_webhooks::Generation>(std::move(endpoints));
+			candidate->generation = std::make_shared<js_webhooks::Generation>(std::move(endpoints), std::move(headers));
 			candidate->wasm = js_scripts::LoadWasmAssets(assets, ServerInstance->Config->Paths.Config);
-			for (const auto& source : js_scripts::LoadSources(sources, ServerInstance->Config->Paths.Config))
+			for (const auto& source : loaded)
 			{
 				auto script = std::make_unique<Script>(timeout, source.authority, candidate->wasm, delivery,
 					candidate->generation, database_root, source.databases);
@@ -876,12 +1097,15 @@ public:
 					throw std::runtime_error("JavaScript initialization failed (active scripts retained)");
 				candidate->scripts.push_back(std::move(script));
 			}
+			ValidateCommands(*candidate);
 			if (!candidate->generation->endpoints.empty())
 				delivery.Start();
 			if (active)
 				active->generation->alive = false;
 			candidate->generation->alive = true;
+			registeredcommands.clear();
 			active.swap(candidate);
+			InstallCommands();
 			ServerInstance->Logs.Normal(MODNAME, "JavaScript configuration loaded");
 		}
 		catch (const std::exception& error)
@@ -892,7 +1116,7 @@ public:
 	ModResult OnPreCommand(
 		std::string& command, CommandBase::Params& parameters, LocalUser* user, bool validated) override
 	{
-		if (state->internal || state->running)
+		if (!state->alive || state->internal || state->running)
 			return MOD_RES_PASSTHRU;
 		if (dispatchdepth >= 8)
 			return MOD_RES_DENY;
@@ -941,7 +1165,7 @@ public:
 	void OnPostCommand(
 		Command* handler, const CommandBase::Params& parameters, LocalUser* user, CmdResult result, bool loop) override
 	{
-		if (state->internal || state->running)
+		if (!state->alive || state->internal || state->running)
 			return;
 		std::string command = handler->name;
 		std::vector<std::string> params = parameters;
