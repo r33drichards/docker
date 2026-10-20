@@ -107,7 +107,7 @@ struct Policy
 {
 	std::map<std::string, std::string> headers;
 	std::string contentType;
-	bool configuredEndpoint = false, discard = false;
+	bool configuredEndpoint = false, discard = false, reportCancelled = false;
 	long connectTimeout = 3000, timeout = 8000;
 	std::size_t maxResponse = MaxBody, maxTotal = 0;
 	std::function<void(bool)> completion;
@@ -297,6 +297,7 @@ class Dispatcher
 				job = std::move(queue.front());
 				queue.pop_front();
 			}
+			const bool attempted = !job->cancelled && job->generation->active;
 			Result result;
 			try
 			{
@@ -318,7 +319,11 @@ class Dispatcher
 					entries.erase(job->id);
 			}
 			else
+			{
+				if (attempted && job->policy.reportCancelled && job->policy.completion)
+					job->policy.completion(false);
 				entries.erase(job->id);
+			}
 		}
 	}
 

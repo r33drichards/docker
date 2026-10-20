@@ -946,7 +946,8 @@ public:
 				const auto url = tag->getString("url"), key = js_webhooks::ExactUrl(url);
 				// Injection grants no additional network authority. HTTPS only, and
 				// the ordinary fetch destination policy is checked independently.
-				if (key.empty() || key.compare(0, 8, "https://") != 0 || !js_async_http::ValidUrl(url))
+				if (key.empty() || (key.compare(0, 8, "https://") != 0 && !js_async_http::FixtureUrl(url)) ||
+					!js_async_http::ValidUrl(url))
 					throw std::runtime_error("Invalid fetch header URL");
 				const auto rule = std::make_pair(path.string(), key);
 				if (!headers.count(rule) && headers.size() >= 32)

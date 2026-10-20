@@ -1,11 +1,10 @@
 /* SPDX-License-Identifier: MIT */
 #pragma once
 
-// Owned, bounded webhook jobs. The worker never enters V8 or touches IRC state.
+// Legacy named-webhook adapter over the canonical owned HTTP transport.
 #include "js_async_http.h"
 #include <curl/curl.h>
 #include <atomic>
-#include <condition_variable>
 #include <array>
 #include <cerrno>
 #include <vector>
@@ -13,13 +12,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <cstddef>
-#include <deque>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <utility>
 
 namespace js_webhooks
@@ -324,8 +320,6 @@ struct Reservation
 };
 class Request
 {
-	std::shared_ptr<Counters> counts;
-
 public:
 	std::shared_ptr<Generation> generation;
 	std::shared_ptr<js_async_http::Generation> scriptgeneration;
@@ -333,10 +327,8 @@ public:
 	std::string id;
 	std::shared_ptr<Reservation> reservation;
 	bool committed = false;
-	Request(std::shared_ptr<Counters> stats, std::shared_ptr<Generation> owner,
-		std::shared_ptr<js_async_http::Dispatcher> dispatcher, std::string token)
-		: counts(std::move(stats))
-		, generation(std::move(owner))
+	Request(std::shared_ptr<Generation> owner, std::shared_ptr<js_async_http::Dispatcher> dispatcher, std::string token)
+		: generation(std::move(owner))
 		, transport(std::move(dispatcher))
 		, id(std::move(token))
 	{
@@ -387,6 +379,7 @@ public:
 		policy.contentType = "application/json";
 		policy.configuredEndpoint = true;
 		policy.discard = true;
+		policy.reportCancelled = true;
 		policy.connectTimeout = 1000;
 		policy.timeout = 2000;
 		policy.maxResponse = MaxResponse;
@@ -405,7 +398,7 @@ public:
 		const auto id = transport->Stage(scriptgeneration, "POST", found->second.url, body, std::move(policy));
 		if (id.empty())
 			return nullptr;
-		auto request = std::make_shared<Request>(counts, generation, transport, id);
+		auto request = std::make_shared<Request>(generation, transport, id);
 		request->reservation = std::move(reservation);
 		request->scriptgeneration = std::move(scriptgeneration);
 		return request;

@@ -65,6 +65,8 @@ jobs:
           runuser -u ci -- sh tests/js_async_http.sh
           runuser -u ci -- node tests/replay/run.cjs
           runuser -u ci -- sh tests/js_replay.sh
+          runuser -u ci -- python3 tests/test_js_fetch_headers.py
+          runuser -u ci -- env WEBHOOK_TEST_CXXFLAGS="-O1 -fsanitize=address,undefined -fno-sanitize-recover=all" python3 tests/test_js_fetch_headers.py
           runuser -u ci -- python3 tests/test_js_webhooks.py
           runuser -u ci -- env WEBHOOK_TEST_CXXFLAGS="-O1 -fsanitize=address,undefined -fno-sanitize-recover=all" python3 tests/test_js_webhooks.py
           runuser -u ci -- bash tests/ci/native.sh sanitizers
