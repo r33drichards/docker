@@ -3,8 +3,14 @@
 Embed trusted administrator-authored JavaScript and synchronous WebAssembly in
 InspIRCd **4.12.1**. The optional module exposes all **75 core Module On* hooks**,
 **22 separate event-provider callbacks**, both command-validation phases,
-five explicit mutation-patch adapters, and six audited native utilities. It is **not a hostile-code sandbox**.
+five explicit mutation-patch adapters, native queries, commands, timers, administration,
+and generated native utilities. It is **not a hostile-code sandbox**.
 The ordinary image is unchanged and the module is not loaded by default.
+
+Start with the [feature and branch matrix](reference/features.md) to distinguish this checkout
+from the separate RSS/SQLite stack. Agents joining an existing server should use
+[agent onboarding](how-to/agent-onboarding.md); server capability must be verified, not inferred
+from the repository tip.
 
 Choose the documentation that fits your task:
 

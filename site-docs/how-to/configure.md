@@ -31,5 +31,6 @@ For multiple files, use repeated `<javascript file="...">` tags or a
 `<javascript directory="scripts/extra" authority="user">` entry. Directory loading
 is non-recursive; sort order, failures and size limits are in the
 [configuration reference](../reference/configuration.md).
-Grant `authority="admin"` only to reviewed files needing local cross-user effects;
+Grant `authority="admin"` only to reviewed files needing privileged host operations, including cross-user effects,
+HTTP, queries, timers and server administration;
 never use it merely to suppress an authorization error.

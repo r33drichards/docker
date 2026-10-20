@@ -16,12 +16,15 @@ import tempfile
 import time
 
 from precommand_client import Client
+from rss_native import exercise_messaging, exercise_remote_messaging
 from test_js_webhooks import Receiver
 from wchat_nocodb_native import exercise_wchat_nocodb
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RUN = pathlib.Path(os.environ["INSPIRCD_NATIVE"]).resolve()
-GOOD = r"""
+GOOD = (
+    (ROOT / "tests/fixtures/native_utilities.js").read_text()
+    + r"""
 if (!ircd.match('hello', 'h*') || !ircd.matchCIDR('192.0.2.4', '192.0.2.0/24') ||
     !ircd.isNick('ValidNick') || !ircd.isChannel('#valid') ||
     ircd.stripColor('\x0304red') !== 'red' || ircd.time() <= 0) throw Error('native utilities');
@@ -60,6 +63,7 @@ ircd.on('postCommand', e => {
   if (e.command === 'VERSION') ircd.notice(e.userId, 'post:' + e.result);
 });
 """
+)
 
 
 HOOKS = json.loads((ROOT / "bindings/module_hooks.json").read_text())["hooks"]
@@ -692,6 +696,7 @@ def main():
                 exercise_native_mutations(caller, other, reload)
                 exercise_event_listeners(caller, other, reload)
                 exercise_webhooks(caller, reload, receiver, path)
+                exercise_messaging(caller, other, reload)
                 output = (path / "server.log").read_text()
                 for marker in ("synthetic-first-token", "synthetic-second-token", "webhook-secret"):
                     assert marker not in output
@@ -807,3 +812,4 @@ def assert_silent(client):
 
 if __name__ == "__main__":
     main()
+    exercise_remote_messaging()

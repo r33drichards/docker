@@ -1,10 +1,10 @@
 name: JavaScript documentation
 on:
   pull_request:
-    paths: ['site-docs/**', 'mkdocs.yml', 'requirements-docs.txt', 'JAVASCRIPT.md', 'bindings/**', 'modules/*.d.ts', 'modules/js_generated/**', 'tools/generate_docs_reference.py', '.github/workflows/docs.yml']
+    paths: ['site-docs/**', 'mkdocs.yml', 'requirements-docs.txt', 'JAVASCRIPT.md', 'bindings/**', 'modules/*.d.ts', 'modules/js_generated/**', 'tools/generate_docs_reference.py', 'tests/test_docs_contract.py', 'conf/docker.motd', 'conf/inspircd.conf', 'Dockerfile', '.github/workflows/docs.yml']
   push:
     branches: [master]
-    paths: ['site-docs/**', 'mkdocs.yml', 'requirements-docs.txt', 'JAVASCRIPT.md', 'bindings/**', 'modules/*.d.ts', 'modules/js_generated/**', 'tools/generate_docs_reference.py', '.github/workflows/docs.yml']
+    paths: ['site-docs/**', 'mkdocs.yml', 'requirements-docs.txt', 'JAVASCRIPT.md', 'bindings/**', 'modules/*.d.ts', 'modules/js_generated/**', 'tools/generate_docs_reference.py', 'tests/test_docs_contract.py', 'conf/docker.motd', 'conf/inspircd.conf', 'Dockerfile', '.github/workflows/docs.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +23,7 @@ jobs:
           python3 -m venv .venv-docs
           .venv-docs/bin/pip install -r requirements-docs.txt
           python3 tools/generate_docs_reference.py --check
+          python3 tests/test_docs_contract.py
           .venv-docs/bin/mkdocs build --strict
   publish:
     if: github.event_name != 'pull_request'

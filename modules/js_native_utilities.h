@@ -264,6 +264,202 @@ inline void JsIrcdTime(const v8::FunctionCallbackInfo<v8::Value>& info)
 		});
 }
 
+// New utility adapters accept at most 4096 UTF-16 code units per string.
+inline bool BoundedString(v8::Isolate* isolate, v8::Local<v8::Value> value, std::string& output, bool rejectnul = true)
+{
+	if (!value->IsString() || value.As<v8::String>()->Length() > 4096)
+	{
+		detail::TypeError(isolate, "Expected a string of at most 4096 UTF-16 units");
+		return false;
+	}
+	return detail::ReadString(isolate, value, output, rejectnul);
+}
+inline bool BoundedInteger(
+	const v8::FunctionCallbackInfo<v8::Value>& info, uint32_t minimum, uint32_t maximum, uint32_t& output)
+{
+	if (!info[0]->IsUint32())
+	{
+		detail::TypeError(info.GetIsolate(), "Expected an unsigned 32-bit integer");
+		return false;
+	}
+	output = info[0].As<v8::Uint32>()->Value();
+	if (output < minimum || output > maximum)
+	{
+		detail::RangeError(info.GetIsolate(), "Utility integer is outside its allowed range");
+		return false;
+	}
+	return true;
+}
+inline void JsIrcdIsUser(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 1) || !detail::ServerAvailable(info.GetIsolate()))
+				return;
+			std::string value;
+			if (BoundedString(info.GetIsolate(), info[0], value))
+				info.GetReturnValue().Set(ServerInstance->IsUser(value));
+		});
+}
+inline void JsIrcdDefaultIsNick(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 1) || !detail::ServerAvailable(info.GetIsolate()))
+				return;
+			std::string value;
+			if (BoundedString(info.GetIsolate(), info[0], value))
+				info.GetReturnValue().Set(InspIRCd::DefaultIsNick(value));
+		});
+}
+inline void JsIrcdDefaultIsUser(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 1) || !detail::ServerAvailable(info.GetIsolate()))
+				return;
+			std::string value;
+			if (BoundedString(info.GetIsolate(), info[0], value))
+				info.GetReturnValue().Set(InspIRCd::DefaultIsUser(value));
+		});
+}
+inline void JsIrcdIsFQDN(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 1) || !detail::ServerAvailable(info.GetIsolate()))
+				return;
+			std::string value;
+			if (BoundedString(info.GetIsolate(), info[0], value))
+				info.GetReturnValue().Set(InspIRCd::IsFQDN(value));
+		});
+}
+inline void JsIrcdIsSID(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 1) || !detail::ServerAvailable(info.GetIsolate()))
+				return;
+			std::string value;
+			if (BoundedString(info.GetIsolate(), info[0], value))
+				info.GetReturnValue().Set(InspIRCd::IsSID(value));
+		});
+}
+inline void JsIrcdIsValidMask(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 1) || !detail::ServerAvailable(info.GetIsolate()))
+				return;
+			std::string value;
+			if (BoundedString(info.GetIsolate(), info[0], value))
+				info.GetReturnValue().Set(InspIRCd::IsValidMask(value));
+		});
+}
+inline void JsIrcdIsHost(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 2) || !detail::ServerAvailable(info.GetIsolate()))
+				return;
+			if (!info[1]->IsBoolean())
+			{
+				detail::TypeError(info.GetIsolate(), "allowsimple must be a boolean");
+				return;
+			}
+			std::string value;
+			if (BoundedString(info.GetIsolate(), info[0], value))
+				info.GetReturnValue().Set(InspIRCd::IsHost(value, info[1].As<v8::Boolean>()->Value()));
+		});
+}
+inline void JsIrcdMatchMask(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 3))
+				return;
+			std::string masks, hostname, address;
+			if (BoundedString(info.GetIsolate(), info[0], masks) &&
+				BoundedString(info.GetIsolate(), info[1], hostname) &&
+				BoundedString(info.GetIsolate(), info[2], address))
+				info.GetReturnValue().Set(InspIRCd::MatchMask(masks, hostname, address));
+		});
+}
+inline void JsIrcdProcessColors(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 1))
+				return;
+			std::string value_copy;
+			if (!BoundedString(info.GetIsolate(), info[0], value_copy, false))
+				return;
+			InspIRCd::ProcessColors(value_copy);
+			detail::ReturnString(info, value_copy);
+		});
+}
+inline void JsIrcdTimingSafeCompare(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 2))
+				return;
+			std::string first, second;
+			if (BoundedString(info.GetIsolate(), info[0], first, false) &&
+				BoundedString(info.GetIsolate(), info[1], second, false))
+				info.GetReturnValue().Set(InspIRCd::TimingSafeCompare(first, second));
+		});
+}
+inline void JsIrcdRandomInt(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 1) || !detail::ServerAvailable(info.GetIsolate()))
+				return;
+			uint32_t maximum;
+			if (BoundedInteger(info, 1, UINT32_MAX, maximum))
+				info.GetReturnValue().Set(static_cast<double>(ServerInstance->GenRandomInt(maximum)));
+		});
+}
+inline void JsIrcdRandomString(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 1) || !detail::ServerAvailable(info.GetIsolate()))
+				return;
+			uint32_t length;
+			if (BoundedInteger(info, 0, 4096, length))
+				detail::ReturnString(info, ServerInstance->GenRandomStr(length));
+		});
+}
+inline void JsIrcdTimeNanoseconds(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+	detail::Guard(info.GetIsolate(),
+		[&info]()
+		{
+			if (!detail::ExactArity(info, 0) || !detail::ServerAvailable(info.GetIsolate()))
+				return;
+			const auto nanos = ServerInstance->Time_ns();
+			if (nanos < 0 || nanos >= 1000000000)
+			{
+				detail::RangeError(info.GetIsolate(), "Invalid fractional nanosecond time");
+				return;
+			}
+			info.GetReturnValue().Set(static_cast<double>(nanos));
+		});
+}
 inline void RegisterUtilities(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate> target)
 {
 #define IRC_JS_BINDING(js_name, native_adapter, exact_arity)                                                           \

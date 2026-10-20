@@ -9,8 +9,10 @@ python3 tools/generate_js_bindings.py
 python3 tools/generate_js_bindings.py --check
 ```
 
-Six audited utility wrappers are implemented: `match`, `matchCIDR`, `isNick`,
-`isChannel`, `stripColor`, and `time`. Inputs have strict arity/types, copied
+Nineteen audited utility wrappers are implemented, covering validation, glob/CIDR
+matching, color processing, random values, time and timing-safe comparison. Their
+exact signatures and conversion limits are generated from the binding manifest
+in [the callable reference](../reference/callable-api.md). Inputs have strict arity/types, copied
 ownership, and explicit conversions. NUL is rejected for native glob/CIDR
 functions with NUL-terminated internals. The manifest tracks reviewed declarations,
 manual-wrapper candidates, exclusions, and pending mutations. It is a systematic
@@ -18,28 +20,39 @@ allowlist and coverage inventory, **not an automatic binding of every function i
 inspircd.h or the whole SDK**. New bindings require explicit conversion, lifetime,
 effect, and authorization policy plus an implementation and tests.
 
-Additional explicit host methods:
+The [callable reference](../reference/callable-api.md) derives every signature
+from the checked-in declarations, including native query/command/channel/admin/timer
+and fetch APIs. See [authority and lifecycle](../explanation/host-lifecycle.md)
+for initialization, deferred commit and unload rules. Core compatibility methods:
 
+- `userById(uuid)` returns an owned `{ id, nick, isOper }` snapshot or null.
+- `notice(target, text)` queues a server NOTICE (maximum 400 UTF-8 bytes).
+- `privmsg(target, text)` queues a server PRIVMSG with identical target and authority rules.
+- `fetch(url, options?)` stages a bounded generic asynchronous HTTP request, returning a request token. Options support GET or POST and an optional string body. Admin callbacks only; invalid requests or full queues throw.
+- `takeFetchResult(token)` polls/consumes `{ok, status, body, bodyBytes, error}`, or null while pending. `body` is null for invalid UTF-8; `bodyBytes` preserves the exact response.
+- `cancelFetch(token)` cancels pending work. Native request tokens are generation-scoped, not persisted JavaScript state.
 - `sqlite.open(name)` opens a host-granted named SQLite database (see [SQLite reference](https://r33drichards.github.io/docker/reference/sqlite/)).
-- `userById(uuid)` returns an owned `{ id, nick }` snapshot or null.
-- `notice(targetUuid, text)` queues a server notice (maximum 400 UTF-8 bytes).
 - `rename(targetUuid, nick)` queues a validated nickname change.
 - `wasm(name)` returns a fresh Uint8Array of a configured asset's bytes.
 - `postWebhook(name, json)` stages a bounded JSON POST to an administrator-configured endpoint (admin callbacks only).
 - `webhookStats()` returns aggregate `{pending, sent, failed, discarded}` counters (admin scripts only).
 
-Default `authority="user"` restricts notice/rename targets to the triggering
+Default `authority="user"` restricts notice/privmsg/rename targets to the triggering
 client. Rename runs ordinary NICK processing as that client, retaining native
-restrictions. Explicit `authority="admin"` permits targeting other local users;
+restrictions. Explicit `authority="admin"` permits messaging any existing local or remote user UUID, or existing #channel;
 rename directly invokes the native administrative nickname change after nickname
 validation. No credential, operator identity, or permission is granted to a user.
 Queued operations re-resolve the original actor and target UUIDs and skip users
-who disconnected. Only local targets are changed in this initial API.
+who disconnected. Rename remains limited to local users. Channel NOTICE and PRIVMSG reach local members and are forwarded once through the network protocol. User messages choose local client delivery or remote forwarding, never both. These are trusted server-origin messages, not impersonated user commands; they do not apply ordinary user speaking restrictions. Targets are re-resolved at flush time; missing users/channels are skipped. No sender or raw-protocol parameter is exposed.
+
+RSS uses the generic asynchronous native HTTP API. RSS/Atom parsing, subscriptions and deduplication are JavaScript application state; no feed-specific native host method or XML dependency is required.
 
 At most 16 effects can be queued per file/event. All effects for the event are
-discarded on pre denial/error. Accepted IRC effects run at the main-loop safe point,
-after the current parser stack unwinds; accepted webhooks enter the owned worker
-queue instead, after the complete JavaScript callback batch accepts the event. They may still be skipped/rejected by
+discarded on pre denial/error. Accepted IRC effects and HTTP commitments share
+the ordered main-loop safe-point queue after the current parser stack unwinds.
+A self-unload earlier in that queue prevents later fetch/webhook jobs from
+starting. Webhook and fetch workers still perform the I/O outside the IRC loop.
+Effects may still be skipped/rejected by
 native checks; queuing is not a success receipt or an atomic transaction, and a
 later core command rejection does not retract accepted queued effects. Native
 effects and commands they synchronously trigger do not invoke JS hooks, avoiding
@@ -173,6 +186,43 @@ owned loopback HTTP/TLS fixtures and checks bounds, cancellation, no redirects,
 proxy suppression, untrusted certificate rejection and HTTP error/size/timeout
 handling. The native daemon suite additionally exercises real JOIN-to-POST,
 rejoin, authority, rollback and failed-rehash behavior.
+
+### URL-scoped fetch headers
+
+Host configuration can inject headers into `ircd.fetch` without exposing a
+credential getter or accepting JavaScript-supplied headers:
+
+```xml
+<javascriptfetchheader script="scripts/trusted.js" url="https://api.example.invalid/v1/events?scope=irc" name="Authorization" valuefile="/run/secrets/api-header">
+```
+
+`script` resolves relative to the configuration directory (or may be absolute)
+and must identify a loaded admin-authority source after canonicalization. Rules
+match that source and the complete parsed URL, not a substring or prefix.
+Scheme/host case and an explicit default port are normalized. Path and query
+bytes, case, and ordering must match exactly, including a trailing empty `?`.
+Userinfo, fragments, backslashes, and literal `.`/`..` path segments are rejected.
+Only HTTPS URLs accepted by the ordinary fetch policy may have rules; injection
+does not relax its public-address, standard-port, no-proxy or no-redirect policy.
+
+There are at most 32 distinct source/URL rules and eight headers per rule, using
+the same header-name, secret-file ownership/mode, value and byte limits as
+`javascriptwebhookheader`. Config loading is atomic. Duplicate headers or
+conflicts with legacy endpoint headers reject the candidate configuration.
+Header values stay in native state and are not exposed by an API or logged.
+However, fetch returns the remote response: configure only trusted endpoints
+that will not reflect credentials. Host injection cannot prevent a recipient
+from returning or encoding a received secret.
+
+`postWebhook` remains a compatibility adapter over the same asynchronous HTTP
+implementation. Named endpoint configuration, JSON POSTs, private/explicit
+loopback endpoint authority, one-worker ordering, 64-job bound, timeouts,
+response-discarding and counters remain supported. Legacy endpoint credentials
+do not automatically become fetch rules. URL rules also apply to a matching
+named webhook from the specified script. Generic fetch still has its own
+per-script two-worker/16-job limit and does not inherit legacy destination
+exceptions. Disabling a poisoned script retires its queued/in-flight HTTP jobs;
+rehash/unload do the same. Already transmitted requests cannot be recalled.
 
 ## TypeScript assets
 
