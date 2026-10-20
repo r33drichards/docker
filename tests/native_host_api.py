@@ -2,6 +2,7 @@
 """Exercise host APIs in a disposable loopback InspIRCd daemon, never production."""
 
 import grp
+import json
 import os
 import pwd
 import signal
@@ -13,6 +14,7 @@ from pathlib import Path
 
 from precommand_client import Client
 from replay.native import exercise_heap_replay
+from test_js_webhooks import Receiver
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -192,6 +194,46 @@ ircd.on('preCommand', e => {
     )
 
 
+def exercise_http_self_unload(caller, reload):
+    """Requires a test-only module built with JS_ASYNC_HTTP_TEST_LOOPBACK.
+
+    A successful control POST proves the transport is enabled; otherwise a
+    rejected URL could make the stale-effect assertion pass vacuously.
+    """
+    receiver = Receiver()
+    try:
+        url = json.dumps(receiver.url + "/native-unload")
+        reload(
+            SOURCE
+            + "\nircd.registerCommand('HTTPBEFORE',0,0,false,e=>ircd.fetch("
+            + url
+            + ",{method:'POST',body:'control'}));"
+            + "\nircd.registerCommand('HTTPUNLOAD',0,0,false,e=>{ircd.unloadModule('m_javascript.so');ircd.fetch("
+            + url
+            + ",{method:'POST',body:'must-not-send'});});",
+            "admin",
+        )
+        caller.send("HTTPBEFORE")
+        caller.barrier("http-control-queued")
+        with receiver.condition:
+            assert receiver.condition.wait_for(lambda: len(receiver.posts) >= 1, timeout=10), (
+                "Control POST missing; module must be built with JS_ASYNC_HTTP_TEST_LOOPBACK"
+            )
+            assert len(receiver.posts) == 1 and receiver.posts[0][1] == b"control", receiver.posts
+        caller.send("HTTPUNLOAD")
+        caller.barrier("http-self-unloaded")
+        caller.send("HTTPBEFORE")
+        lines = caller.barrier("http-command-removed")
+        assert any(" 421 " in line and "HTTPBEFORE" in line for line in lines), lines
+        with receiver.condition:
+            assert not receiver.condition.wait_for(lambda: len(receiver.posts) > 1, timeout=2), (
+                receiver.posts
+            )
+        print("PASS: self-unload suppresses subsequent POST; fixture positive control received")
+    finally:
+        receiver.close()
+
+
 def main():
     run = Path(os.environ["INSPIRCD_NATIVE"]).resolve()
     with tempfile.TemporaryDirectory(prefix="irc-native-host-") as directory:
@@ -272,6 +314,9 @@ def main():
                 assert any(line.endswith(":host-topic") for line in lines), lines
                 print("PASS: native rehash and self-unload discard stale queued effects")
                 reload(SOURCE, "admin")
+                if os.environ.get("INSPIRCD_HTTP_TEST_LOOPBACK") == "1":
+                    exercise_http_self_unload(caller, reload)
+                    reload(SOURCE, "admin")
                 # Shutdown is tested only after every other check in this disposable process.
                 caller.send("JSHOST shutdown")
                 server.wait(timeout=15)

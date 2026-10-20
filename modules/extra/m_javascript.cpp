@@ -477,6 +477,13 @@ public:
 		auto owner = state.lock();
 		if (!owner || !owner->alive)
 			return;
+		if (effect.http)
+		{
+			// Preserve callback effect ordering: accepted self-unload earlier in
+			// this queue prevents this request from ever reaching a worker.
+			effect.http->committed = effect.http->transport->Commit(effect.http->id);
+			return;
+		}
 		if (!effect.operation.empty())
 		{
 			auto generation = effect.owner.lock();
@@ -726,10 +733,6 @@ class ModuleJavaScript final : public Module
 		{
 			if (effect.local)
 				effect.local->committed = true;
-			else if (effect.http)
-			{
-				effect.http->committed = effect.http->transport->Commit(effect.http->id);
-			}
 			else if (effect.webhook)
 				delivery.Commit(std::move(effect.webhook));
 			else

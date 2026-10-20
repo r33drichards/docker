@@ -9,6 +9,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <deque>
 #include <map>
 #include <memory>
@@ -35,11 +36,16 @@ inline bool PublicAddress(const sockaddr* address)
 	if (address->sa_family == AF_INET)
 	{
 		const auto ip = ntohl(reinterpret_cast<const sockaddr_in*>(address)->sin_addr.s_addr);
-		const auto a = ip >> 24, b = (ip >> 16) & 255;
-		return a != 0 && a != 10 && a != 127 && a < 224 && !(a == 100 && b >= 64 && b <= 127) &&
-			!(a == 169 && b == 254) && !(a == 172 && b >= 16 && b <= 31) &&
-			!(a == 192 && (b == 168 || b == 0 || b == 2 || b == 88)) &&
-			!(a == 198 && (b == 18 || b == 19 || b == 51)) && !(a == 203 && b == 0);
+		// IANA IPv4 Special-Purpose Address Registry; keep exact prefix widths.
+		// Conservatively exclude entire protocol-assignment/transition prefixes,
+		// including their individual anycast exceptions. Multicast is not HTTP.
+		// https://www.iana.org/assignments/iana-ipv4-special-registry/
+		const auto in = [ip](uint32_t network, unsigned prefix)
+		{ return (ip & (UINT32_MAX << (32 - prefix))) == network; };
+		return !in(0x00000000, 8) && !in(0x0a000000, 8) && !in(0x64400000, 10) && !in(0x7f000000, 8) &&
+			!in(0xa9fe0000, 16) && !in(0xac100000, 12) && !in(0xc0000000, 24) && !in(0xc0000200, 24) &&
+			!in(0xc0586300, 24) && !in(0xc0a80000, 16) && !in(0xc6120000, 15) && !in(0xc6336400, 24) &&
+			!in(0xcb007100, 24) && !in(0xe0000000, 4) && !in(0xf0000000, 4);
 	}
 	if (address->sa_family == AF_INET6)
 	{
