@@ -95,6 +95,32 @@ def main():
                 command("#rss-test list:5", "RSS list page out of range")
                 command("#rss-test off", "RSS subscriptions removed")
                 command("#rss-test list", "RSS list: no subscriptions")
+                # Real V8 parser/timer execution with deterministic HTTP completion data.
+                large_fixture = (
+                    source
+                    + """
+let fixtureReady = false;
+ircd.fetch = () => { fixtureReady = true; return 'fixture'; };
+ircd.takeFetchResult = () => {
+  if (!fixtureReady) return null;
+  fixtureReady = false;
+  const body = '<rss><channel><description>' + 'x'.repeat(FIXTURE_BYTES) +
+    '</description><item><guid>large</guid><title>Large</title><link>https://example.invalid/large</link></item></channel></rss>';
+  return {ok:true,status:200,body,bodyBytes:new Uint8Array(body.length)};
+};
+"""
+                )
+                for size, category in ((70000, "baseline-ready"), (131073, "oversize")):
+                    reload(large_fixture.replace("FIXTURE_BYTES", str(size)))
+                    command("#rss-test " + feed, "RSS subscribed.")
+                    deadline = time.monotonic() + 15
+                    expected = "category=" + category
+                    while expected not in logpath.read_text() and time.monotonic() < deadline:
+                        time.sleep(0.05)
+                    assert expected in logpath.read_text(), category
+                    lines = command("#rss-test list", "RSS list complete:")
+                    assert any("fetch: " + category in line for line in lines), lines
+                    command("#rss-test off", "RSS subscriptions removed")
                 reload(
                     source.replace(
                         "rssStorage.add(channel, feed);", "throw Error('private-storage-sentinel');"
@@ -118,6 +144,31 @@ def main():
                 command("#rss-test list", "RSS unavailable:")
                 reload("// No RSS handler")
                 command("#rss-test list", "RSS unavailable:")
+                for category in (
+                    "baseline-ready",
+                    "success",
+                    "transport",
+                    "http",
+                    "oversize",
+                    "xml",
+                    "storage",
+                    "queue",
+                    "timeout",
+                ):
+                    reload(
+                        "ircd.on('backgroundTimer', () => ({rssFetchOutcomes:['"
+                        + category
+                        + "']}));"
+                    )
+                    deadline = time.monotonic() + 8
+                    expected = "category=" + category
+                    while expected not in logpath.read_text() and time.monotonic() < deadline:
+                        time.sleep(0.05)
+                    assert expected in logpath.read_text(), category
+                reload(
+                    "ircd.on('backgroundTimer', () => ({rssFetchOutcomes:['private-audit-sentinel']}));"
+                )
+                time.sleep(6)
                 output = logpath.read_text()
                 assert "RSS command outcome=success" in output
                 assert "RSS command outcome=failure" in output
@@ -127,6 +178,7 @@ def main():
                     "private-storage-sentinel",
                     "private-exception-sentinel",
                     "private-pre-sentinel",
+                    "private-audit-sentinel",
                 ):
                     assert secret not in output, secret
                 print(

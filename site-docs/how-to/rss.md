@@ -85,7 +85,7 @@ fetches may finish, but their results are no longer posted.
 - Successful fetches repeat every five minutes, subject to background timer
   cadence and queue availability. Failures back off from five minutes to at most
   one hour. Only one fetch per subscription is active at a time.
-- RSS XML parsing accepts at most 64 KiB UTF-8, 512 XML nodes, depth 32,
+- RSS XML parsing accepts at most 128 KiB UTF-8, 512 XML nodes, depth 32,
   32 attributes per element and 64 namespace bindings. DTD/entity declarations,
   malformed XML and unknown entities are rejected. RSS2 and Atom are supported;
   arbitrary XML/HTML is not. Parsing is bounded independently of the generic
@@ -152,3 +152,17 @@ verifies persisted deduplication and exercises an exclusive database lock during
 unsubscribe. `node tests/test_rss_sqlite.cjs` separately exercises real SQLite
 transactions and file-backed fresh-realm restart (requires Node 24). The portable
 scheduler/replay suites use an explicit SQL contract mock, not a native database.
+
+## Retrieval status
+
+A successful subscription confirms storage, not successful retrieval. `/RSS #news list`
+shows each feed's last transient fetch status: `pending`, `baseline-ready`, `success`,
+`transport`, `http`, `oversize`, `xml`, `storage`, `queue`, or `timeout`.
+A restored baseline remains durable; the last failure category is transient.
+Server logs separately emit `RSS fetch outcome=success|failure category=...` using
+only those fixed categories, without feed URLs, response contents, or credentials.
+
+The RSS parser accepts at most 128 KiB of UTF-8 XML. Native generic fetch retains
+its existing 512 KiB response limit. XML nesting/node/entry limits, request timeouts,
+SSRF protection and retry/rate limits are unchanged. Larger or invalid feeds retry
+with bounded backoff and do not seed or post entries.
