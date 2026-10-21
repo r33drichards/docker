@@ -989,7 +989,8 @@ class ModuleJavaScript final : public Module
 									if (category != "success" && category != "baseline-ready" &&
 										category != "transport" && category != "http" && category != "oversize" &&
 										category != "xml" && category != "storage" && category != "queue" &&
-										category != "timeout")
+										category != "timeout" && category != "dns" && category != "connect" &&
+										category != "tls" && category != "cancelled" && category != "expired")
 										return false;
 									commits.push_back(
 										[category]

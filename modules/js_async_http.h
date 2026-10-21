@@ -30,8 +30,31 @@ struct Result
 {
 	bool ok = false;
 	long status = 0;
-	std::string body, error;
+	std::string body, error, errorCode = "transport";
 };
+// Stable, redacted categories only. Never expose curl error buffers or request URLs.
+inline const char* ErrorCategory(CURLcode code)
+{
+	switch (code)
+	{
+	case CURLE_COULDNT_RESOLVE_HOST:
+		return "dns";
+	case CURLE_COULDNT_CONNECT:
+		return "connect";
+	case CURLE_OPERATION_TIMEDOUT:
+		return "timeout";
+	case CURLE_PEER_FAILED_VERIFICATION:
+	case CURLE_SSL_CONNECT_ERROR:
+	case CURLE_SSL_CACERT_BADFILE:
+		return "tls";
+	case CURLE_FILESIZE_EXCEEDED:
+		return "oversize";
+	case CURLE_ABORTED_BY_CALLBACK:
+		return "cancelled";
+	default:
+		return "transport";
+	}
+}
 inline bool PublicAddress(const sockaddr* address)
 {
 	if (address->sa_family == AF_INET)
@@ -168,17 +191,26 @@ class Dispatcher
 		Job& job;
 		std::string body;
 		std::size_t headers = 0;
+		bool sizeExceeded = false;
 		bool Cancelled() const { return owner.stopping || job.cancelled || !job.Active(); }
 	};
 	static std::size_t Write(char* data, std::size_t size, std::size_t count, void* user)
 	{
 		auto& t = *static_cast<Transfer*>(user);
-		if ((size && count > MaxBody / size) || t.Cancelled())
+		if (t.Cancelled())
 			return 0;
+		if (size && count > MaxBody / size)
+		{
+			t.sizeExceeded = true;
+			return 0;
+		}
 		const auto total = size * count;
 		if (total > t.job.policy.maxResponse - t.body.size() ||
 			(t.job.policy.maxTotal && t.headers + t.body.size() + total > t.job.policy.maxTotal))
+		{
+			t.sizeExceeded = true;
 			return 0;
+		}
 		try
 		{
 			t.body.append(data, total);
@@ -192,12 +224,20 @@ class Dispatcher
 	static std::size_t Header(char*, std::size_t size, std::size_t count, void* user)
 	{
 		auto& t = *static_cast<Transfer*>(user);
-		if ((size && count > 65536 / size) || t.Cancelled())
+		if (t.Cancelled())
 			return 0;
+		if (size && count > 65536 / size)
+		{
+			t.sizeExceeded = true;
+			return 0;
+		}
 		const auto total = size * count;
 		if (total > 65536 - t.headers ||
 			(t.job.policy.maxTotal && t.headers + t.body.size() + total > t.job.policy.maxTotal))
+		{
+			t.sizeExceeded = true;
 			return 0;
+		}
 		t.headers += total;
 		return total;
 	}
@@ -262,13 +302,23 @@ class Dispatcher
 			(!set(CURLOPT_POST, 1L) || !set(CURLOPT_POSTFIELDS, job.body.data()) ||
 				!set(CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(job.body.size()))))
 			return result;
-		if (t.Cancelled() || curl_easy_perform(curl.get()) != CURLE_OK)
+		if (t.Cancelled())
+		{
+			result.errorCode = "cancelled";
 			return result;
+		}
+		const auto code = curl_easy_perform(curl.get());
+		if (code != CURLE_OK)
+		{
+			result.errorCode = t.sizeExceeded ? "oversize" : ErrorCategory(code);
+			return result;
+		}
 		if (curl_easy_getinfo(curl.get(), CURLINFO_RESPONSE_CODE, &result.status) != CURLE_OK)
 			return result;
 		result.ok = true; // HTTP 4xx/5xx are completed HTTP responses, not transport errors.
 		result.body = std::move(t.body);
 		result.error.clear();
+		result.errorCode.clear();
 		return result;
 	}
 	void Expire()
@@ -401,6 +451,7 @@ public:
 		{
 			result = {};
 			result.error = "expired or unknown HTTP request";
+			result.errorCode = "expired";
 			return true;
 		}
 		if (!found->second->ready)

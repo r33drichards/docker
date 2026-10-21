@@ -72,6 +72,13 @@ def main():
                         time.sleep(0.05)
                     raise AssertionError(logpath.read_text()[offset:])
 
+                reload(
+                    "ircd.registerCommand('FETCHERRORCHECK',0,0,false,e=>{const id=ircd.fetch('https://example.invalid/'); ircd.cancelFetch(id); const r=ircd.takeFetchResult(id); ircd.notice(e.userId,'fetch-error:'+r.errorCode);});"
+                )
+                client.send("FETCHERRORCHECK")
+                client.until(lambda line: "fetch-error:expired" in line)
+                reload(source)
+
                 for args in ("", "list", "#rss-test list extra"):
                     command(args, "RSS usage:")
                 command("#missing list", "RSS requires an existing channel")
@@ -154,6 +161,11 @@ ircd.takeFetchResult = () => {
                     "storage",
                     "queue",
                     "timeout",
+                    "dns",
+                    "connect",
+                    "tls",
+                    "cancelled",
+                    "expired",
                 ):
                     reload(
                         "ircd.on('backgroundTimer', () => ({rssFetchOutcomes:['"

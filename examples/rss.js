@@ -306,7 +306,7 @@ ircd.on('backgroundTimer', event => {
         --activeJobs;
         const items = result.ok && result.status === 200 && typeof result.body === 'string' ? rssParseFeed(result.body) : null;
         if (items === null) {
-          report(sub, !result.ok ? 'transport' : result.status !== 200 ? 'http' :
+          report(sub, !result.ok ? (['dns', 'connect', 'timeout', 'tls', 'oversize', 'cancelled', 'expired'].includes(result.errorCode) ? result.errorCode : 'transport') : result.status !== 200 ? 'http' :
             (result.bodyBytes ? result.bodyBytes.length : typeof result.body === 'string' ? result.body.length : 0) > RSS_MAX_XML_BYTES ? 'oversize' : 'xml');
           rssRetry(sub, now);
         } else {

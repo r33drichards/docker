@@ -166,3 +166,9 @@ The RSS parser accepts at most 128 KiB of UTF-8 XML. Native generic fetch retain
 its existing 512 KiB response limit. XML nesting/node/entry limits, request timeouts,
 SSRF protection and retry/rate limits are unchanged. Larger or invalid feeds retry
 with bounded backoff and do not seed or post entries.
+
+Native fetch failures also expose fixed categories `dns`, `connect`, `tls`,
+`timeout`, `oversize`, `cancelled`, `expired`, or `transport`. RSS list and audit
+logs preserve these categories without printing curl error buffers, URLs, or
+credentials. The existing fetch `error` text remains compatible; the additive
+`errorCode` field is null on successful HTTP completion (including HTTP errors).

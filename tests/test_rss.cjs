@@ -259,3 +259,13 @@ console.log('PASS: RSS registered-user/stage guards, Map state, deduplication, b
   assert.equal(h.posts().length, 0);
 }
 console.log('PASS: >64KiB baseline, 128KiB parser cap, retrieval status and sanitized categories');
+
+for (const code of ['dns', 'connect', 'tls', 'timeout', 'oversize', 'cancelled', 'expired', 'raw-secret']) {
+ const h = harness(); h.command(); h.tick(1);
+ h.results.set('1', {ok:false,status:0,body:'',error:'private-error-secret',errorCode:code});
+ const expected = code === 'raw-secret' ? 'transport' : code;
+ assert.deepEqual([...h.tick(2).rssFetchOutcomes], [expected]);
+ h.command('#rss','list'); assert.match(h.notices.at(-2).text, new RegExp('fetch: '+expected));
+ assert.ok(!h.notices.some(n => n.text.includes('secret')));
+}
+console.log('PASS: fixed native error categories, compatible fallback and redaction');
