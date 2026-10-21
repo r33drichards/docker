@@ -9,7 +9,7 @@ function rssInitializeStorage() {
   if (!rssStorageReady) { rssStorage.initialize(); rssStorageReady = true; }
 }
 const RSS_INTERVAL = 300;
-const RSS_MAX_XML_BYTES = 128 * 1024;
+const RSS_MAX_XML_BYTES = 1024 * 1024;
 const RSS_MAX_SUBSCRIPTIONS = 32;
 const RSS_MAX_ITEMS = 64;
 const RSS_MAX_SEEN = 2048;

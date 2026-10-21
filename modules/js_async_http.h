@@ -21,7 +21,7 @@
 
 namespace js_async_http
 {
-constexpr std::size_t MaxJobs = 16, MaxBody = 512 * 1024, MaxRequestBody = 64 * 1024;
+constexpr std::size_t MaxJobs = 16, MaxBody = 2 * 1024 * 1024, MaxRequestBody = 64 * 1024;
 struct Generation
 {
 	std::atomic<bool> active{true};

@@ -117,14 +117,22 @@ ircd.takeFetchResult = () => {
 };
 """
                 )
-                for size, category in ((70000, "baseline-ready"), (131073, "oversize")):
+                for size, category in (
+                    (70000, "baseline-ready"),
+                    (1048000, "baseline-ready"),
+                    (1048577, "oversize"),
+                ):
+                    log_offset = logpath.stat().st_size
                     reload(large_fixture.replace("FIXTURE_BYTES", str(size)))
                     command("#rss-test " + feed, "RSS subscribed.")
                     deadline = time.monotonic() + 15
                     expected = "category=" + category
-                    while expected not in logpath.read_text() and time.monotonic() < deadline:
+                    while (
+                        expected not in logpath.read_text()[log_offset:]
+                        and time.monotonic() < deadline
+                    ):
                         time.sleep(0.05)
-                    assert expected in logpath.read_text(), category
+                    assert expected in logpath.read_text()[log_offset:], category
                     lines = command("#rss-test list", "RSS list complete:")
                     assert any("fetch: " + category in line for line in lines), lines
                     command("#rss-test off", "RSS subscriptions removed")

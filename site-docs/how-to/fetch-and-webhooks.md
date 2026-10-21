@@ -40,7 +40,7 @@ HTTP failure, cancellation and process termination need explicit application han
 
 Public HTTP(S) destinations on standard ports only; URL credentials, proxies and
 redirects are disabled. DNS address validation occurs at socket creation. Requests
-are bounded to 64 KiB and responses to 512 KiB; there are at most 16 jobs per script
+are bounded to 64 KiB and responses to 2 MiB; there are at most 16 jobs per script
 and two workers. Connect timeout is 3 seconds and the overall request timeout is
 8 seconds. Workers own their inputs and never enter V8. Poisoning/disabling a script, reload or unload cancels
 or drops that generation's jobs; don't reuse tokens across generations. An accepted

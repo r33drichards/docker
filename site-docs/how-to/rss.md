@@ -85,7 +85,7 @@ fetches may finish, but their results are no longer posted.
 - Successful fetches repeat every five minutes, subject to background timer
   cadence and queue availability. Failures back off from five minutes to at most
   one hour. Only one fetch per subscription is active at a time.
-- RSS XML parsing accepts at most 128 KiB UTF-8, 512 XML nodes, depth 32,
+- RSS XML parsing accepts at most 1 MiB UTF-8, 512 XML nodes, depth 32,
   32 attributes per element and 64 namespace bindings. DTD/entity declarations,
   malformed XML and unknown entities are rejected. RSS2 and Atom are supported;
   arbitrary XML/HTML is not. Parsing is bounded independently of the generic
@@ -162,8 +162,8 @@ A restored baseline remains durable; the last failure category is transient.
 Server logs separately emit `RSS fetch outcome=success|failure category=...` using
 only those fixed categories, without feed URLs, response contents, or credentials.
 
-The RSS parser accepts at most 128 KiB of UTF-8 XML. Native generic fetch retains
-its existing 512 KiB response limit. XML nesting/node/entry limits, request timeouts,
+The RSS parser accepts at most 1 MiB of UTF-8 XML. Native generic fetch accepts
+at most 2 MiB per response. XML nesting/node/entry limits, request timeouts,
 SSRF protection and retry/rate limits are unchanged. Larger or invalid feeds retry
 with bounded backoff and do not seed or post entries.
 
@@ -172,3 +172,11 @@ Native fetch failures also expose fixed categories `dns`, `connect`, `tls`,
 logs preserve these categories without printing curl error buffers, URLs, or
 credentials. The existing fetch `error` text remains compatible; the additive
 `errorCode` field is null on successful HTTP completion (including HTTP errors).
+
+Response buffering remains bounded, not free: 16 retained 2 MiB native results
+can use roughly 32 MiB per script before allocator overhead or JS copies. RSS
+starts at most eight jobs and parses one completion per timer callback. V8's
+32 MiB old-generation threshold is not a hard process/native-buffer memory cap.
+The 25 ms default callback watchdog is unchanged; large or complex XML can still
+exceed that execution budget even below the byte limit. Size acceptance does not
+guarantee every feed can be parsed within that budget.

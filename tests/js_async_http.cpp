@@ -86,6 +86,8 @@ public:
 						}
 						body = request.substr(start);
 					}
+					if (request.find(" /boundary ") != std::string::npos)
+						body.assign(js_async_http::MaxBody, 'a');
 					if (request.find(" /oversize ") != std::string::npos)
 						body.assign(js_async_http::MaxBody + 1, 'a');
 					const bool redirect = request.find(" /redirect ") != std::string::npos;
@@ -200,6 +202,10 @@ int main()
 	Check(d.Commit(id));
 	r = Wait(d, g, id);
 	Check(r.ok && r.body == std::string("a\0b", 3));
+	id = d.Stage(g, "GET", fixture.url + "/boundary");
+	Check(d.Commit(id));
+	r = Wait(d, g, id);
+	Check(r.ok && r.body.size() == MaxBody && r.errorCode.empty());
 	id = d.Stage(g, "GET", fixture.url + "/oversize");
 	Check(d.Commit(id));
 	r = Wait(d, g, id);

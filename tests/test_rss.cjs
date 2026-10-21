@@ -164,7 +164,7 @@ const item = (id, title = id) => ({id, title, url: 'https://example.com/' + enco
     '<rss><channel/></rss><?xml version="1.0"?>', '<feed><entry/></feed>',
     '<rss><channel>' + '<x>'.repeat(33) + '</x>'.repeat(33) + '</channel></rss>',
     '<rss><channel>' + '<x/>'.repeat(2050) + '</channel></rss>',
-    '<rss><channel>' + '😀'.repeat(65536) + '</channel></rss>',
+    '<rss><channel>' + '😀'.repeat(262144) + '</channel></rss>',
     '<rss><channel>' + '\ud800' + '</channel></rss>',
   ]) assert.equal(parse(bad), null, bad.slice(0, 100));
   assert.equal(parse(rss('<title>Unsafe</title><link>javascript:alert(1)</link>')).length, 0);
@@ -188,8 +188,8 @@ const item = (id, title = id) => ({id, title, url: 'https://example.com/' + enco
   const h = harness();
   const parse = body => { h.context.body = body; return vm.runInContext('rssParseFeed(body)', h.context); };
   const wrap = text => '<rss><channel>' + text + '</channel></rss>';
-  assert.ok(parse(wrap('x'.repeat(131072 - 30))));
-  assert.equal(parse(wrap('x'.repeat(131073 - 30))), null);
+  assert.ok(parse(wrap('x'.repeat(1048576 - 30))));
+  assert.equal(parse(wrap('x'.repeat(1048577 - 30))), null);
   assert.ok(parse(wrap('<x/>'.repeat(510))));
   assert.equal(parse(wrap('<x/>'.repeat(511))), null);
   assert.ok(parse(wrap('&amp;'.repeat(13100))));
@@ -250,7 +250,7 @@ console.log('PASS: RSS registered-user/stage guards, Map state, deduplication, b
   assert.equal(h.posts().length, 0);
   h.command('#rss', 'list'); assert.match(h.notices.at(-2).text, /fetch: baseline-ready/);
   h.tick(302);
-  const huge = '<rss><channel>' + 'x'.repeat(131073) + '</channel></rss>';
+  const huge = '<rss><channel>' + 'x'.repeat(1048577) + '</channel></rss>';
   h.results.set('2', {ok:true,status:200,body:huge,bodyBytes:new Uint8Array(Buffer.from(huge))});
   assert.deepEqual([...h.tick(303).rssFetchOutcomes], ['oversize']);
   h.command('#rss', 'list'); assert.match(h.notices.at(-2).text, /fetch: oversize/);
@@ -258,7 +258,7 @@ console.log('PASS: RSS registered-user/stage guards, Map state, deduplication, b
   assert.deepEqual([...h.tick(604).rssFetchOutcomes], ['transport']);
   assert.equal(h.posts().length, 0);
 }
-console.log('PASS: >64KiB baseline, 128KiB parser cap, retrieval status and sanitized categories');
+console.log('PASS: >64KiB baseline, 1MiB parser cap, retrieval status and sanitized categories');
 
 for (const code of ['dns', 'connect', 'tls', 'timeout', 'oversize', 'cancelled', 'expired', 'raw-secret']) {
  const h = harness(); h.command(); h.tick(1);
