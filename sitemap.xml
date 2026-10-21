@@ -2,102 +2,102 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://r33drichards.github.io/docker/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/explanation/architecture/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/explanation/host-lifecycle/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/explanation/trust/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/how-to/agent-onboarding/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/how-to/configure/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/how-to/documentation/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/how-to/fetch-and-webhooks/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/how-to/native-host-api/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/how-to/reload/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/how-to/replay/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/how-to/rss/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/how-to/test/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/how-to/wasm/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/reference/api/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/reference/callable-api/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/reference/commands/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/reference/configuration/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/reference/events/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/reference/features/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/reference/hooks/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/reference/limits/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/reference/sqlite/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/tutorials/command-and-timer/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
     <url>
          <loc>https://r33drichards.github.io/docker/tutorials/first-hook/</loc>
-         <lastmod>2026-10-20</lastmod>
+         <lastmod>2026-10-21</lastmod>
     </url>
 </urlset>

@@ -198,7 +198,7 @@
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#add-or-remove-a-feed" class="nav-link">Add or remove a feed</a>
+            <li class="nav-item" data-bs-level="2"><a href="#add-list-or-remove-feeds" class="nav-link">Add, list or remove feeds</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -242,7 +242,7 @@ separately; see <a href="../../reference/sqlite/">SQLite configuration and limit
 script requires this grant and fails loading rather than silently falling back
 to volatile storage. Schema writes occur only in active callbacks, never during
 startup. Deploying or provisioning storage is a separate operator action.</p>
-<h2 id="add-or-remove-a-feed">Add or remove a feed</h2>
+<h2 id="add-list-or-remove-feeds">Add, list or remove feeds</h2>
 <p>As any registered IRC user, enter:</p>
 <pre><code class="language-text">/rss #news https://example.org/feed.xml
 </code></pre>
@@ -257,6 +257,19 @@ channels. Feed URLs must be public HTTP(S) URLs without embedded credentials or 
 on the scheme's default port (80 for HTTP, 443 for HTTPS). Article links are only
 displayed, not fetched, and may include fragments or other valid ports.
 The transport rejects prohibited network destinations and unsafe feed data.</p>
+<p>To list subscriptions, including an explicit empty result:</p>
+<pre><code class="language-text">/quote RSS #news list
+</code></pre>
+<p>Lists are paginated in groups of ten. Follow the returned <code>/quote RSS #news list:2</code>
+command for the next page. Feed URLs are bounded to fit IRC notices. WeeChat users
+should use <code>/quote RSS ...</code> for this server command.</p>
+<p>Each RSS request returns a notice with success, failure, or usage. Disabled,
+missing, or failing handlers return a native unavailable notice instead of silence.
+If an outcome is uncertain, inspect the list before retrying. Server logs record
+fixed <code>RSS command outcome=success|failure</code> codes, never feed URLs or exception
+contents. Script handlers must return <code>{rssOutcome: 'success'}</code> or
+<code>{rssOutcome: 'failure'}</code> and queue a notice to the requester; the supplied script
+does this for every supported operation.</p>
 <p>To remove every feed subscription for a channel:</p>
 <pre><code class="language-text">/rss #news off
 </code></pre>
