@@ -240,42 +240,48 @@ ircd.on('postCommand', event => {
   if (event.command !== 'RSS' || !event.validated || event.result !== 'SUCCESS') return;
   const user = ircd.userById(event.userId);
   if (!user || event.params.length !== 2) return;
+  const respond = (ok, message) => { ircd.notice(event.userId, message); return {rssOutcome: ok ? 'success' : 'failure'}; };
   const [channel, feed] = event.params;
   if (typeof channel !== 'string' || !ircd.isChannel(channel)) return;
-  try { rssInitializeStorage(); } catch (_) { ircd.notice(event.userId, 'RSS storage unavailable; no change made.'); return; }
+  try { rssInitializeStorage(); } catch (_) { return respond(false, 'RSS storage unavailable; no change made.'); }
   const channelKey = rssChannelKey(channel);
+  if (/^list(?::[1-9][0-9]*)?$/.test(feed)) {
+    const feeds = [...rssSubscriptions.values()].filter(sub => sub.channelKey === channelKey);
+    if (!feeds.length) return respond(true, 'RSS list: no subscriptions for ' + channel + '.');
+    const page = feed === 'list' ? 1 : Number(feed.slice(5));
+    const pages = Math.ceil(feeds.length / 10);
+    if (!Number.isSafeInteger(page) || page > pages) return respond(false, 'RSS list page out of range. Use /RSS ' + channel + ' list.');
+    for (const sub of feeds.slice((page - 1) * 10, page * 10)) ircd.notice(event.userId, 'RSS feed: ' + rssWireText(sub.feed));
+    return respond(true, 'RSS list complete: ' + feeds.length + ' subscription(s) for ' + channel + ', page ' + page + '/' + pages + (page < pages ? '. Next: /RSS ' + channel + ' list:' + (page + 1) : '.'));
+  }
   if (feed === 'off') {
     for (const [key, sub] of rssSubscriptions) {
       if (sub.channelKey === channelKey) {
         try { rssStorage.remove(sub.channel, sub.feed); } catch (_) {
-          ircd.notice(event.userId, 'RSS storage unavailable; some subscriptions may remain.'); return;
+          return respond(false, 'RSS storage unavailable; some subscriptions may remain.');
         }
         if (sub.job !== null) ircd.cancelFetch(sub.job);
         rssSubscriptions.delete(key);
       }
     }
-    ircd.notice(event.userId, 'RSS subscriptions removed for ' + channel + '.');
-    return;
+    return respond(true, 'RSS subscriptions removed for ' + channel + '.');
   }
   if (!rssHttpUrl(feed, true)) {
-    ircd.notice(event.userId, 'RSS requires a public HTTP(S) feed URL without credentials or fragments, on its default port.');
-    return;
+    return respond(false, 'RSS requires a public HTTP(S) feed URL without credentials or fragments, on its default port.');
   }
   const key = channelKey + '\n' + feed;
   if (rssSubscriptions.has(key)) {
-    ircd.notice(event.userId, 'RSS subscription already exists.');
-    return;
+    return respond(true, 'RSS subscription already exists.');
   }
   if (rssSubscriptions.size >= RSS_MAX_SUBSCRIPTIONS) {
-    ircd.notice(event.userId, 'RSS subscription limit reached.');
-    return;
+    return respond(false, 'RSS subscription limit reached.');
   }
-  try { rssStorage.add(channel, feed); } catch (_) { ircd.notice(event.userId, 'RSS storage unavailable; subscription not added.'); return; }
+  try { rssStorage.add(channel, feed); } catch (_) { return respond(false, 'RSS storage unavailable; subscription not added.'); }
   rssSubscriptions.set(key, {
     channel, channelKey, feed, seen: new Map(), seeded: false, pending: [],
     job: null, startedAt: 0, nextDue: 0, failures: 0,
   });
-  ircd.notice(event.userId, 'RSS subscribed. The first successful fetch establishes a baseline; new entries will be posted.');
+  return respond(true, 'RSS subscribed. The first successful fetch establishes a baseline; new entries will be posted.');
 });
 
 ircd.on('backgroundTimer', event => {

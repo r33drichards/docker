@@ -94,8 +94,10 @@ ircd.on('backgroundTimer', () => {
     # broader administrative host API authority.
     reload("""
 ircd.on('postCommand', e => {
-  if (e.command === 'RSS' && e.validated && e.result === 'SUCCESS')
+  if (e.command === 'RSS' && e.validated && e.result === 'SUCCESS') {
     ircd.notice(e.userId, 'rss-registered-user-success');
+    return {rssOutcome:'success'};
+  }
 });
 """)
     caller.send("RSS #rss-messaging https://example.org/feed")

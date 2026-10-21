@@ -693,6 +693,9 @@ def main():
 
                 exercise_validated_commands(caller, reload)
                 exercise_module_hooks(caller, reload)
+                output = (path / "server.log").read_text()
+                assert "script=1 stage=userPreNick category=exception" in output
+                assert "script=1 stage=userPreMessage category=timeout" in output
                 exercise_native_mutations(caller, other, reload)
                 exercise_event_listeners(caller, other, reload)
                 exercise_webhooks(caller, reload, receiver, path)
@@ -706,7 +709,10 @@ def main():
                 for marker in ("synthetic-adapter-token", "adapter-secret"):
                     assert marker not in output
                 reload(GOOD)
-                reload('throw Error("candidate fails");')
+                reload('throw Error("private-init-sentinel");')
+                output = (path / "server.log").read_text()
+                assert "script=1 stage=initialization category=exception" in output
+                assert "private-init-sentinel" not in output
                 caller.send("XWASM")  # Last-good context survived failed reload.
                 caller.until(lambda line: " PONG " in line and line.endswith("42"))
                 reload(GOOD, "admin")
@@ -733,9 +739,17 @@ def main():
                 caller.send("PING :timeout")
                 assert_silent(caller)
                 assert server.poll() is None
+                assert (
+                    "script=1 stage=preCommand category=timeout"
+                    in (path / "server.log").read_text()
+                )
                 reload("ircd.on('postCommand', e => { throw Error('post failed'); });")
                 caller.barrier("post-error-cannot-undo")
                 caller.barrier("post-only-does-not-lock-pre")
+                assert (
+                    "script=1 stage=postCommand category=exception"
+                    in (path / "server.log").read_text()
+                )
                 script.write_text(GOOD)
                 config.write_text(
                     base.replace('<module name="javascript">', "")
