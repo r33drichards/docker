@@ -966,6 +966,43 @@ class ModuleJavaScript final : public Module
 						if (!callback.Get(isolate)->Call(context, v8::Undefined(isolate), 1, &arg).ToLocal(&returned) ||
 							!js_runtime::Runtime::RequireSynchronous(isolate, returned))
 							return false;
+						// Optional RSS retrieval audit: only fixed categories are logged, never URLs or errors.
+						if (std::string(stage) == "backgroundTimer" && returned->IsObject() &&
+							script->authority == Authority::Admin)
+						{
+							v8::Local<v8::Value> audit;
+							if (!returned.As<v8::Object>()
+									->Get(context, Key(isolate, "rssFetchOutcomes"))
+									.ToLocal(&audit))
+								return false;
+							if (!audit->IsUndefined())
+							{
+								if (!audit->IsArray() || audit.As<v8::Array>()->Length() > 64)
+									return false;
+								auto entries = audit.As<v8::Array>();
+								for (uint32_t i = 0; i < entries->Length(); ++i)
+								{
+									v8::Local<v8::Value> entry;
+									std::string category;
+									if (!entries->Get(context, i).ToLocal(&entry) || !Text(isolate, entry, category))
+										return false;
+									if (category != "success" && category != "baseline-ready" &&
+										category != "transport" && category != "http" && category != "oversize" &&
+										category != "xml" && category != "storage" && category != "queue" &&
+										category != "timeout" && category != "dns" && category != "connect" &&
+										category != "tls" && category != "cancelled" && category != "expired")
+										return false;
+									commits.push_back(
+										[category]
+										{
+											ServerInstance->Logs.Normal(MODNAME, "RSS fetch outcome={} category={}",
+												category == "success" || category == "baseline-ready" ? "success"
+																									  : "failure",
+												category);
+										});
+								}
+							}
+						}
 						if ((hook.decision || mutate) &&
 							!HookDecision(context, returned, hook, script->authority, result, mutate, actor, commits))
 							return false;

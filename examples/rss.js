@@ -9,6 +9,7 @@ function rssInitializeStorage() {
   if (!rssStorageReady) { rssStorage.initialize(); rssStorageReady = true; }
 }
 const RSS_INTERVAL = 300;
+const RSS_MAX_XML_BYTES = 1024 * 1024;
 const RSS_MAX_SUBSCRIPTIONS = 32;
 const RSS_MAX_ITEMS = 64;
 const RSS_MAX_SEEN = 2048;
@@ -48,13 +49,13 @@ function rssParseXml(input) {
   const xmlChar = cp => cp === 9 || cp === 10 || cp === 13 ||
     (cp >= 32 && cp <= 0xd7ff) || (cp >= 0xe000 && cp <= 0xfffd) ||
     (cp >= 0x10000 && cp <= 0x10ffff);
-  if (typeof input !== 'string' || input.length > 65536) bad();
+  if (typeof input !== 'string' || input.length > RSS_MAX_XML_BYTES) bad();
   let bytes = 0;
   for (const char of input) {
     const cp = char.codePointAt(0);
     if (!xmlChar(cp)) bad();
     bytes += cp < 128 ? 1 : cp < 2048 ? 2 : cp < 65536 ? 3 : 4;
-    if (bytes > 65536) bad();
+    if (bytes > RSS_MAX_XML_BYTES) bad();
   }
   const decode = text => {
     let result = '', position = 0;
@@ -251,7 +252,7 @@ ircd.on('postCommand', event => {
     const page = feed === 'list' ? 1 : Number(feed.slice(5));
     const pages = Math.ceil(feeds.length / 10);
     if (!Number.isSafeInteger(page) || page > pages) return respond(false, 'RSS list page out of range. Use /RSS ' + channel + ' list.');
-    for (const sub of feeds.slice((page - 1) * 10, page * 10)) ircd.notice(event.userId, 'RSS feed: ' + rssWireText(sub.feed));
+    for (const sub of feeds.slice((page - 1) * 10, page * 10)) ircd.notice(event.userId, 'RSS feed: ' + rssWireText(sub.feed, 320) + ' [fetch: ' + (sub.lastStatus || (sub.seeded ? 'baseline-ready' : 'pending')) + ']');
     return respond(true, 'RSS list complete: ' + feeds.length + ' subscription(s) for ' + channel + ', page ' + page + '/' + pages + (page < pages ? '. Next: /RSS ' + channel + ' list:' + (page + 1) : '.'));
   }
   if (feed === 'off') {
@@ -287,7 +288,9 @@ ircd.on('postCommand', event => {
 ircd.on('backgroundTimer', event => {
   const now = event.curtime;
   if (!Number.isFinite(now)) return;
-  try { rssInitializeStorage(); } catch (_) { return; }
+  try { rssInitializeStorage(); } catch (_) { return {rssFetchOutcomes: ['storage']}; }
+  const outcomes = [];
+  const report = (sub, status) => { sub.lastStatus = status; outcomes.push(status); };
   let posts = 0, starts = 0, completions = 0;
   const ordered = [...rssSubscriptions.values()].sort((a, b) =>
     (a.job === null) - (b.job === null) || a.startedAt - b.startedAt);
@@ -303,6 +306,8 @@ ircd.on('backgroundTimer', event => {
         --activeJobs;
         const items = result.ok && result.status === 200 && typeof result.body === 'string' ? rssParseFeed(result.body) : null;
         if (items === null) {
+          report(sub, !result.ok ? (['dns', 'connect', 'timeout', 'tls', 'oversize', 'cancelled', 'expired'].includes(result.errorCode) ? result.errorCode : 'transport') : result.status !== 200 ? 'http' :
+            (result.bodyBytes ? result.bodyBytes.length : typeof result.body === 'string' ? result.body.length : 0) > RSS_MAX_XML_BYTES ? 'oversize' : 'xml');
           rssRetry(sub, now);
         } else {
           const unique = new Map();
@@ -322,23 +327,26 @@ ircd.on('backgroundTimer', event => {
           }
           if (!sub.seeded) {
             try { sub.seenLimit = rssStorage.remember(sub.channel, sub.feed, [...unique.keys()], true); }
-            catch (_) { rssRetry(sub, now); continue; }
+            catch (_) { report(sub, 'storage'); rssRetry(sub, now); continue; }
             for (const id of unique.keys()) rssRemember(sub, id);
             sub.seeded = true;
+            report(sub, 'baseline-ready');
           } else {
             // Feeds conventionally list newest first. Deliver new entries oldest first.
             // Indexed lookup of only this bounded batch avoids replaying all saved
             // history at startup and makes the database the dedup source of truth.
             let known;
             try { known = rssStorage.known(sub.channel, sub.feed, [...unique.keys()]); }
-            catch (_) { rssRetry(sub, now); continue; }
+            catch (_) { report(sub, 'storage'); rssRetry(sub, now); continue; }
             sub.pending = [...unique.values()].filter(item => !known.has(item.id)).reverse();
+            report(sub, 'success');
           }
           sub.failures = 0;
           sub.nextDue = now + RSS_INTERVAL;
         }
       } else if (now < sub.startedAt || now - sub.startedAt >= RSS_JOB_TIMEOUT) {
         // Native work is not persisted. A restored job token must never stall a feed.
+        report(sub, 'timeout');
         ircd.cancelFetch(sub.job);
         sub.job = null;
         --activeJobs;
@@ -350,7 +358,7 @@ ircd.on('backgroundTimer', event => {
       // Commit before queuing IRC output: failed storage never emits a post.
       // A crash/veto after commit can lose delivery; this is not exactly-once.
       try { sub.seenLimit = rssStorage.remember(sub.channel, sub.feed, [item.id]); }
-      catch (_) { sub.storageRetryAt = now + RSS_INTERVAL; break; }
+      catch (_) { report(sub, 'storage'); sub.storageRetryAt = now + RSS_INTERVAL; break; }
       sub.pending.shift();
       rssRemember(sub, item.id);
       ircd.privmsg(sub.channel, item.text);
@@ -365,10 +373,12 @@ ircd.on('backgroundTimer', event => {
         sub.job = job;
         sub.startedAt = now;
       } else {
+        report(sub, 'queue');
         rssRetry(sub, now);
       }
     }
   }
+  return {rssFetchOutcomes: outcomes};
 });
 
 // BEGIN RSS SQLITE ADAPTER

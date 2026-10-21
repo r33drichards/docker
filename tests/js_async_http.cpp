@@ -86,6 +86,8 @@ public:
 						}
 						body = request.substr(start);
 					}
+					if (request.find(" /boundary ") != std::string::npos)
+						body.assign(js_async_http::MaxBody, 'a');
 					if (request.find(" /oversize ") != std::string::npos)
 						body.assign(js_async_http::MaxBody + 1, 'a');
 					const bool redirect = request.find(" /redirect ") != std::string::npos;
@@ -127,6 +129,13 @@ static js_async_http::Result Wait(
 int main()
 {
 	using namespace js_async_http;
+	Check(std::string(ErrorCategory(CURLE_COULDNT_RESOLVE_HOST)) == "dns");
+	Check(std::string(ErrorCategory(CURLE_COULDNT_CONNECT)) == "connect");
+	Check(std::string(ErrorCategory(CURLE_OPERATION_TIMEDOUT)) == "timeout");
+	Check(std::string(ErrorCategory(CURLE_PEER_FAILED_VERIFICATION)) == "tls");
+	Check(std::string(ErrorCategory(CURLE_FILESIZE_EXCEEDED)) == "oversize");
+	Check(std::string(ErrorCategory(CURLE_ABORTED_BY_CALLBACK)) == "cancelled");
+	Check(std::string(ErrorCategory(CURLE_RECV_ERROR)) == "transport");
 	Check(ValidUrl("https://example.com/feed?x=1"));
 	for (auto url : {"file:///etc/passwd", "ftp://example.com/", "https://user:pass@example.com/",
 			 "https://example.com/#x", "https://example.com:444/", "http://127.0.0.1/", "http://[::1]/",
@@ -188,15 +197,27 @@ int main()
 	Check(d.Commit(id));
 	Check(!d.Commit(id));
 	auto r = Wait(d, g, id);
-	Check(r.ok && r.status == 200 && r.body == "fixture-response");
+	Check(r.ok && r.status == 200 && r.body == "fixture-response" && r.errorCode.empty());
 	id = d.Stage(g, "POST", fixture.url + "/", std::string("a\0b", 3));
 	Check(d.Commit(id));
 	r = Wait(d, g, id);
 	Check(r.ok && r.body == std::string("a\0b", 3));
+	id = d.Stage(g, "GET", fixture.url + "/boundary");
+	Check(d.Commit(id));
+	r = Wait(d, g, id);
+	Check(r.ok && r.body.size() == MaxBody && r.errorCode.empty());
 	id = d.Stage(g, "GET", fixture.url + "/oversize");
 	Check(d.Commit(id));
 	r = Wait(d, g, id);
 	Check(!r.ok && r.body.empty());
+	Check(r.errorCode == "oversize" && r.error == "HTTP transport failed");
+	Policy shortTimeout;
+	shortTimeout.timeout = 20;
+	id = d.Stage(g, "GET", fixture.url + "/slow", {}, shortTimeout);
+	Check(d.Commit(id));
+	r = Wait(d, g, id);
+	Check(!r.ok && r.errorCode == "timeout" && r.body.empty());
+	std::this_thread::sleep_for(std::chrono::milliseconds(250));
 	const auto before = fixture.requests.load();
 	id = d.Stage(g, "GET", fixture.url + "/redirect");
 	Check(d.Commit(id));

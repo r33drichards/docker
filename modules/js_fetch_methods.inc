@@ -100,6 +100,9 @@ static void TakeHttpResult(const v8::FunctionCallbackInfo<v8::Value>& args)
 	Put(context, value, "bodyBytes", Bytes(args.GetIsolate(), result.body));
 	Put(context, value, "body", Display(args.GetIsolate(), result.body));
 	Put(context, value, "error", Display(args.GetIsolate(), result.error));
+	Put(context, value, "errorCode",
+		result.errorCode.empty() ? v8::Local<v8::Value>(v8::Null(args.GetIsolate()))
+								 : Display(args.GetIsolate(), result.errorCode));
 	args.GetReturnValue().Set(value);
 }
 static void CancelHttp(const v8::FunctionCallbackInfo<v8::Value>& args)

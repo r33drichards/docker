@@ -29,7 +29,7 @@ function harness(existingDatabase) {
   return {notices, jobs, results, context, handlers, cancelled, database,
     failStorage(value) { storageFailure = value; },
     oper(value) { operator = value; }, present(value) { present = value; }, accepting(value) { accepting = value; },
-    tick(now) { handlers.get('backgroundTimer')({curtime: now}); },
+    tick(now) { return handlers.get('backgroundTimer')({curtime: now}); },
     command(channel = '#rss', feed = 'https://example.com/rss', extra = {}) {
       handlers.get('postCommand')({command: 'RSS', validated: true, result: 'SUCCESS', userId: '001AAAAAA', params: [channel, feed], ...extra});
     },
@@ -164,7 +164,7 @@ const item = (id, title = id) => ({id, title, url: 'https://example.com/' + enco
     '<rss><channel/></rss><?xml version="1.0"?>', '<feed><entry/></feed>',
     '<rss><channel>' + '<x>'.repeat(33) + '</x>'.repeat(33) + '</channel></rss>',
     '<rss><channel>' + '<x/>'.repeat(2050) + '</channel></rss>',
-    '<rss><channel>' + '😀'.repeat(65536) + '</channel></rss>',
+    '<rss><channel>' + '😀'.repeat(262144) + '</channel></rss>',
     '<rss><channel>' + '\ud800' + '</channel></rss>',
   ]) assert.equal(parse(bad), null, bad.slice(0, 100));
   assert.equal(parse(rss('<title>Unsafe</title><link>javascript:alert(1)</link>')).length, 0);
@@ -188,8 +188,8 @@ const item = (id, title = id) => ({id, title, url: 'https://example.com/' + enco
   const h = harness();
   const parse = body => { h.context.body = body; return vm.runInContext('rssParseFeed(body)', h.context); };
   const wrap = text => '<rss><channel>' + text + '</channel></rss>';
-  assert.ok(parse(wrap('x'.repeat(65536 - 30))));
-  assert.equal(parse(wrap('x'.repeat(65537 - 30))), null);
+  assert.ok(parse(wrap('x'.repeat(1048576 - 30))));
+  assert.equal(parse(wrap('x'.repeat(1048577 - 30))), null);
   assert.ok(parse(wrap('<x/>'.repeat(510))));
   assert.equal(parse(wrap('<x/>'.repeat(511))), null);
   assert.ok(parse(wrap('&amp;'.repeat(13100))));
@@ -241,3 +241,31 @@ const item = (id, title = id) => ({id, title, url: 'https://example.com/' + enco
   assert.match(restarted.posts()[0].text, /genuinely-new/);
 }
 console.log('PASS: RSS registered-user/stage guards, Map state, deduplication, baseline, multi-channel isolation, bounded scheduling/output, UTF-8 sanitation, backoff, stale jobs and removal');
+
+{
+  const h = harness(); h.command(); h.tick(1);
+  const large = '<rss><channel><description>' + 'x'.repeat(70000) + '</description><item><guid>large</guid><title>Large feed</title><link>https://example.com/large</link></item></channel></rss>';
+  h.results.set('1', {ok:true,status:200,body:large,bodyBytes:new Uint8Array(Buffer.from(large))});
+  assert.deepEqual([...h.tick(2).rssFetchOutcomes], ['baseline-ready']);
+  assert.equal(h.posts().length, 0);
+  h.command('#rss', 'list'); assert.match(h.notices.at(-2).text, /fetch: baseline-ready/);
+  h.tick(302);
+  const huge = '<rss><channel>' + 'x'.repeat(1048577) + '</channel></rss>';
+  h.results.set('2', {ok:true,status:200,body:huge,bodyBytes:new Uint8Array(Buffer.from(huge))});
+  assert.deepEqual([...h.tick(303).rssFetchOutcomes], ['oversize']);
+  h.command('#rss', 'list'); assert.match(h.notices.at(-2).text, /fetch: oversize/);
+  h.tick(603); h.results.set('3',{ok:false,status:0,body:'',error:'private-transport-secret'});
+  assert.deepEqual([...h.tick(604).rssFetchOutcomes], ['transport']);
+  assert.equal(h.posts().length, 0);
+}
+console.log('PASS: >64KiB baseline, 1MiB parser cap, retrieval status and sanitized categories');
+
+for (const code of ['dns', 'connect', 'tls', 'timeout', 'oversize', 'cancelled', 'expired', 'raw-secret']) {
+ const h = harness(); h.command(); h.tick(1);
+ h.results.set('1', {ok:false,status:0,body:'',error:'private-error-secret',errorCode:code});
+ const expected = code === 'raw-secret' ? 'transport' : code;
+ assert.deepEqual([...h.tick(2).rssFetchOutcomes], [expected]);
+ h.command('#rss','list'); assert.match(h.notices.at(-2).text, new RegExp('fetch: '+expected));
+ assert.ok(!h.notices.some(n => n.text.includes('secret')));
+}
+console.log('PASS: fixed native error categories, compatible fallback and redaction');
