@@ -1,9 +1,4 @@
-tests/*
-!tests/fixtures/
-tests/fixtures/*
-!tests/fixtures/m_js_hook_probe.cpp
-!tests/fixtures/m_js_event_probe.cpp
-!tests/fixtures/module_hook_calls.inc
+tests/
 version.sh
 .github
 .gitignore
