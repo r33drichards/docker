@@ -1,8 +1,5 @@
 # InspIRCd
 
-JavaScript module documentation: [Diátaxis documentation site](https://r33drichards.github.io/docker/) (MkDocs).
-Source and local build instructions: [site-docs](site-docs/index.md), [documentation guide](site-docs/how-to/documentation.md).
-
 InspIRCd is a modular Internet Relay Chat (IRC) server written in C++ for Linux, BSD, Windows and Mac OS X systems which was created from scratch to be stable, modern and lightweight.
 
 InspIRCd is one of only a few IRC servers to provide a tunable number of features through the use of an advanced but well-documented module system. By keeping core functionality to a minimum we hope to increase the stability, security, and speed of InspIRCd while also making it customizable to the needs of many different users.
@@ -350,90 +347,6 @@ You can put the sources these modules in the modules directory of this repositor
 
 It also allows you to overwrite modules.
 
-
-### Included JavaScript module (InspIRCd 4)
-
-The primary `Dockerfile` includes `m_javascript.so` and its matching V8 runtime.
-The module is **not loaded by default**, and no scripts are enabled automatically.
-Downstream projects, including Railway services building this Dockerfile, can
-load it explicitly and supply their own scripts through their configuration.
-Existing configuration volumes and entrypoint behavior are unchanged. See
-[JavaScript build and configuration](JAVASCRIPT.md#build-and-configure) before
-enabling trusted administrator-authored scripts.
-
-### Included pre/post-command debug hooks (InspIRCd 4)
-
-**Warning: this opt-in debugging module logs unredacted command parameters.**
-Passwords, SASL payloads, operator credentials, channel keys, service
-authentication, private messages, and identifying parameters can enter server
-logs and any log collectors. Use only with synthetic data or where this capture
-is explicitly intended. Leave it unloaded on normal production servers. Escaping
-prevents log-line injection; it does **not** hide secrets.
-
-This repository includes `modules/m_precommand.cpp`. The Docker build compiles
-it into `m_precommand.so`, but it is **not loaded by default**. It observes
-InspIRCd's `OnPreCommand` and `OnPostCommand` hooks and logs at normal level under
-`m_precommand`.
-For an isolated debugging server, load it and route its output to stdout:
-
-```sh
-docker build -t inspircd:precommand .
-cat > precommand.conf <<'CONF'
-<module name="precommand">
-<log method="stdout" level="normal" type="m_precommand">
-CONF
-docker run --rm -p 127.0.0.1:6667:6667 \
-  -v "$(pwd)/precommand.conf:/inspircd/conf.d/precommand.conf:ro" inspircd:precommand
-```
-
-For each observed callback, the module copies the full parsed values into an
-owned `ParsedCommand` struct (`modules/parsed_command.h`): `command` is a
-`std::string` and `parameters` is a `std::vector<std::string>`. Argument order,
-spaces, empty values, and arbitrary bytes are preserved without keeping
-references to parser buffers. The snapshot lives only within that callback;
-there is no queue or network exporter. Normal destruction is not a secure-memory
-erasure guarantee. Its printed representation is retained by configured logs.
-
-For example, `/quote PING :hello` produces this record after the server log prefix:
-
-```text
-stage=OnPreCommand ParsedCommand{command="PING", parameters=["hello"]} validated=true
-stage=OnPostCommand ParsedCommand{command="PING", parameters=["hello"]} result=SUCCESS loop=false
-```
-
-`Repr()` prints every value without redaction. Quotes and backslashes are escaped;
-control and non-ASCII bytes use fixed-width `\xHH` escapes. For example, a UTF-8
-`café` parameter is represented as `"caf\xc3\xa9"`. This is a byte-preserving
-C-style representation, not JSON; it is deterministic and always one ASCII line.
-The raw IRC line, message tags, and the separate user object are not collected,
-but identities and secrets occurring in command parameters are printed in full.
-
-The pre-command hook only prints its `validated=true` stage, avoiding the normal
-pre-/post-validation duplicate. Unknown commands, missing-parameter commands, and
-permission failures rejected before validation have no command snapshots.
-Parameters reflect command-specific joining and empty-argument handling.
-
-The post-command hook prints a fresh snapshot after the handler returns, plus
-its result (`SUCCESS`, `FAILURE`, or `INVALID`) and the `loop` flag. Thus a handler
-that fails after validation still has pre/post records. `loop=true` marks
-per-target callbacks from `LoopCall` (for commands accepting comma-separated
-targets); those can add post records beyond the ordinary pre/post pair.
-Core-generated commands, such as LUSERS/MOTD during registration, and hooks
-invoked by other modules can also produce different callback patterns. Another
-module can veto before this observer is called. These are callback snapshots,
-not an exactly-once audit trail; a successful handler does not prove recipient
-client delivery.
-
-Only pre/post **command** hooks are registered. There are no pre/post-message
-hooks. `OnPreCommand` always returns `MOD_RES_PASSTHRU`, and `OnPostCommand` only
-logs. The module does not mutate or block commands, change routing, or send user
-replies. Both stages print the full struct using the same escaping rules.
-
-`./run_tests.sh` discovers `tests/precommand.sh`, which uses Python 3 on the host
-and synthetic data to check opt-in logging, exact captured values, escaping, pre/post success and failure results, and
-unchanged client behavior against `inspircd:testing`. `tests/precommand_struct.sh`
-uses a host C++ compiler (`CXX`, or `c++`) to test ownership and the representation.
-
 Make sure you install all needed dependencies using `ADDPACKAGES`.
 
 
@@ -499,6 +412,9 @@ You can also reach many of the project maintainers via the `#inspircd` IRC chann
 
 You are invited to contribute new features, fixes, or updates, large or small; we are always thrilled to receive pull requests and do our best to process them as fast as we can.
 
-## Optional JavaScript and WebAssembly hooks
+## Persistent state and V8 rollback
 
-See [JAVASCRIPT.md](JAVASCRIPT.md) for the opt-in V8 image, pre/post command callbacks, configurable script files/directories, local Wasm assets, and explicit user/admin mutation authority. The original image remains unchanged.
+The V8 extension and its dependent RSS/webhook features have been removed.
+Persistent configuration, data, TLS import and bounded logging are retained.
+Read the [rollback and deployment prerequisites](docs/V8-ROLLBACK.md) before
+upgrading a deployment that used scripting or user-edited mounted configuration.

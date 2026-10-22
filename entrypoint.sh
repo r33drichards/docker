@@ -1,9 +1,8 @@
 #!/bin/sh
 # shellcheck disable=SC2068
 
-# Clear the optional token environment before any child command or daemon.
-# shellcheck source=tools/materialize-nocodb-token.sh
-. /materialize-nocodb-token.sh || exit 1
+# The removed JavaScript forwarding feature must not leak a stale deployment secret.
+unset INSPIRCD_NOCODB_TOKEN
 
 INSPIRCD_ROOT="/inspircd"
 
@@ -85,5 +84,5 @@ if [ ! -e $INSPIRCD_ROOT/conf/dhparams.pem ]; then
     /usr/bin/certtool --generate-dh-params --sec-param normal --outfile $INSPIRCD_ROOT/conf/dhparams.pem
 fi
 
-cd $INSPIRCD_ROOT
+cd "$INSPIRCD_ROOT" || exit 1
 exec env INSPIRCD_ROOT=$INSPIRCD_ROOT $INSPIRCD_ROOT/bin/inspircd --nofork $@

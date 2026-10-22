@@ -13,7 +13,6 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    if: github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ci:heavy') && ((github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'ci:heavy'))
     timeout-minutes: 45
     runs-on: ubuntu-22.04
     env:
@@ -47,6 +46,9 @@ jobs:
             echo "platforms=linux/amd64" >> "$GITHUB_OUTPUT"
           fi
       -
+        name: Install persistence test compiler dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libssl-dev
+      -
         name: Build and test amd64 image
         run: |
           IP=$(ip addr s \
@@ -58,8 +60,6 @@ jobs:
           docker swarm init --advertise-addr "$IP"
           docker build --build-arg VERSION="${INSP_VERSION}" --target builder -t inspircd:test-builder .
           docker build --build-arg VERSION="${INSP_VERSION}" -t inspircd:testing .
-          export SQLITE_TEST_IMAGE=inspircd:test-builder
-          export HTTP_TEST_IMAGE=inspircd:test-builder
 
           echo "* * * Image built, running tests... * * *"
           ./run_tests.sh

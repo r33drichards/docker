@@ -753,10 +753,30 @@ class PersistentConfigTests(unittest.TestCase):
                 self.assertNotIn(SECRET, result.stderr)
                 self.assertEqual(list(self.destination.iterdir()), [])
 
-    def test_entrypoint_materializes_token_before_opt_in_helper(self):
+    def test_rollback_updates_managed_config_without_deleting_removed_helpers(self):
+        old = '<module name="javascript">\n<include executable="sh conf/sqlite.sh">\n'
+        new = '<include executable="sh conf/persistent.sh">\n'
+        self.put_source("inspircd.conf", old)
+        self.put_source("sqlite.sh", "legacy helper\n", 0o755)
+        self.assertEqual(self.run_helper().returncode, 0)
+        self.put_source("inspircd.conf", new)
+        (self.source / "sqlite.sh").unlink()
+        self.assertEqual(self.run_helper().returncode, 0)
+        self.assertEqual((self.destination / "inspircd.conf").read_text(), new)
+        self.assertEqual((self.destination / "sqlite.sh").read_text(), "legacy helper\n")
+
+    def test_rollback_preserves_custom_config_requiring_deployment_audit(self):
+        self.assertEqual(self.run_helper().returncode, 0)
+        custom = '<module name="javascript">\n# user configuration\n'
+        self.put_destination("inspircd.conf", custom)
+        self.put_source("inspircd.conf", "rollback default\n")
+        self.assertEqual(self.run_helper().returncode, 0)
+        self.assertEqual((self.destination / "inspircd.conf").read_text(), custom)
+
+    def test_entrypoint_clears_legacy_token_before_opt_in_helper(self):
         script = (ROOT / "entrypoint.sh").read_text()
         self.assertLess(
-            script.index(". /materialize-nocodb-token.sh"), script.index("INSPIRCD_ROOT=")
+            script.index("unset INSPIRCD_NOCODB_TOKEN"), script.index("INSPIRCD_ROOT=")
         )
         self.assertLess(script.index("INSPIRCD_ROOT="), script.index("/seed-persistent-config"))
         self.assertIn('if [ "${INSPIRCD_PERSISTENT:-no}" = yes ]; then', script)
