@@ -14,6 +14,11 @@ RUN apk add --no-cache gcc g++ make git pkgconfig perl openssl-dev openssl-libs-
        perl-net-ssleay perl-crypt-ssleay perl-lwp-protocol-https \
        perl-libwww wget gnutls-dev $BUILD_DEPENDENCIES
 
+# Build the opt-in reverse SSH supervisor.
+COPY modules/reverse_tunnel.h /modules/reverse_tunnel.h
+COPY tools/inspircd-tunnel.cpp /tools/inspircd-tunnel.cpp
+RUN c++ -std=c++17 -Os -Wall -Wextra -Werror -o /inspircd-tunnel /tools/inspircd-tunnel.cpp
+
 # Retain the existing non-destructive persistent-volume startup contract.
 COPY tools/sqlite-bootstrap.c /tmp/sqlite-bootstrap.c
 RUN cc -std=c11 -Os -static -Wall -Wextra -Werror -o /sqlite-bootstrap /tmp/sqlite-bootstrap.c
@@ -44,12 +49,13 @@ FROM alpine:3.22
 
 ARG RUN_DEPENDENCIES=
 
-RUN apk add --no-cache libgcc libstdc++ gnutls gnutls-utils $RUN_DEPENDENCIES && \
+RUN apk add --no-cache libgcc libstdc++ gnutls gnutls-utils openssh-client-default $RUN_DEPENDENCIES && \
     addgroup -g 10000 -S inspircd && \
     adduser -u 10000 -h /inspircd/ -D -S -G inspircd inspircd
 
 COPY --chown=inspircd:inspircd conf/ /conf/
 COPY --chown=inspircd:inspircd entrypoint.sh /entrypoint.sh
+COPY --from=builder /inspircd-tunnel /usr/local/libexec/inspircd-tunnel
 COPY --from=builder /sqlite-bootstrap /sqlite-bootstrap
 COPY --from=builder /seed-persistent-config /seed-persistent-config
 COPY --chown=0:0 --chmod=0644 tools/seed-persistent-config.baseline /seed-persistent-config.baseline
