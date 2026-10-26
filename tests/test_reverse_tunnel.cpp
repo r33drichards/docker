@@ -10,6 +10,8 @@ int main()
 	Profiles profiles{{"edge", p}};
 	Tunnels tunnels{{"irc", {"edge", 16667, 6667, false}}};
 	Validate(profiles, tunnels);
+	assert(Enabled("enabled") && !Enabled("disabled"));
+	Reject([] { Enabled("yes"); });
 	for (const auto& s : {"", "0", "65536", "-1", "22x", "1\n", "999999999999999999"}) Reject([&] { Port(s); });
 	assert(Port("65535") == 65535);
 	for (const auto& s : {"-oProxyCommand=x", "a:b", "host;id", "a b", "a\n", "a..b", "*"}) assert(!Host(s));

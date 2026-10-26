@@ -15,7 +15,6 @@ RUN apk add --no-cache gcc g++ make git pkgconfig perl openssl-dev openssl-libs-
        perl-libwww wget gnutls-dev $BUILD_DEPENDENCIES
 
 # Build the opt-in reverse SSH supervisor.
-COPY modules/reverse_tunnel.h /modules/reverse_tunnel.h
 COPY tools/inspircd-tunnel.cpp /tools/inspircd-tunnel.cpp
 RUN c++ -std=c++17 -Os -Wall -Wextra -Werror -o /inspircd-tunnel /tools/inspircd-tunnel.cpp
 

@@ -6,89 +6,19 @@
 namespace rt = reverse_tunnel;
 using TunnelClock = std::chrono::steady_clock;
 
-class TunnelManager
+static uint64_t TunnelNow()
 {
-	struct Runtime
-	{
-		std::vector<std::string> args;
-		int socket = -1;
-		unsigned failures = 0;
-		std::string state = "pending";
-		TunnelClock::time_point retry{}, started{};
-		explicit Runtime(std::vector<std::string> a) : args(std::move(a)) { }
-		~Runtime() { if (socket >= 0) close(socket); }
-	};
-	std::map<std::string, std::unique_ptr<Runtime>> running;
-
-public:
-	rt::Profiles profiles;
-	rt::Tunnels tunnels;
-	void Apply(rt::Profiles nextprofiles, rt::Tunnels nexttunnels)
-	{
-		rt::Validate(nextprofiles, nexttunnels);
-		// Validate the entire candidate before stopping or replacing any process.
-		for (auto it = running.begin(); it != running.end(); )
-		{
-			auto t = nexttunnels.find(it->first);
-			if (t == nexttunnels.end() || it->second->args != rt::Arguments(nextprofiles.at(t->second.profile), t->second))
-				it = running.erase(it);
-			else ++it;
-		}
-		profiles.swap(nextprofiles);
-		tunnels.swap(nexttunnels);
-		for (const auto& t : tunnels)
-			if (!running.count(t.first)) running.emplace(t.first, std::make_unique<Runtime>(rt::Arguments(profiles.at(t.second.profile), t.second)));
-	}
-	void Tick()
-	{
-		const auto now = TunnelClock::now();
-		for (auto& entry : running)
-		{
-			auto& r = *entry.second;
-			if (r.socket >= 0)
-			{
-				char buffer[64];
-				const ssize_t count = read(r.socket, buffer, sizeof(buffer));
-				if (count > 0)
-				{
-					for (ssize_t i = 0; i < count; ++i) r.state = buffer[i] == 'S' ? "ssh-running-unverified" : "backoff";
-				}
-				else if (!count || (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR))
-				{
-					close(r.socket);
-					r.socket = -1;
-					if (now - r.started >= std::chrono::seconds(60)) r.failures = 0;
-					r.retry = now + std::chrono::seconds(rt::Backoff(r.failures));
-					r.failures = std::min(r.failures + 1, 6U);
-					r.state = "companion-backoff";
-				}
-			}
-			else if (now >= r.retry)
-			{
-				r.socket = rt::Start(r.args);
-				r.started = now;
-				r.state = r.socket < 0 ? "companion-backoff" : "starting";
-				r.retry = now + std::chrono::seconds(rt::Backoff(r.failures));
-				if (r.socket < 0) r.failures = std::min(r.failures + 1, 6U);
-			}
-		}
-	}
-	std::string Status(const std::string& name) const
-	{
-		const auto& t = tunnels.at(name);
-		// Do not expose endpoints, usernames, file references, PIDs, or SSH output.
-		return name + " owner=" + (t.dynamic ? "dynamic" : "config") + " state=" + running.at(name)->state;
-	}
-};
+	return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(TunnelClock::now().time_since_epoch()).count());
+}
 
 class CommandReverseTunnel final : public Command
 {
-	TunnelManager& manager;
+	rt::Controller& manager;
 public:
-	CommandReverseTunnel(Module* owner, TunnelManager& m) : Command(owner, "RTUNNEL", 1, 5), manager(m)
+	CommandReverseTunnel(Module* owner, rt::Controller& m) : Command(owner, "RTUNNEL", 1, 6), manager(m)
 	{
 		access_needed = CmdAccess::OPERATOR;
-		syntax = {"LIST", "SHOW <name>", "ADD|UPDATE <name> <profile> <listenport> <destinationport>", "DELETE <name>"};
+		syntax = {"LIST", "SHOW <name>", "ADD|UPDATE <name> <profile> <listenport> <destinationport> [enabled|disabled]", "ENABLE|DISABLE|DELETE <name>"};
 	}
 	CmdResult Handle(User* user, const Params& p) override
 	{
@@ -101,7 +31,7 @@ public:
 		{
 			if (p[0] == "LIST" && p.size() == 1)
 			{
-				for (const auto& t : manager.tunnels) user->WriteNotice(manager.Status(t.first));
+				for (const auto& t : manager.tunnels) user->WriteNotice(manager.Status(t.first, TunnelNow()));
 				user->WriteNotice("RTUNNEL end of list");
 				return CmdResult::SUCCESS;
 			}
@@ -111,21 +41,26 @@ public:
 			if (p[0] == "SHOW" && p.size() == 2)
 			{
 				rt::Require(found != next.end(), "unknown tunnel");
-				user->WriteNotice(manager.Status(p[1]));
+				user->WriteNotice(manager.Status(p[1], TunnelNow()));
 				return CmdResult::SUCCESS;
 			}
-			if (p[0] == "ADD" && p.size() == 5)
+			if (p[0] == "ADD" && (p.size() == 5 || p.size() == 6))
 				rt::Require(found == next.end(), "tunnel already exists");
 			else
 			{
-				rt::Require((p[0] == "UPDATE" && p.size() == 5) || (p[0] == "DELETE" && p.size() == 2), "invalid command syntax");
+				rt::Require((p[0] == "UPDATE" && (p.size() == 5 || p.size() == 6)) || ((p[0] == "DELETE" || p[0] == "ENABLE" || p[0] == "DISABLE") && p.size() == 2), "invalid command syntax");
 				rt::Require(found != next.end(), "unknown tunnel");
 				rt::Require(found->second.dynamic, "config-owned tunnel; edit configuration and rehash");
 			}
 			if (p[0] == "DELETE") next.erase(p[1]);
-			else next[p[1]] = {p[2], rt::Port(p[3]), rt::Port(p[4]), true};
-			manager.Apply(manager.profiles, std::move(next));
-			user->WriteNotice("RTUNNEL change accepted (dynamic changes are memory-only)");
+			else if (p[0] == "ENABLE" || p[0] == "DISABLE") found->second.enabled = p[0] == "ENABLE";
+			else
+			{
+				const bool enabled = p.size() == 6 ? rt::Enabled(p[5]) : (found == next.end() || found->second.enabled);
+				next[p[1]] = {p[2], rt::Port(p[3]), rt::Port(p[4]), true, enabled};
+			}
+			manager.Submit(manager.profiles, std::move(next));
+			user->WriteNotice("RTUNNEL desired-state change accepted (reconciliation pending; dynamic changes are memory-only)");
 			return CmdResult::SUCCESS;
 		}
 		catch (const rt::Error& e)
@@ -138,10 +73,11 @@ public:
 
 class ModuleReverseTunnel final : public Module
 {
-	TunnelManager manager;
+	rt::ProcessTransport transport;
+	rt::Controller manager;
 	CommandReverseTunnel command;
 public:
-	ModuleReverseTunnel() : Module(VF_NONE, "Manages opt-in reverse SSH tunnels via a supervised OpenSSH companion."), command(this, manager) { }
+	ModuleReverseTunnel() : Module(VF_NONE, "Manages opt-in reverse SSH tunnels via a supervised OpenSSH companion."), manager(transport), command(this, manager) { }
 	void ReadConfig(ConfigStatus&) override
 	{
 		try
@@ -167,14 +103,14 @@ public:
 			}
 			for (const auto& [_, tag] : ServerInstance->Config->ConfTags("reversetunnel"))
 			{
-				rt::Tunnel t{tag->getString("profile"), rt::Port(tag->getString("listenport")), rt::Port(tag->getString("destinationport")), false};
+				rt::Tunnel t{tag->getString("profile"), rt::Port(tag->getString("listenport")), rt::Port(tag->getString("destinationport")), false, rt::Enabled(tag->getString("state", "enabled"))};
 				rt::Require(tunnels.emplace(tag->getString("name"), t).second, "duplicate tunnel name");
 				rt::Require(tunnels.size() <= 32, "maximum 32 tunnels");
 			}
-			manager.Apply(std::move(profiles), rt::Merge(manager.tunnels, std::move(tunnels)));
+			manager.Submit(std::move(profiles), rt::Merge(manager.tunnels, std::move(tunnels)));
 		}
 		catch (const rt::Error& e) { throw ModuleException(this, std::string("Reverse tunnel configuration rejected: ") + e.what()); }
 	}
-	void OnBackgroundTimer(time_t) override { manager.Tick(); }
+	void OnBackgroundTimer(time_t) override { manager.Reconcile(TunnelNow()); }
 };
 MODULE_INIT(ModuleReverseTunnel)

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #pragma once
-#include "reverse_tunnel.h"
+#include "reverse_tunnel_controller.h"
 #include <cerrno>
 #include <fcntl.h>
 #include <sys/socket.h>
@@ -36,7 +36,20 @@ inline int Start(const std::vector<std::string>& arguments)
 	}
 	close(pair[1]);
 	if (pid < 0) { close(pair[0]); return -1; }
-	fcntl(pair[0], F_SETFL, O_NONBLOCK);
+	if (fcntl(pair[0], F_SETFL, O_NONBLOCK) < 0) { close(pair[0]); return -1; }
 	return pair[0];
 }
+class ProcessTransport final : public Transport
+{
+public:
+	int Start(const std::vector<std::string>& args) override { return reverse_tunnel::Start(args); }
+	int Receive(int socket, char* buffer, size_t size) override
+	{
+		const auto count = read(socket, buffer, size);
+		if (count >= 0) return static_cast<int>(count);
+		return errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR ? -1 : -2;
+	}
+	void Stop(int socket) override { shutdown(socket, SHUT_WR); }
+	void Close(int socket) override { close(socket); }
+};
 } // namespace reverse_tunnel

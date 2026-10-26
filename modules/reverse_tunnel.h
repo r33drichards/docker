@@ -49,7 +49,13 @@ struct Tunnel
 	std::string profile;
 	unsigned listen = 0, destination = 0;
 	bool dynamic = false;
+	bool enabled = true;
 };
+inline bool Enabled(const std::string& value)
+{
+	Require(value == "enabled" || value == "disabled", "state must be enabled or disabled");
+	return value == "enabled";
+}
 using Profiles = std::map<std::string, Profile>;
 using Tunnels = std::map<std::string, Tunnel>;
 inline void Validate(const Profiles& profiles, const Tunnels& tunnels)

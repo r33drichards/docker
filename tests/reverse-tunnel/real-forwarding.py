@@ -210,7 +210,8 @@ try:
  listenmin="{FORWARD_PORT}" listenmax="{BAD_PORT}" destmin="{TARGET_PORT}" destmax="{TARGET_PORT}">
 '''
     config = ROOT / 'inspircd.conf'
-    config.write_text(base + f'<reversetunnel name="real" profile="edge" listenport="{FORWARD_PORT}" destinationport="{TARGET_PORT}">\n')
+    declarative = f'<reversetunnel name="real" profile="edge" listenport="{FORWARD_PORT}" destinationport="{TARGET_PORT}" state="enabled">\n'
+    config.write_text(base + declarative)
     daemon = subprocess.Popen(['/inspircd/bin/inspircd', '--nofork', '--config', str(config)],
                               cwd='/inspircd', stdout=daemonlog, stderr=daemonlog,
                               user=DAEMON_UID, group=DAEMON_GID, extra_groups=[])
@@ -225,6 +226,14 @@ try:
     assert listeners == [f'0100007F:{FORWARD_PORT:04X}'], listeners
     print('PASS real OpenSSH encrypted bidirectional forwarding; remote listener is IPv4 loopback only')
 
+    # Controller restores an enabled tunnel when the real SSH child is killed.
+    for pid in original_clients:
+        os.kill(pid, signal.SIGKILL)
+    eventually(lambda: not (processes('ssh') & original_clients), 'killed SSH client reaped')
+    eventually(forwarded, 'controller restores forward after SSH child kill')
+    original_clients = processes('ssh')
+    print('PASS controller recovers a killed real SSH child without new desired-state submission')
+
     # A wrong pinned key must never reach public-key authentication or bind.
     before = (ROOT / 'sshd.log').read_text().count('Accepted publickey')
     irc.command(f'RTUNNEL ADD rejected bad {BAD_PORT} {TARGET_PORT}', 'change accepted')
@@ -232,8 +241,13 @@ try:
     while time.monotonic() < deadline:
         assert not listening(BAD_PORT), 'wrong host key unexpectedly opened a forward'
         time.sleep(.25)
-    status = irc.command('RTUNNEL SHOW rejected', 'owner=dynamic')
-    assert 'state=backoff' in status, 'wrong host key did not produce failed-connection backoff'
+    def in_backoff():
+        status = irc.command('RTUNNEL SHOW rejected', 'owner=dynamic')
+        if 'state=backoff' in status:
+            return True
+        time.sleep(2)  # Respect the daemon's command rate limits.
+        return False
+    eventually(in_backoff, 'wrong host key produces controller backoff')
     assert (ROOT / 'sshd.log').read_text().count('Accepted publickey') == before
     assert forwarded(), 'wrong-key attempt disrupted the valid tunnel'
     irc.command('RTUNNEL DELETE rejected', 'change accepted')
@@ -246,6 +260,20 @@ try:
     eventually(forwarded, 'encrypted forward recovered after SSH server restart')
     assert processes('ssh').isdisjoint(original_clients), 'reconnect did not replace the SSH child'
     print('PASS real SSH disconnect/reconnect: new client and successful encrypted roundtrip')
+
+    # Declarative disabled state reconciles to stopped and remains stopped.
+    config.write_text(base + declarative.replace('state="enabled"', 'state="disabled"'))
+    irc.command('REHASH', 'Rehashing')
+    eventually(lambda: not processes('ssh') and not listening(FORWARD_PORT), 'rehash disabled stops forward')
+    deadline = time.monotonic() + 12
+    while time.monotonic() < deadline:
+        assert not processes('ssh') and not listening(FORWARD_PORT), 'disabled tunnel resurrected'
+        time.sleep(.25)
+    irc.command('RTUNNEL SHOW real', 'state=stopped')
+    config.write_text(base + declarative)
+    irc.command('REHASH', 'Rehashing')
+    eventually(forwarded, 'rehash enabled restores encrypted forward')
+    print('PASS declarative rehash disables without resurrection and enables recovery')
 
     irc.command('UNLOADMODULE reverse_tunnel', 'successfully unloaded')
     eventually(lambda: not processes('ssh') and not listening(FORWARD_PORT), 'unload removes SSH client and forward')

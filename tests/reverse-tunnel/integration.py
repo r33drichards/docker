@@ -126,17 +126,36 @@ try:
     # Child exit is detected and restarted, with increasing backoff.
     Path('/tmp/ssh-fail').touch()
     os.kill(dynpid, signal.SIGKILL)
-    eventually(lambda: len(events()) >= 6)
+    eventually(lambda: len(events()) >= 6, timeout=60)
     recent = events()[-3:]
     assert recent[1]['time'] - recent[0]['time'] >= .9
     assert recent[2]['time'] - recent[1]['time'] >= 1.9
     Path('/tmp/ssh-fail').unlink()
-    eventually(lambda: len(events()) >= 7)
+    eventually(lambda: len(events()) >= 7, timeout=60)
     current = events()[-1]['pid']
     user.command('RTUNNEL DELETE dyn', 'change accepted')
     eventually(lambda: not alive(current))
+    # Disabled desired state is retained but never launches a process.
+    user.command('RTUNNEL ADD paused edge 16673 6667 disabled', 'change accepted')
+    time.sleep(12)
+    assert len(events()) == 7
+    user.command('RTUNNEL SHOW paused', 'state=stopped')
+    user.command('RTUNNEL ENABLE paused', 'change accepted')
+    eventually(lambda: len(events()) == 8)
+    pausedpid = events()[-1]['pid']
+    user.command('RTUNNEL DISABLE paused', 'change accepted')
+    eventually(lambda: not alive(pausedpid))
+    # UPDATE without state preserves disabled; rehash also preserves it.
+    user.command('RTUNNEL UPDATE paused edge 16674 6667', 'change accepted')
+    user.command('REHASH', 'Rehashing')
+    time.sleep(12)
+    assert len(events()) == 8
+    user.command('RTUNNEL SHOW paused', 'state=stopped')
+    user.command('RTUNNEL DELETE paused', 'change accepted')
+    time.sleep(12)
+    assert len(events()) == 8
     user.command('RTUNNEL ADD unload edge 16673 6667', 'change accepted')
-    eventually(lambda: len(events()) >= 8)
+    eventually(lambda: len(events()) >= 9)
     current = events()[-1]['pid']
     user.command('UNLOADMODULE reverse_tunnel', 'successfully unloaded')
     eventually(lambda: not alive(current))
@@ -144,12 +163,12 @@ try:
     status = user.command('RTUNNEL LIST', 'end of list')
     assert 'owner=' not in status
     user.command('RTUNNEL ADD crash edge 16674 6667', 'change accepted')
-    eventually(lambda: len(events()) >= 9)
+    eventually(lambda: len(events()) >= 10)
     current = events()[-1]['pid']
     daemon.kill()
     daemon.wait(timeout=5)
     eventually(lambda: not alive(current))
-    print('PASS: real module CRUD, privileges, argv, atomic rehash, ownership, backoff, delete, unload, restart volatility, daemon crash cleanup')
+    print('PASS: real module CRUD, privileges, argv, atomic rehash, ownership, backoff, disable/delete no resurrection, unload, restart volatility, daemon crash cleanup')
 finally:
     if daemon.poll() is None:
         daemon.terminate()
