@@ -418,3 +418,13 @@ The V8 extension and its dependent RSS/webhook features have been removed.
 Persistent configuration, data, TLS import and bounded logging are retained.
 Read the [rollback and deployment prerequisites](docs/V8-ROLLBACK.md) before
 upgrading a deployment that used scripting or user-edited mounted configuration.
+
+## Reverse SSH tunnel management
+
+The opt-in `reverse_tunnel` module exposes declarative tunnel entries and
+privileged local `/RTUNNEL` CRUD commands submit enabled/disabled desired state
+to a background controller. It reconciles OpenSSH companions with generation
+protection and bounded backoff, using config-defined profiles and credential file
+references.
+Dynamic changes survive rehash but are memory-only across restart/unload.
+See [configuration, permissions, lifecycle and tests](docs/reverse-tunnels.md).
