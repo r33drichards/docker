@@ -9,3 +9,5 @@ trap 'exit 1' HUP INT TERM
 "$TESTDIR/test"
 docker build -t inspircd-tunnel:integration tests/reverse-tunnel
 docker run --rm --network none inspircd-tunnel:integration
+docker build -f tests/reverse-tunnel/Dockerfile.real -t inspircd-tunnel:real-forwarding tests/reverse-tunnel
+docker run --rm --network none inspircd-tunnel:real-forwarding

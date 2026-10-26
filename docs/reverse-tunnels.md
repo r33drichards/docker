@@ -139,8 +139,23 @@ It runs the real module and companion with a synthetic SSH executable under
 `docker run --network none`. It verifies permission denial, config and dynamic
 CRUD, redacted status, rehash atomicity, preservation of unchanged processes,
 reconnect delays, deletion, unload/reload volatility and daemon-crash cleanup.
-It does not use real credentials or contact SSH/IRC infrastructure. This tests the
-supervision contract, not a real encrypted data path or gateway configuration.
+The synthetic test uses no credentials or external SSH/IRC infrastructure and
+exercises the supervision contract deterministically.
+
+The same runner also builds `tests/reverse-tunnel/Dockerfile.real` and runs a
+second disposable container with `--network none` and no host mounts. This uses
+the real module, companion, OpenSSH client and OpenSSH server with fresh Ed25519
+test keys generated inside the container. It verifies encrypted bidirectional
+payload forwarding through the remote loopback listener, rejection of a wrong
+pinned server key before authentication, recovery after an SSH server disconnect
+and restart, and removal of the real SSH client and listener on unload and daemon
+crash. Only loopback is permitted to be UP; all services bind to loopback. Python
+reads only fixture public keys; OpenSSH alone opens fixture private keys. Docker
+removes the container and its keys after the test. The SSH server and temporary
+test account are present only in this test image, never in the production image.
+
+These tests cover real encrypted forwarding within an isolated network namespace;
+they do not validate a production gateway, DNS, firewall or external connectivity.
 
 ```sh
 docker build -t inspircd:testing .

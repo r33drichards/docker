@@ -1,0 +1,7 @@
+FROM inspircd:testing
+USER root
+RUN apk add --no-cache python3 openssh-server && \
+    adduser -D -s /bin/sh tunneltest && passwd -d tunneltest && \
+    mkdir -p /run/sshd
+COPY real-forwarding.py /real-forwarding.py
+ENTRYPOINT ["python3", "-u", "/real-forwarding.py"]
