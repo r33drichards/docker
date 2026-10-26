@@ -39,10 +39,19 @@ choose an existing profile and ports within its explicit inclusive ranges.
 Profile port bounds are required, remote listen ports must be 1024–65535, and
 destination/SSH ports must be 1–65535. Use the smallest useful bounds.
 
-The first version permits only IPv4/DNS destinations and SSH hosts and a fixed
-IPv4 loopback remote bind. IPv6, public binds, arbitrary SSH options, interactive
+SSH hosts support DNS names, IPv4, and bare IPv6 literals (for example,
+`host="2603:1020:1601:8::136"`). IPv6 literals are validated with `inet_pton`;
+brackets, zone IDs, embedded ports, and other non-address syntax are rejected.
+The SSH port remains the separate `port` field. Equivalent IPv6 spellings are
+normalized when detecting duplicate listeners. At a non-default SSH port, pin
+`[IPv6-address]:port` in the known-hosts file using a separately verified host key.
+No host-key trust or networking setting is changed by accepting an IPv6 literal.
+
+Forwarding destinations still permit only IPv4/DNS and the remote bind is fixed
+IPv4 loopback. IPv6 forwarding destinations, public binds, arbitrary SSH options, interactive
 authentication and dynamic profile creation are intentionally outside its API.
-Host strings are limited to 253 ASCII letters/digits/dots/hyphens; profile/tunnel
+DNS/IPv4 host strings are limited to 253 ASCII letters/digits/dots/hyphens;
+IPv6 SSH literals use the system IPv6 text-length bound; profile/tunnel
 names and SSH usernames to 32 ASCII letters/digits/underscores/hyphens (no leading
 hyphen). Absolute file references permit only letters/digits, `/`, `_`, `.`, `-`
 and at most 240 characters. `%` and `~` expansion is disallowed. There are at
@@ -198,7 +207,8 @@ The synthetic test uses no credentials or external SSH/IRC infrastructure and
 exercises the supervision contract deterministically.
 
 The same runner also builds `tests/reverse-tunnel/Dockerfile.real` and runs a
-second disposable container with `--network none` and no host mounts. This uses
+disposable containers with `--network none` and no host mounts, once with IPv4
+SSH transport (`127.0.0.1`) and once with literal IPv6 (`::1`). This uses
 the real module, companion, OpenSSH client and OpenSSH server with fresh Ed25519
 test keys generated inside the container. It verifies encrypted bidirectional
 payload forwarding through the remote loopback listener, rejection of a wrong

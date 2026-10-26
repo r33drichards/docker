@@ -1,10 +1,12 @@
 /* SPDX-License-Identifier: MIT */
 #pragma once
 #include <algorithm>
+#include <arpa/inet.h>
 #include <map>
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace reverse_tunnel
@@ -28,6 +30,26 @@ inline bool Host(const std::string& s)
 	return !s.empty() && s.size() <= 253 && s.front() != '-' && s.front() != '.' && s.back() != '.' &&
 		s.find("..") == std::string::npos && s.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-") == std::string::npos;
 }
+inline bool IPv6(const std::string& s, in6_addr& address)
+{
+	// Bare literals only: no brackets, zone IDs, ports, whitespace, or NULs.
+	return !s.empty() && s.size() < INET6_ADDRSTRLEN &&
+		s.find_first_not_of("0123456789abcdefABCDEF:.") == std::string::npos &&
+		inet_pton(AF_INET6, s.c_str(), &address) == 1;
+}
+inline bool SSHHost(const std::string& s)
+{
+	in6_addr address{};
+	return Host(s) || IPv6(s, address);
+}
+inline std::string ListenerHost(const std::string& s)
+{
+	in6_addr address{};
+	if (!IPv6(s, address)) return s;
+	char canonical[INET6_ADDRSTRLEN];
+	Require(inet_ntop(AF_INET6, &address, canonical, sizeof(canonical)) != nullptr, "invalid IPv6 SSH host");
+	return canonical;
+}
 inline bool Path(const std::string& s)
 {
 	// OpenSSH expands percent tokens and tildes in filenames; disallow both.
@@ -39,7 +61,7 @@ struct Profile
 	unsigned port = 22, listenmin = 1024, listenmax = 65535, destmin = 1, destmax = 65535;
 	void Validate() const
 	{
-		Require(Host(host) && Host(destination) && Token(user), "invalid profile host or user");
+		Require(SSHHost(host) && Host(destination) && Token(user), "invalid profile host or user");
 		Require(Path(identity) && Path(knownhosts), "invalid credential file reference");
 		Require(port > 0 && port <= 65535 && listenmin >= 1024 && listenmin <= listenmax && listenmax <= 65535 && destmin > 0 && destmin <= destmax && destmax <= 65535, "invalid profile port bounds");
 	}
@@ -62,7 +84,7 @@ inline void Validate(const Profiles& profiles, const Tunnels& tunnels)
 {
 	Require(profiles.size() <= 32 && tunnels.size() <= 32, "maximum 32 profiles and tunnels");
 	for (const auto& p : profiles) { Require(Token(p.first), "invalid profile name"); p.second.Validate(); }
-	std::set<std::string> listeners;
+	std::set<std::tuple<std::string, unsigned, unsigned>> listeners;
 	for (const auto& t : tunnels)
 	{
 		Require(Token(t.first), "invalid tunnel name");
@@ -70,11 +92,13 @@ inline void Validate(const Profiles& profiles, const Tunnels& tunnels)
 		Require(found != profiles.end(), "unknown profile");
 		const auto& p = found->second;
 		Require(t.second.listen >= p.listenmin && t.second.listen <= p.listenmax && t.second.destination >= p.destmin && t.second.destination <= p.destmax, "tunnel port outside profile bounds");
-		Require(listeners.insert(p.host + ":" + std::to_string(p.port) + ":" + std::to_string(t.second.listen)).second, "duplicate remote listener");
+		Require(listeners.emplace(ListenerHost(p.host), p.port, t.second.listen).second, "duplicate remote listener");
 	}
 }
 inline std::vector<std::string> Arguments(const Profile& p, const Tunnel& t)
 {
+	// SSH host is a separate argument; IPv6 needs no brackets here. The SSH
+	// port and user are separate flags, never host:port/user@host interpolation.
 	return {"/usr/bin/ssh", "-F", "/dev/null", "-N", "-T", "-n", "-oBatchMode=yes",
 		"-oStrictHostKeyChecking=yes", "-oUserKnownHostsFile=" + p.knownhosts,
 		"-oGlobalKnownHostsFile=/dev/null", "-oUpdateHostKeys=no", "-oVerifyHostKeyDNS=no",

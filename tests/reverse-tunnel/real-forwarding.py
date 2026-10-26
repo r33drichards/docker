@@ -13,6 +13,7 @@ import socket
 import socketserver
 import struct
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -30,6 +31,9 @@ ROOT = Path(tempfile.mkdtemp(prefix='rt-real-', dir='/tmp'))
 ROOT.chmod(0o755)
 DAEMON_UID = 10000
 DAEMON_GID = 10000
+assert sys.argv[1:] in ([], ['--ipv6']), 'only --ipv6 is supported'
+SSH_HOST = '::1' if sys.argv[1:] else '127.0.0.1'
+print(f'Testing real SSH transport over {SSH_HOST}')
 SSHD_PORT, IRC_PORT, TARGET_PORT = 2222, 16669, 16666
 FORWARD_PORT, BAD_PORT = 16675, 16676
 
@@ -43,9 +47,9 @@ def eventually(fn, label, timeout=30):
     raise AssertionError('timed out: ' + label)
 
 
-def listening(port):
+def listening(port, host='127.0.0.1'):
     try:
-        with socket.create_connection(('127.0.0.1', port), timeout=.3):
+        with socket.create_connection((host, port), timeout=.3):
             return True
     except OSError:
         return False
@@ -143,10 +147,10 @@ authfile.chmod(0o600)
 os.chown(authfile, account.pw_uid, account.pw_gid)
 for name, source in [('known-hosts', hostkey), ('wrong-known-hosts', wrongkey)]:
     public = Path(str(source) + '.pub').read_text().split()
-    (ROOT / name).write_text(f'[127.0.0.1]:{SSHD_PORT} {public[0]} {public[1]}\n')
+    (ROOT / name).write_text(f'[{SSH_HOST}]:{SSHD_PORT} {public[0]} {public[1]}\n')
 
 sshdconfig = ROOT / 'sshd.conf'
-sshdconfig.write_text(f'''ListenAddress 127.0.0.1
+sshdconfig.write_text(f'''ListenAddress {SSH_HOST}
 Port {SSHD_PORT}
 HostKey {hostkey}
 PidFile {ROOT}/sshd.pid
@@ -176,7 +180,7 @@ threading.Thread(target=backend.serve_forever, daemon=True).start()
 
 def start_sshd():
     process = subprocess.Popen(['/usr/sbin/sshd', '-D', '-e', '-f', str(sshdconfig)], stdout=sshdlog, stderr=sshdlog)
-    eventually(lambda: process.poll() is None and listening(SSHD_PORT), 'sshd listener')
+    eventually(lambda: process.poll() is None and listening(SSHD_PORT, SSH_HOST), 'sshd listener')
     return process
 
 
@@ -205,7 +209,7 @@ try:
 <oper name="admin" password="testpass" host="*@127.0.0.1" type="admin">
 '''
     for name, known in [('edge', 'known-hosts'), ('bad', 'wrong-known-hosts')]:
-        base += f'''<tunnelprofile name="{name}" host="127.0.0.1" port="{SSHD_PORT}" user="tunneltest"
+        base += f'''<tunnelprofile name="{name}" host="{SSH_HOST}" port="{SSHD_PORT}" user="tunneltest"
  identityfile="{identity}" knownhostsfile="{ROOT}/{known}" destination="127.0.0.1"
  listenmin="{FORWARD_PORT}" listenmax="{BAD_PORT}" destmin="{TARGET_PORT}" destmax="{TARGET_PORT}">
 '''
